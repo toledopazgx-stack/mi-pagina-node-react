@@ -1,0 +1,20211 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { BookOpen, Calculator, Activity, Clock } from 'lucide-react';
+
+function GravitacionSimulation() {
+  const canvasRef = useRef(null);
+  const [isRunning, setIsRunning] = useState(false);
+  const [simType, setSimType] = useState('orbital');
+  const [params, setParams] = useState({ v: 5, r: 120, M: 100 });
+  const animationRef = useRef(null);
+  const thetaRef = useRef(0);
+  const posRef = useRef({ x: 0, y: 0 });
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+
+    if (isRunning) {
+      thetaRef.current = 0;
+      const centerX = canvas.width / 2;
+      const centerY = canvas.height / 2;
+      posRef.current = { x: centerX + params.r, y: centerY };
+      
+      const animate = () => {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        if (simType === 'orbital') {
+          const omega = params.v / params.r;
+          thetaRef.current += omega * 0.05;
+          
+          const planetRadius = Math.max(20, params.M / 5);
+          
+          ctx.fillStyle = '#f59e0b';
+          ctx.shadowColor = '#f59e0b';
+          ctx.shadowBlur = 20;
+          ctx.beginPath();
+          ctx.arc(centerX, centerY, planetRadius, 0, 2 * Math.PI);
+          ctx.fill();
+          ctx.shadowBlur = 0;
+          
+          ctx.strokeStyle = '#93c5fd';
+          ctx.lineWidth = 1;
+          ctx.setLineDash([5, 5]);
+          ctx.beginPath();
+          ctx.arc(centerX, centerY, params.r, 0, 2 * Math.PI);
+          ctx.stroke();
+          ctx.setLineDash([]);
+          
+          const satX = centerX + params.r * Math.cos(thetaRef.current);
+          const satY = centerY + params.r * Math.sin(thetaRef.current);
+          
+          ctx.strokeStyle = '#6b7280';
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(centerX, centerY);
+          ctx.lineTo(satX, satY);
+          ctx.stroke();
+          
+          ctx.fillStyle = '#3b82f6';
+          ctx.beginPath();
+          ctx.arc(satX, satY, 8, 0, 2 * Math.PI);
+          ctx.fill();
+          
+          const vTangX = -params.v * Math.sin(thetaRef.current) * 5;
+          const vTangY = params.v * Math.cos(thetaRef.current) * 5;
+          
+          ctx.strokeStyle = '#10b981';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(satX, satY);
+          ctx.lineTo(satX + vTangX, satY + vTangY);
+          ctx.stroke();
+          
+          ctx.fillStyle = '#10b981';
+          ctx.beginPath();
+          ctx.moveTo(satX + vTangX, satY + vTangY);
+          ctx.lineTo(satX + vTangX - 8, satY + vTangY - 5);
+          ctx.lineTo(satX + vTangX - 5, satY + vTangY + 5);
+          ctx.fill();
+          
+          const G = 6.674e-11;
+          const Fc = params.M * Math.pow(params.v, 2) / params.r;
+          const T = 2 * Math.PI * params.r / params.v;
+          
+          ctx.fillStyle = '#1f2937';
+          ctx.font = '14px Arial';
+          ctx.fillText('Velocidad orbital: ' + params.v + ' m/s', 10, 20);
+          ctx.fillText('Radio orbital: ' + params.r + ' m', 10, 40);
+          ctx.fillText('Fuerza centrípeta: ' + Fc.toFixed(2) + ' N', 10, 60);
+          ctx.fillText('Período: ' + T.toFixed(2) + ' s', 10, 80);
+          
+        } else if (simType === 'caida') {
+          const G = 0.5;
+          const M = params.M;
+          const g = G * M / 100;
+          
+          const dt = 0.05;
+          posRef.current.y += g * dt * 50;
+          
+          const planetRadius = 50;
+          
+          ctx.fillStyle = '#3b82f6';
+          ctx.beginPath();
+          ctx.arc(centerX, canvas.height - 50, planetRadius, 0, 2 * Math.PI);
+          ctx.fill();
+          
+          ctx.fillStyle = '#ef4444';
+          ctx.beginPath();
+          ctx.arc(centerX, posRef.current.y, 10, 0, 2 * Math.PI);
+          ctx.fill();
+          
+          const distFromCenter = (canvas.height - 50 - posRef.current.y);
+          const force = G * M * 10 / Math.pow(distFromCenter / 10 + 1, 2);
+          
+          ctx.strokeStyle = '#10b981';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(centerX, posRef.current.y);
+          ctx.lineTo(centerX, posRef.current.y + force);
+          ctx.stroke();
+          
+          ctx.fillStyle = '#1f2937';
+          ctx.font = '14px Arial';
+          ctx.fillText('Masa planeta: ' + M, 10, 20);
+          ctx.fillText('Distancia: ' + distFromCenter.toFixed(2) + ' unidades', 10, 40);
+          ctx.fillText('Fuerza gravitatoria: ' + force.toFixed(2) + ' N', 10, 60);
+          
+          if (posRef.current.y >= canvas.height - 70) {
+            setIsRunning(false);
+            return;
+          }
+        }
+
+        if (thetaRef.current < 100) {
+          animationRef.current = requestAnimationFrame(animate);
+        } else {
+          setIsRunning(false);
+        }
+      };
+
+      animate();
+    }
+
+    return () => {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
+    };
+  }, [isRunning, simType, params]);
+
+  return (
+    <div className="p-8 max-w-6xl mx-auto">
+      <h2 className="text-3xl font-bold text-gray-800 mb-6">Simulación de Gravitación</h2>
+
+      <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6">
+        <p className="text-sm text-gray-700">Observa el movimiento orbital y la atracción gravitacional.</p>
+      </div>
+
+      <div className="mb-6">
+        <label className="block text-sm font-semibold text-gray-700 mb-2">Tipo de Simulación</label>
+        <select value={simType} onChange={(e) => { setSimType(e.target.value); setIsRunning(false); }} className="w-full p-3 border border-gray-300 rounded-lg">
+          <option value="orbital">Movimiento Orbital</option>
+          <option value="caida">Caída Gravitacional</option>
+        </select>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        {simType === 'orbital' && (
+          <>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Velocidad: {params.v} m/s</label>
+              <input type="range" min="2" max="10" step="0.5" value={params.v} onChange={(e) => setParams({...params, v: Number(e.target.value)})} className="w-full" disabled={isRunning} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Radio orbital: {params.r} m</label>
+              <input type="range" min="80" max="180" value={params.r} onChange={(e) => setParams({...params, r: Number(e.target.value)})} className="w-full" disabled={isRunning} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Masa planeta: {params.M}</label>
+              <input type="range" min="50" max="200" value={params.M} onChange={(e) => setParams({...params, M: Number(e.target.value)})} className="w-full" disabled={isRunning} />
+            </div>
+          </>
+        )}
+        {simType === 'caida' && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Masa planeta: {params.M}</label>
+            <input type="range" min="50" max="200" value={params.M} onChange={(e) => setParams({...params, M: Number(e.target.value)})} className="w-full" disabled={isRunning} />
+          </div>
+        )}
+      </div>
+
+      <div className="mb-6">
+        <button onClick={() => setIsRunning(!isRunning)} className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors">
+          {isRunning ? 'Detener' : 'Iniciar'}
+        </button>
+      </div>
+
+      <div className="bg-white border-2 border-gray-300 rounded-lg overflow-hidden">
+        <canvas ref={canvasRef} width={800} height={400} className="w-full" />
+      </div>
+    </div>
+  );
+}
+
+function GravitacionCalculator() {
+  const [calcType, setCalcType] = useState('fuerza');
+  const [inputs, setInputs] = useState({});
+  const [result, setResult] = useState(null);
+  const [findVariable, setFindVariable] = useState('F');
+
+  const calculateFuerza = () => {
+    const { m1, m2, r, F } = inputs;
+    const G = 6.674e-11;
+    
+    if (findVariable === 'F') {
+      const fuerza = G * parseFloat(m1) * parseFloat(m2) / Math.pow(parseFloat(r), 2);
+      setResult({ fuerzaGravitatoria: fuerza.toExponential(3) });
+    } else if (findVariable === 'r') {
+      const distancia = Math.sqrt(G * parseFloat(m1) * parseFloat(m2) / parseFloat(F));
+      setResult({ distancia: distancia.toFixed(3) });
+    } else if (findVariable === 'm1') {
+      const masa = parseFloat(F) * Math.pow(parseFloat(r), 2) / (G * parseFloat(m2));
+      setResult({ masa1: masa.toExponential(3) });
+    }
+  };
+
+  const calculateCampo = () => {
+    const { M, r } = inputs;
+    const G = 6.674e-11;
+    
+    const g = G * parseFloat(M) / Math.pow(parseFloat(r), 2);
+    setResult({ campoGravitatorio: g.toFixed(3) });
+  };
+
+  const calculateOrbital = () => {
+    const { M, r } = inputs;
+    const G = 6.674e-11;
+    
+    const v = Math.sqrt(G * parseFloat(M) / parseFloat(r));
+    const T = 2 * Math.PI * Math.sqrt(Math.pow(parseFloat(r), 3) / (G * parseFloat(M)));
+    const ve = Math.sqrt(2 * G * parseFloat(M) / parseFloat(r));
+    
+    setResult({
+      velocidadOrbital: v.toFixed(3),
+      periodoOrbital: T.toFixed(2),
+      velocidadEscape: ve.toFixed(3)
+    });
+  };
+
+  const calculateEnergia = () => {
+    const { m, M, r } = inputs;
+    const G = 6.674e-11;
+    
+    const U = -G * parseFloat(M) * parseFloat(m) / parseFloat(r);
+    const v = Math.sqrt(G * parseFloat(M) / parseFloat(r));
+    const K = 0.5 * parseFloat(m) * Math.pow(v, 2);
+    const E = K + U;
+    
+    setResult({
+      energiaPotencial: U.toExponential(3),
+      energiaCinetica: K.toExponential(3),
+      energiaTotal: E.toExponential(3)
+    });
+  };
+
+  const handleCalculate = () => {
+    if (calcType === 'fuerza') calculateFuerza();
+    else if (calcType === 'campo') calculateCampo();
+    else if (calcType === 'orbital') calculateOrbital();
+    else if (calcType === 'energia') calculateEnergia();
+  };
+
+  return (
+    <div className="p-8 max-w-4xl mx-auto">
+      <h2 className="text-3xl font-bold text-gray-800 mb-6">Calculadora de Gravitación</h2>
+
+      <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6">
+        <p className="text-sm text-gray-700">Calcula fuerza gravitatoria, órbitas y energía gravitacional.</p>
+        <p className="text-xs text-gray-600 mt-2">G = 6.674 × 10⁻¹¹ N·m²/kg²</p>
+      </div>
+
+      <div className="mb-6">
+        <label className="block text-sm font-semibold text-gray-700 mb-2">Tipo de Cálculo</label>
+        <select value={calcType} onChange={(e) => { setCalcType(e.target.value); setInputs({}); setResult(null); }} className="w-full p-3 border border-gray-300 rounded-lg">
+          <option value="fuerza">Fuerza Gravitatoria</option>
+          <option value="campo">Campo Gravitatorio</option>
+          <option value="orbital">Velocidad y Período Orbital</option>
+          <option value="energia">Energía Gravitacional</option>
+        </select>
+      </div>
+
+      {calcType === 'fuerza' && (
+        <div className="mb-6">
+          <label className="block text-sm font-semibold text-gray-700 mb-2">Variable a encontrar</label>
+          <select value={findVariable} onChange={(e) => { setFindVariable(e.target.value); setInputs({}); setResult(null); }} className="w-full p-3 border border-gray-300 rounded-lg">
+            <option value="F">Fuerza (F)</option>
+            <option value="r">Distancia (r)</option>
+            <option value="m1">Masa 1 (m₁)</option>
+          </select>
+        </div>
+      )}
+
+      <div className="bg-white border border-gray-200 rounded-lg p-6 mb-6">
+        {calcType === 'fuerza' && (
+          <div className="space-y-4">
+            {findVariable !== 'F' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Fuerza F (N)</label>
+                <input type="number" step="any" value={inputs.F || ''} onChange={(e) => setInputs({...inputs, F: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+              </div>
+            )}
+            {findVariable !== 'm1' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Masa 1 (kg)</label>
+                <input type="number" step="any" value={inputs.m1 || ''} onChange={(e) => setInputs({...inputs, m1: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" placeholder="Ej: 5.972e24 (Tierra)" />
+              </div>
+            )}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Masa 2 (kg)</label>
+              <input type="number" step="any" value={inputs.m2 || ''} onChange={(e) => setInputs({...inputs, m2: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+            </div>
+            {findVariable !== 'r' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Distancia r (m)</label>
+                <input type="number" step="any" value={inputs.r || ''} onChange={(e) => setInputs({...inputs, r: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+              </div>
+            )}
+          </div>
+        )}
+
+        {calcType === 'campo' && (
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Masa M (kg)</label>
+              <input type="number" step="any" value={inputs.M || ''} onChange={(e) => setInputs({...inputs, M: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" placeholder="Ej: 5.972e24 (Tierra)" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Distancia r (m)</label>
+              <input type="number" step="any" value={inputs.r || ''} onChange={(e) => setInputs({...inputs, r: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" placeholder="Ej: 6.371e6 (Radio Tierra)" />
+            </div>
+          </div>
+        )}
+
+        {calcType === 'orbital' && (
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Masa del cuerpo central M (kg)</label>
+              <input type="number" step="any" value={inputs.M || ''} onChange={(e) => setInputs({...inputs, M: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" placeholder="Ej: 5.972e24 (Tierra)" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Radio orbital r (m)</label>
+              <input type="number" step="any" value={inputs.r || ''} onChange={(e) => setInputs({...inputs, r: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" placeholder="Ej: 4.2164e7 (Órbita geoestacionaria)" />
+            </div>
+          </div>
+        )}
+
+        {calcType === 'energia' && (
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Masa del satélite m (kg)</label>
+              <input type="number" step="any" value={inputs.m || ''} onChange={(e) => setInputs({...inputs, m: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Masa del planeta M (kg)</label>
+              <input type="number" step="any" value={inputs.M || ''} onChange={(e) => setInputs({...inputs, M: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" placeholder="Ej: 5.972e24 (Tierra)" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Distancia r (m)</label>
+              <input type="number" step="any" value={inputs.r || ''} onChange={(e) => setInputs({...inputs, r: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+            </div>
+          </div>
+        )}
+
+        <button onClick={handleCalculate} className="mt-6 w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors">
+          Calcular
+        </button>
+      </div>
+
+      {result && (
+        <div className="bg-green-50 border border-green-200 rounded-lg p-6">
+          <h3 className="text-xl font-bold text-gray-800 mb-4">Resultados</h3>
+          <div className="space-y-2">
+            {Object.entries(result).map(([key, value]) => (
+              <div key={key} className="flex justify-between items-center py-2 border-b border-green-100">
+                <span className="font-medium text-gray-700 capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}:</span>
+                <span className="text-lg font-semibold text-gray-900">{value}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}function MomentumCalculator() {
+  const [calcType, setCalcType] = useState('colision_elastica');
+  const [inputs, setInputs] = useState({});
+  const [result, setResult] = useState(null);
+
+  const calculateColisionElastica = () => {
+    const { m1, m2, v1i, v2i } = inputs;
+    const m1n = parseFloat(m1);
+    const m2n = parseFloat(m2);
+    const v1in = parseFloat(v1i);
+    const v2in = parseFloat(v2i);
+    
+    const v1f = ((m1n - m2n) * v1in + 2 * m2n * v2in) / (m1n + m2n);
+    const v2f = ((m2n - m1n) * v2in + 2 * m1n * v1in) / (m1n + m2n);
+    
+    const pi = m1n * v1in + m2n * v2in;
+    const pf = m1n * v1f + m2n * v2f;
+    const Ki = 0.5 * m1n * Math.pow(v1in, 2) + 0.5 * m2n * Math.pow(v2in, 2);
+    const Kf = 0.5 * m1n * Math.pow(v1f, 2) + 0.5 * m2n * Math.pow(v2f, 2);
+    
+    setResult({
+      velocidadFinal1: v1f.toFixed(3),
+      velocidadFinal2: v2f.toFixed(3),
+      momentumInicial: pi.toFixed(3),
+      momentumFinal: pf.toFixed(3),
+      energiaInicial: Ki.toFixed(3),
+      energiaFinal: Kf.toFixed(3)
+    });
+  };
+
+  const calculateColisionInelastica = () => {
+    const { m1, m2, v1i, v2i } = inputs;
+    const m1n = parseFloat(m1);
+    const m2n = parseFloat(m2);
+    const v1in = parseFloat(v1i);
+    const v2in = parseFloat(v2i);
+    
+    const vf = (m1n * v1in + m2n * v2in) / (m1n + m2n);
+    
+    const pi = m1n * v1in + m2n * v2in;
+    const pf = (m1n + m2n) * vf;
+    const Ki = 0.5 * m1n * Math.pow(v1in, 2) + 0.5 * m2n * Math.pow(v2in, 2);
+    const Kf = 0.5 * (m1n + m2n) * Math.pow(vf, 2);
+    const energiaPerdida = Ki - Kf;
+    
+    setResult({
+      velocidadFinalCombinada: vf.toFixed(3),
+      momentumInicial: pi.toFixed(3),
+      momentumFinal: pf.toFixed(3),
+      energiaInicial: Ki.toFixed(3),
+      energiaFinal: Kf.toFixed(3),
+      energiaPerdida: energiaPerdida.toFixed(3)
+    });
+  };
+
+  const calculateImpulso = () => {
+    const { F, t, m, v1, v2 } = inputs;
+    
+    if (F && t) {
+      const impulso = parseFloat(F) * parseFloat(t);
+      const deltaV = impulso / parseFloat(m);
+      setResult({
+        impulso: impulso.toFixed(3),
+        cambioVelocidad: deltaV.toFixed(3)
+      });
+    } else if (m && v1 && v2) {
+      const impulso = parseFloat(m) * (parseFloat(v2) - parseFloat(v1));
+      const fuerzaPromedio = impulso / parseFloat(t || 1);
+      setResult({
+        impulso: impulso.toFixed(3),
+        fuerzaPromedio: fuerzaPromedio.toFixed(3)
+      });
+    }
+  };
+
+  const handleCalculate = () => {
+    if (calcType === 'colision_elastica') calculateColisionElastica();
+    else if (calcType === 'colision_inelastica') calculateColisionInelastica();
+    else if (calcType === 'impulso') calculateImpulso();
+  };
+
+  return (
+    <div className="p-8 max-w-4xl mx-auto">
+      <h2 className="text-3xl font-bold text-gray-800 mb-6">Calculadora de Cantidad de Movimiento</h2>
+
+      <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6">
+        <p className="text-sm text-gray-700">Calcula colisiones elásticas, inelásticas e impulso.</p>
+      </div>
+
+      <div className="mb-6">
+        <label className="block text-sm font-semibold text-gray-700 mb-2">Tipo de Cálculo</label>
+        <select value={calcType} onChange={(e) => { setCalcType(e.target.value); setInputs({}); setResult(null); }} className="w-full p-3 border border-gray-300 rounded-lg">
+          <option value="colision_elastica">Colisión Elástica</option>
+          <option value="colision_inelastica">Colisión Perfectamente Inelástica</option>
+          <option value="impulso">Impulso y Momentum</option>
+        </select>
+      </div>
+
+      <div className="bg-white border border-gray-200 rounded-lg p-6 mb-6">
+        {(calcType === 'colision_elastica' || calcType === 'colision_inelastica') && (
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Masa 1 (kg)</label>
+              <input type="number" step="any" value={inputs.m1 || ''} onChange={(e) => setInputs({...inputs, m1: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Masa 2 (kg)</label>
+              <input type="number" step="any" value={inputs.m2 || ''} onChange={(e) => setInputs({...inputs, m2: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Velocidad inicial 1 (m/s)</label>
+              <input type="number" step="any" value={inputs.v1i || ''} onChange={(e) => setInputs({...inputs, v1i: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Velocidad inicial 2 (m/s)</label>
+              <input type="number" step="any" value={inputs.v2i || ''} onChange={(e) => setInputs({...inputs, v2i: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" placeholder="0" />
+            </div>
+          </div>
+        )}
+
+        {calcType === 'impulso' && (
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Masa m (kg)</label>
+              <input type="number" step="any" value={inputs.m || ''} onChange={(e) => setInputs({...inputs, m: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Fuerza F (N) - Opcional</label>
+              <input type="number" step="any" value={inputs.F || ''} onChange={(e) => setInputs({...inputs, F: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Tiempo t (s)</label>
+              <input type="number" step="any" value={inputs.t || ''} onChange={(e) => setInputs({...inputs, t: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Velocidad inicial v₁ (m/s) - Opcional</label>
+              <input type="number" step="any" value={inputs.v1 || ''} onChange={(e) => setInputs({...inputs, v1: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Velocidad final v₂ (m/s) - Opcional</label>
+              <input type="number" step="any" value={inputs.v2 || ''} onChange={(e) => setInputs({...inputs, v2: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+            </div>
+          </div>
+        )}
+
+        <button onClick={handleCalculate} className="mt-6 w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors">
+          Calcular
+        </button>
+      </div>
+
+      {result && (
+        <div className="bg-green-50 border border-green-200 rounded-lg p-6">
+          <h3 className="text-xl font-bold text-gray-800 mb-4">Resultados</h3>
+          <div className="space-y-2">
+            {Object.entries(result).map(([key, value]) => (
+              <div key={key} className="flex justify-between items-center py-2 border-b border-green-100">
+                <span className="font-medium text-gray-700 capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}:</span>
+                <span className="text-lg font-semibold text-gray-900">{value}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}function TrabajoSimulation() {
+  const canvasRef = useRef(null);
+  const [isRunning, setIsRunning] = useState(false);
+  const [params, setParams] = useState({ F: 30, m: 5, angle: 20 });
+  const animationRef = useRef(null);
+  const posRef = useRef(50);
+  const velRef = useRef(0);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+
+    if (isRunning) {
+      posRef.current = 50;
+      velRef.current = 0;
+      let trabajo = 0;
+      
+      const animate = () => {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        const angleRad = params.angle * Math.PI / 180;
+        const Fx = params.F * Math.cos(angleRad);
+        const a = Fx / params.m;
+        
+        velRef.current += a * 0.05;
+        const deltaPos = velRef.current * 0.05;
+        posRef.current += deltaPos * 10;
+        trabajo += Fx * deltaPos;
+        
+        const x = posRef.current;
+        
+        ctx.fillStyle = '#374151';
+        ctx.fillRect(0, canvas.height - 50, canvas.width, 50);
+        
+        ctx.fillStyle = '#3b82f6';
+        ctx.fillRect(x, canvas.height - 90, 40, 40);
+        
+        ctx.strokeStyle = '#ef4444';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(x + 20, canvas.height - 70);
+        const endX = x + 20 + params.F * Math.cos(angleRad) * 2;
+        const endY = canvas.height - 70 - params.F * Math.sin(angleRad) * 2;
+        ctx.lineTo(endX, endY);
+        ctx.stroke();
+        
+        ctx.fillStyle = '#ef4444';
+        ctx.beginPath();
+        ctx.moveTo(endX, endY);
+        ctx.lineTo(endX - 10, endY + 5);
+        ctx.lineTo(endX - 10, endY - 5);
+        ctx.fill();
+        
+        const K = 0.5 * params.m * Math.pow(velRef.current, 2);
+        
+        ctx.fillStyle = '#1f2937';
+        ctx.font = '14px Arial';
+        ctx.fillText('Trabajo: ' + trabajo.toFixed(2) + ' J', 10, 20);
+        ctx.fillText('Energía Cinética: ' + K.toFixed(2) + ' J', 10, 40);
+        ctx.fillText('Velocidad: ' + velRef.current.toFixed(2) + ' m/s', 10, 60);
+        ctx.fillText('F = ' + params.F + ' N', 10, 80);
+        ctx.fillText('Ángulo: ' + params.angle + '°', 10, 100);
+        
+        if (x < canvas.width - 50) {
+          animationRef.current = requestAnimationFrame(animate);
+        } else {
+          setIsRunning(false);
+        }
+      };
+
+      animate();
+    }
+
+    return () => {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
+    };
+  }, [isRunning, params]);
+
+  return (
+    <div className="p-8 max-w-6xl mx-auto">
+      <h2 className="text-3xl font-bold text-gray-800 mb-6">Simulación de Trabajo y Energía</h2>
+
+      <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6">
+        <p className="text-sm text-gray-700">Visualiza cómo el trabajo realizado se transforma en energía cinética.</p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Fuerza: {params.F} N</label>
+          <input type="range" min="10" max="60" value={params.F} onChange={(e) => setParams({...params, F: Number(e.target.value)})} className="w-full" disabled={isRunning} />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Masa: {params.m} kg</label>
+          <input type="range" min="1" max="20" value={params.m} onChange={(e) => setParams({...params, m: Number(e.target.value)})} className="w-full" disabled={isRunning} />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Ángulo: {params.angle}°</label>
+          <input type="range" min="0" max="60" value={params.angle} onChange={(e) => setParams({...params, angle: Number(e.target.value)})} className="w-full" disabled={isRunning} />
+        </div>
+      </div>
+
+      <div className="mb-6">
+        <button onClick={() => setIsRunning(!isRunning)} className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors">
+          {isRunning ? 'Detener' : 'Iniciar'}
+        </button>
+      </div>
+
+      <div className="bg-white border-2 border-gray-300 rounded-lg overflow-hidden">
+        <canvas ref={canvasRef} width={800} height={400} className="w-full" />
+      </div>
+    </div>
+  );
+}
+
+function ConservacionCalculator() {
+  const [calcType, setCalcType] = useState('pendulo');
+  const [inputs, setInputs] = useState({});
+  const [result, setResult] = useState(null);
+
+  const calculatePendulo = () => {
+    const { m, h, v } = inputs;
+    const g = 9.81;
+    
+    if (h && !v) {
+      const velocidad = Math.sqrt(2 * g * parseFloat(h));
+      const K = 0.5 * parseFloat(m) * Math.pow(velocidad, 2);
+      const U = parseFloat(m) * g * parseFloat(h);
+      setResult({
+        velocidadFinal: velocidad.toFixed(3),
+        energiaCineticaInicial: '0.000',
+        energiaPotencialInicial: U.toFixed(3),
+        energiaCineticaFinal: K.toFixed(3),
+        energiaPotencialFinal: '0.000',
+        energiaTotal: U.toFixed(3)
+      });
+    } else if (v && !h) {
+      const altura = Math.pow(parseFloat(v), 2) / (2 * g);
+      const K = 0.5 * parseFloat(m) * Math.pow(parseFloat(v), 2);
+      const U = parseFloat(m) * g * altura;
+      setResult({
+        alturaMaxima: altura.toFixed(3),
+        energiaCineticaInicial: K.toFixed(3),
+        energiaPotencialInicial: '0.000',
+        energiaCineticaFinal: '0.000',
+        energiaPotencialFinal: U.toFixed(3),
+        energiaTotal: K.toFixed(3)
+      });
+    }
+  };
+
+  const calculateResorte = () => {
+    const { m, k, x, v } = inputs;
+    
+    if (x && !v) {
+      const velocidad = Math.sqrt((parseFloat(k) / parseFloat(m))) * parseFloat(x);
+      const Ue = 0.5 * parseFloat(k) * Math.pow(parseFloat(x), 2);
+      const K = 0.5 * parseFloat(m) * Math.pow(velocidad, 2);
+      setResult({
+        velocidadMaxima: velocidad.toFixed(3),
+        energiaElastica: Ue.toFixed(3),
+        energiaCineticaMaxima: K.toFixed(3),
+        energiaTotal: Ue.toFixed(3)
+      });
+    } else if (v && !x) {
+      const deformacion = parseFloat(v) * Math.sqrt(parseFloat(m) / parseFloat(k));
+      const K = 0.5 * parseFloat(m) * Math.pow(parseFloat(v), 2);
+      const Ue = 0.5 * parseFloat(k) * Math.pow(deformacion, 2);
+      setResult({
+        deformacionMaxima: deformacion.toFixed(3),
+        energiaCinetica: K.toFixed(3),
+        energiaElasticaMaxima: Ue.toFixed(3),
+        energiaTotal: K.toFixed(3)
+      });
+    }
+  };
+
+  const calculateCaidaLibre = () => {
+    const { m, h1, h2 } = inputs;
+    const g = 9.81;
+    
+    const U1 = parseFloat(m) * g * parseFloat(h1);
+    const U2 = parseFloat(m) * g * parseFloat(h2 || 0);
+    const K2 = U1 - U2;
+    const v2 = Math.sqrt(2 * K2 / parseFloat(m));
+    
+    setResult({
+      energiaPotencialInicial: U1.toFixed(3),
+      energiaPotencialFinal: U2.toFixed(3),
+      energiaCineticaFinal: K2.toFixed(3),
+      velocidadFinal: v2.toFixed(3),
+      energiaTotal: U1.toFixed(3)
+    });
+  };
+
+  const handleCalculate = () => {
+    if (calcType === 'pendulo') calculatePendulo();
+    else if (calcType === 'resorte') calculateResorte();
+    else if (calcType === 'caida') calculateCaidaLibre();
+  };
+
+  return (
+    <div className="p-8 max-w-4xl mx-auto">
+      <h2 className="text-3xl font-bold text-gray-800 mb-6">Calculadora de Conservación de Energía</h2>
+
+      <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6">
+        <p className="text-sm text-gray-700">Aplica el principio de conservación de energía en diferentes sistemas.</p>
+      </div>
+
+      <div className="mb-6">
+        <label className="block text-sm font-semibold text-gray-700 mb-2">Tipo de Sistema</label>
+        <select value={calcType} onChange={(e) => { setCalcType(e.target.value); setInputs({}); setResult(null); }} className="w-full p-3 border border-gray-300 rounded-lg">
+          <option value="pendulo">Péndulo Simple</option>
+          <option value="resorte">Sistema Masa-Resorte</option>
+          <option value="caida">Caída Libre</option>
+        </select>
+      </div>
+
+      <div className="bg-white border border-gray-200 rounded-lg p-6 mb-6">
+        {calcType === 'pendulo' && (
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Masa m (kg)</label>
+              <input type="number" step="any" value={inputs.m || ''} onChange={(e) => setInputs({...inputs, m: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Altura inicial h (m) - Para calcular velocidad</label>
+              <input type="number" step="any" value={inputs.h || ''} onChange={(e) => setInputs({...inputs, h: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Velocidad inicial v (m/s) - Para calcular altura</label>
+              <input type="number" step="any" value={inputs.v || ''} onChange={(e) => setInputs({...inputs, v: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+            </div>
+            <p className="text-sm text-gray-500 italic">Complete solo uno: altura O velocidad</p>
+          </div>
+        )}
+
+        {calcType === 'resorte' && (
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Masa m (kg)</label>
+              <input type="number" step="any" value={inputs.m || ''} onChange={(e) => setInputs({...inputs, m: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Constante elástica k (N/m)</label>
+              <input type="number" step="any" value={inputs.k || ''} onChange={(e) => setInputs({...inputs, k: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Deformación x (m) - Para calcular velocidad</label>
+              <input type="number" step="any" value={inputs.x || ''} onChange={(e) => setInputs({...inputs, x: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Velocidad v (m/s) - Para calcular deformación</label>
+              <input type="number" step="any" value={inputs.v || ''} onChange={(e) => setInputs({...inputs, v: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+            </div>
+            <p className="text-sm text-gray-500 italic">Complete solo uno: deformación O velocidad</p>
+          </div>
+        )}
+
+        {calcType === 'caida' && (
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Masa m (kg)</label>
+              <input type="number" step="any" value={inputs.m || ''} onChange={(e) => setInputs({...inputs, m: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Altura inicial h₁ (m)</label>
+              <input type="number" step="any" value={inputs.h1 || ''} onChange={(e) => setInputs({...inputs, h1: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Altura final h₂ (m)</label>
+              <input type="number" step="any" value={inputs.h2 || ''} onChange={(e) => setInputs({...inputs, h2: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" placeholder="0" />
+            </div>
+          </div>
+        )}
+
+        <button onClick={handleCalculate} className="mt-6 w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors">
+          Calcular
+        </button>
+      </div>
+
+      {result && (
+        <div className="bg-green-50 border border-green-200 rounded-lg p-6">
+          <h3 className="text-xl font-bold text-gray-800 mb-4">Resultados</h3>
+          <div className="space-y-2">
+            {Object.entries(result).map(([key, value]) => (
+              <div key={key} className="flex justify-between items-center py-2 border-b border-green-100">
+                <span className="font-medium text-gray-700 capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}:</span>
+                <span className="text-lg font-semibold text-gray-900">{value}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ConservacionSimulation() {
+  const canvasRef = useRef(null);
+  const [isRunning, setIsRunning] = useState(false);
+  const [simType, setSimType] = useState('pendulo');
+  const [params, setParams] = useState({ h: 5, k: 50, m: 2 });
+  const animationRef = useRef(null);
+  const timeRef = useRef(0);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+
+    if (isRunning) {
+      timeRef.current = 0;
+      
+      const animate = () => {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        const t = timeRef.current;
+        let shouldContinue = true;
+
+        if (simType === 'pendulo') {
+          const L = 150;
+          const g = 9.81;
+          const theta0 = (params.h / L) * 2;
+          const omega = Math.sqrt(g / L);
+          const theta = theta0 * Math.cos(omega * t);
+          
+          const pivotX = canvas.width / 2;
+          const pivotY = 100;
+          const bobX = pivotX + L * Math.sin(theta);
+          const bobY = pivotY + L * Math.cos(theta);
+          
+          ctx.strokeStyle = '#6b7280';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(pivotX, pivotY);
+          ctx.lineTo(bobX, bobY);
+          ctx.stroke();
+          
+          ctx.fillStyle = '#374151';
+          ctx.beginPath();
+          ctx.arc(pivotX, pivotY, 8, 0, 2 * Math.PI);
+          ctx.fill();
+          
+          ctx.fillStyle = '#3b82f6';
+          ctx.beginPath();
+          ctx.arc(bobX, bobY, 20, 0, 2 * Math.PI);
+          ctx.fill();
+          
+          const h = L * (1 - Math.cos(theta));
+          const v = L * omega * theta0 * Math.sin(omega * t);
+          const U = params.m * g * h;
+          const K = 0.5 * params.m * Math.pow(v, 2);
+          const E = U + K;
+          
+          ctx.fillStyle = '#1f2937';
+          ctx.font = '14px Arial';
+          ctx.fillText('Energía Potencial: ' + U.toFixed(2) + ' J', 10, 20);
+          ctx.fillText('Energía Cinética: ' + K.toFixed(2) + ' J', 10, 40);
+          ctx.fillText('Energía Total: ' + E.toFixed(2) + ' J', 10, 60);
+          ctx.fillText('Altura: ' + h.toFixed(2) + ' m', 10, 80);
+          
+          ctx.strokeStyle = '#d1d5db';
+          ctx.setLineDash([5, 5]);
+          ctx.beginPath();
+          ctx.moveTo(0, pivotY + L);
+          ctx.lineTo(canvas.width, pivotY + L);
+          ctx.stroke();
+          ctx.setLineDash([]);
+          
+          if (t > 15) shouldContinue = false;
+          
+        } else if (simType === 'resorte') {
+          const centerY = canvas.height / 2;
+          const A = params.h * 20;
+          const omega = Math.sqrt(params.k / params.m);
+          const x = A * Math.cos(omega * t);
+          
+          const blockX = canvas.width / 2 + x;
+          
+          ctx.strokeStyle = '#6b7280';
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.moveTo(50, centerY);
+          
+          const coils = 15;
+          const coilWidth = (blockX - 50) / coils;
+          for (let i = 0; i < coils; i++) {
+            const x1 = 50 + i * coilWidth;
+            const x2 = 50 + (i + 0.5) * coilWidth;
+            const x3 = 50 + (i + 1) * coilWidth;
+            ctx.lineTo(x1, centerY);
+            ctx.lineTo(x2, centerY - 10);
+            ctx.lineTo(x3, centerY);
+          }
+          ctx.stroke();
+          
+          ctx.fillStyle = '#3b82f6';
+          ctx.fillRect(blockX - 20, centerY - 20, 40, 40);
+          
+          const v = -A * omega * Math.sin(omega * t);
+          const K = 0.5 * params.m * Math.pow(v, 2);
+          const U = 0.5 * params.k * Math.pow(x / 100, 2);
+          const E = K + U;
+          
+          ctx.fillStyle = '#1f2937';
+          ctx.font = '14px Arial';
+          ctx.fillText('Energía Cinética: ' + K.toFixed(2) + ' J', 10, 20);
+          ctx.fillText('Energía Elástica: ' + U.toFixed(2) + ' J', 10, 40);
+          ctx.fillText('Energía Total: ' + E.toFixed(2) + ' J', 10, 60);
+          ctx.fillText('Deformación: ' + (x / 100).toFixed(3) + ' m', 10, 80);
+          
+          if (t > 10) shouldContinue = false;
+          
+        } else if (simType === 'caida') {
+          const g = 9.81;
+          const h0 = params.h * 30;
+          const y0 = 100;
+          const h = h0 - 0.5 * g * t * t * 30;
+          
+          if (h > 0) {
+            const ballY = y0 + (h0 - h);
+            
+            ctx.strokeStyle = '#d1d5db';
+            ctx.setLineDash([5, 5]);
+            ctx.beginPath();
+            ctx.moveTo(0, y0);
+            ctx.lineTo(canvas.width, y0);
+            ctx.stroke();
+            ctx.setLineDash([]);
+            
+            ctx.strokeStyle = '#d1d5db';
+            ctx.setLineDash([5, 5]);
+            ctx.beginPath();
+            ctx.moveTo(0, y0 + h0);
+            ctx.lineTo(canvas.width, y0 + h0);
+            ctx.stroke();
+            ctx.setLineDash([]);
+            
+            ctx.fillStyle = '#3b82f6';
+            ctx.beginPath();
+            ctx.arc(canvas.width / 2, ballY, 15, 0, 2 * Math.PI);
+            ctx.fill();
+            
+            const hMeters = h / 30;
+            const v = g * t;
+            const U = params.m * g * hMeters;
+            const K = 0.5 * params.m * Math.pow(v, 2);
+            const E = U + K;
+            
+            ctx.fillStyle = '#1f2937';
+            ctx.font = '14px Arial';
+            ctx.fillText('Altura: ' + hMeters.toFixed(2) + ' m', 10, 20);
+            ctx.fillText('Velocidad: ' + v.toFixed(2) + ' m/s', 10, 40);
+            ctx.fillText('E. Potencial: ' + U.toFixed(2) + ' J', 10, 60);
+            ctx.fillText('E. Cinética: ' + K.toFixed(2) + ' J', 10, 80);
+            ctx.fillText('E. Total: ' + E.toFixed(2) + ' J', 10, 100);
+          } else {
+            shouldContinue = false;
+          }
+        }
+
+        timeRef.current += 0.05;
+
+        if (shouldContinue) {
+          animationRef.current = requestAnimationFrame(animate);
+        } else {
+          setIsRunning(false);
+        }
+      };
+
+      animate();
+    }
+
+    return () => {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
+    };
+  }, [isRunning, simType, params]);
+
+  return (
+    <div className="p-8 max-w-6xl mx-auto">
+      <h2 className="text-3xl font-bold text-gray-800 mb-6">Simulación de Conservación de Energía</h2>
+
+      <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6">
+        <p className="text-sm text-gray-700">Observa cómo se conserva la energía en diferentes sistemas.</p>
+      </div>
+
+      <div className="mb-6">
+        <label className="block text-sm font-semibold text-gray-700 mb-2">Tipo de Sistema</label>
+        <select value={simType} onChange={(e) => { setSimType(e.target.value); setIsRunning(false); }} className="w-full p-3 border border-gray-300 rounded-lg">
+          <option value="pendulo">Péndulo Simple</option>
+          <option value="resorte">Sistema Masa-Resorte</option>
+          <option value="caida">Caída Libre</option>
+        </select>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        {simType === 'pendulo' && (
+          <>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Amplitud: {params.h}</label>
+              <input type="range" min="1" max="10" value={params.h} onChange={(e) => setParams({...params, h: Number(e.target.value)})} className="w-full" disabled={isRunning} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Masa: {params.m} kg</label>
+              <input type="range" min="1" max="10" value={params.m} onChange={(e) => setParams({...params, m: Number(e.target.value)})} className="w-full" disabled={isRunning} />
+            </div>
+          </>
+        )}
+        {simType === 'resorte' && (
+          <>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Amplitud: {params.h}</label>
+              <input type="range" min="1" max="10" value={params.h} onChange={(e) => setParams({...params, h: Number(e.target.value)})} className="w-full" disabled={isRunning} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Constante k: {params.k} N/m</label>
+              <input type="range" min="10" max="100" value={params.k} onChange={(e) => setParams({...params, k: Number(e.target.value)})} className="w-full" disabled={isRunning} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Masa: {params.m} kg</label>
+              <input type="range" min="1" max="10" value={params.m} onChange={(e) => setParams({...params, m: Number(e.target.value)})} className="w-full" disabled={isRunning} />
+            </div>
+          </>
+        )}
+        {simType === 'caida' && (
+          <>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Altura inicial: {params.h} m</label>
+              <input type="range" min="2" max="10" value={params.h} onChange={(e) => setParams({...params, h: Number(e.target.value)})} className="w-full" disabled={isRunning} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Masa: {params.m} kg</label>
+              <input type="range" min="1" max="10" value={params.m} onChange={(e) => setParams({...params, m: Number(e.target.value)})} className="w-full" disabled={isRunning} />
+            </div>
+          </>
+        )}
+        <div className="flex items-end">
+          <button onClick={() => setIsRunning(!isRunning)} className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors">
+            {isRunning ? 'Detener' : 'Iniciar'}
+          </button>
+        </div>
+      </div>
+
+      <div className="bg-white border-2 border-gray-300 rounded-lg overflow-hidden">
+        <canvas ref={canvasRef} width={800} height={400} className="w-full" />
+      </div>
+    </div>
+  );
+}
+
+function MomentumCalculador() {
+  return (
+    <div className="p-8">
+      <h2 className="text-3xl font-bold text-gray-800 mb-6">Calculadora de Momentum</h2>
+      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6">
+        <p className="text-yellow-800">Calculadora en desarrollo</p>
+      </div>
+    </div>
+  );
+}
+
+function MomentumSimulation() {
+  const canvasRef = useRef(null);
+  const [isRunning, setIsRunning] = useState(false);
+  const [simType, setSimType] = useState('elastica');
+  const [params, setParams] = useState({ m1: 5, m2: 5, v1: 8, v2: 0 });
+  const animationRef = useRef(null);
+  const pos1Ref = useRef(100);
+  const pos2Ref = useRef(500);
+  const vel1Ref = useRef(0);
+  const vel2Ref = useRef(0);
+  const collisionRef = useRef(false);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+
+    if (isRunning) {
+      pos1Ref.current = 100;
+      pos2Ref.current = 500;
+      vel1Ref.current = params.v1;
+      vel2Ref.current = params.v2;
+      collisionRef.current = false;
+      
+      const animate = () => {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        ctx.fillStyle = '#374151';
+        ctx.fillRect(0, canvas.height - 50, canvas.width, 50);
+        
+        if (!collisionRef.current && pos1Ref.current + 30 >= pos2Ref.current - 30) {
+          collisionRef.current = true;
+          
+          if (simType === 'elastica') {
+            const v1f = ((params.m1 - params.m2) * vel1Ref.current + 2 * params.m2 * vel2Ref.current) / (params.m1 + params.m2);
+            const v2f = ((params.m2 - params.m1) * vel2Ref.current + 2 * params.m1 * vel1Ref.current) / (params.m1 + params.m2);
+            vel1Ref.current = v1f;
+            vel2Ref.current = v2f;
+          } else {
+            const vf = (params.m1 * vel1Ref.current + params.m2 * vel2Ref.current) / (params.m1 + params.m2);
+            vel1Ref.current = vf;
+            vel2Ref.current = vf;
+          }
+        }
+        
+        pos1Ref.current += vel1Ref.current * 2;
+        pos2Ref.current += vel2Ref.current * 2;
+        
+        const size1 = 20 + params.m1 * 2;
+        const size2 = 20 + params.m2 * 2;
+        
+        ctx.fillStyle = '#3b82f6';
+        ctx.fillRect(pos1Ref.current - size1/2, canvas.height - 70 - size1/2, size1, size1);
+        
+        ctx.fillStyle = '#ef4444';
+        ctx.fillRect(pos2Ref.current - size2/2, canvas.height - 70 - size2/2, size2, size2);
+        
+        const p1 = params.m1 * vel1Ref.current;
+        const p2 = params.m2 * vel2Ref.current;
+        const pTotal = p1 + p2;
+        
+        ctx.fillStyle = '#1f2937';
+        ctx.font = '14px Arial';
+        ctx.fillText('Objeto 1: m=' + params.m1 + ' kg, v=' + vel1Ref.current.toFixed(2) + ' m/s', 10, 20);
+        ctx.fillText('Objeto 2: m=' + params.m2 + ' kg, v=' + vel2Ref.current.toFixed(2) + ' m/s', 10, 40);
+        ctx.fillText('Momentum total: ' + pTotal.toFixed(2) + ' kg·m/s', 10, 60);
+        ctx.fillText(collisionRef.current ? 'Colisión ocurrida' : 'Antes de colisión', 10, 80);
+        
+        if (pos1Ref.current < canvas.width && pos2Ref.current < canvas.width && pos1Ref.current > 0) {
+          animationRef.current = requestAnimationFrame(animate);
+        } else {
+          setIsRunning(false);
+        }
+      };
+
+      animate();
+    }
+
+    return () => {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
+    };
+  }, [isRunning, simType, params]);
+
+  return (
+    <div className="p-8 max-w-6xl mx-auto">
+      <h2 className="text-3xl font-bold text-gray-800 mb-6">Simulación de Colisiones</h2>
+
+      <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6">
+        <p className="text-sm text-gray-700">Observa la conservación del momentum en colisiones.</p>
+      </div>
+
+      <div className="mb-6">
+        <label className="block text-sm font-semibold text-gray-700 mb-2">Tipo de Colisión</label>
+        <select value={simType} onChange={(e) => { setSimType(e.target.value); setIsRunning(false); }} className="w-full p-3 border border-gray-300 rounded-lg">
+          <option value="elastica">Colisión Elástica</option>
+          <option value="inelastica">Colisión Perfectamente Inelástica</option>
+        </select>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Masa 1: {params.m1} kg</label>
+          <input type="range" min="1" max="10" value={params.m1} onChange={(e) => setParams({...params, m1: Number(e.target.value)})} className="w-full" disabled={isRunning} />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Masa 2: {params.m2} kg</label>
+          <input type="range" min="1" max="10" value={params.m2} onChange={(e) => setParams({...params, m2: Number(e.target.value)})} className="w-full" disabled={isRunning} />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Velocidad 1: {params.v1} m/s</label>
+          <input type="range" min="2" max="15" value={params.v1} onChange={(e) => setParams({...params, v1: Number(e.target.value)})} className="w-full" disabled={isRunning} />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Velocidad 2: {params.v2} m/s</label>
+          <input type="range" min="-5" max="5" value={params.v2} onChange={(e) => setParams({...params, v2: Number(e.target.value)})} className="w-full" disabled={isRunning} />
+        </div>
+      </div>
+
+      <div className="mb-6">
+        <button onClick={() => setIsRunning(!isRunning)} className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors">
+          {isRunning ? 'Detener' : 'Iniciar'}
+        </button>
+      </div>
+
+      <div className="bg-white border-2 border-gray-300 rounded-lg overflow-hidden">
+        <canvas ref={canvasRef} width={800} height={400} className="w-full" />
+      </div>
+    </div>
+  );
+}
+
+function RotacionCalculator() {
+  const [calcType, setCalcType] = useState('momento_inercia');
+  const [inputs, setInputs] = useState({});
+  const [result, setResult] = useState(null);
+  const [findVariable, setFindVariable] = useState('I');
+
+  const calculateMomentoInercia = () => {
+    const { tipo, m, r, L } = inputs;
+    let I = 0;
+    
+    if (tipo === 'disco') {
+      I = 0.5 * parseFloat(m) * Math.pow(parseFloat(r), 2);
+    } else if (tipo === 'esfera') {
+      I = 0.4 * parseFloat(m) * Math.pow(parseFloat(r), 2);
+    } else if (tipo === 'aro') {
+      I = parseFloat(m) * Math.pow(parseFloat(r), 2);
+    } else if (tipo === 'barra_centro') {
+      I = (1/12) * parseFloat(m) * Math.pow(parseFloat(L), 2);
+    } else if (tipo === 'barra_extremo') {
+      I = (1/3) * parseFloat(m) * Math.pow(parseFloat(L), 2);
+    }
+    
+    setResult({ momentoInercia: I.toFixed(3) });
+  };
+
+  const calculateDinamica = () => {
+    const { tau, I, alpha } = inputs;
+    
+    if (findVariable === 'tau') {
+      const torque = parseFloat(I) * parseFloat(alpha);
+      setResult({ torque: torque.toFixed(3) });
+    } else if (findVariable === 'I') {
+      const momento = parseFloat(tau) / parseFloat(alpha);
+      setResult({ momentoInercia: momento.toFixed(3) });
+    } else if (findVariable === 'alpha') {
+      const aceleracionAngular = parseFloat(tau) / parseFloat(I);
+      setResult({ aceleracionAngular: aceleracionAngular.toFixed(3) });
+    }
+  };
+
+  const calculateEnergia = () => {
+    const { I, omega, K } = inputs;
+    
+    if (findVariable === 'K') {
+      const energia = 0.5 * parseFloat(I) * Math.pow(parseFloat(omega), 2);
+      setResult({ energiaCineticaRotacional: energia.toFixed(3) });
+    } else if (findVariable === 'omega') {
+      const velocidadAngular = Math.sqrt(2 * parseFloat(K) / parseFloat(I));
+      setResult({ velocidadAngular: velocidadAngular.toFixed(3) });
+    } else if (findVariable === 'I') {
+      const momento = 2 * parseFloat(K) / Math.pow(parseFloat(omega), 2);
+      setResult({ momentoInercia: momento.toFixed(3) });
+    }
+  };
+
+  const handleCalculate = () => {
+    if (calcType === 'momento_inercia') calculateMomentoInercia();
+    else if (calcType === 'dinamica') calculateDinamica();
+    else if (calcType === 'energia') calculateEnergia();
+  };
+
+  return (
+    <div className="p-8 max-w-4xl mx-auto">
+      <h2 className="text-3xl font-bold text-gray-800 mb-6">Calculadora de Rotación</h2>
+
+      <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6">
+        <p className="text-sm text-gray-700">Calcula momento de inercia, torque y energía rotacional.</p>
+      </div>
+
+      <div className="mb-6">
+        <label className="block text-sm font-semibold text-gray-700 mb-2">Tipo de Cálculo</label>
+        <select value={calcType} onChange={(e) => { setCalcType(e.target.value); setInputs({}); setResult(null); }} className="w-full p-3 border border-gray-300 rounded-lg">
+          <option value="momento_inercia">Momento de Inercia</option>
+          <option value="dinamica">Dinámica Rotacional (τ = Iα)</option>
+          <option value="energia">Energía Cinética Rotacional</option>
+        </select>
+      </div>
+
+      {calcType !== 'momento_inercia' && (
+        <div className="mb-6">
+          <label className="block text-sm font-semibold text-gray-700 mb-2">Variable a encontrar</label>
+          <select value={findVariable} onChange={(e) => { setFindVariable(e.target.value); setInputs({}); setResult(null); }} className="w-full p-3 border border-gray-300 rounded-lg">
+            {calcType === 'dinamica' && (
+              <>
+                <option value="tau">Torque (τ)</option>
+                <option value="I">Momento de Inercia (I)</option>
+                <option value="alpha">Aceleración Angular (α)</option>
+              </>
+            )}
+            {calcType === 'energia' && (
+              <>
+                <option value="K">Energía Cinética (K)</option>
+                <option value="omega">Velocidad Angular (ω)</option>
+                <option value="I">Momento de Inercia (I)</option>
+              </>
+            )}
+          </select>
+        </div>
+      )}
+
+      <div className="bg-white border border-gray-200 rounded-lg p-6 mb-6">
+        {calcType === 'momento_inercia' && (
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Tipo de Objeto</label>
+              <select value={inputs.tipo || 'disco'} onChange={(e) => setInputs({...inputs, tipo: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg">
+                <option value="disco">Disco (I = 0.5MR²)</option>
+                <option value="esfera">Esfera Sólida (I = 0.4MR²)</option>
+                <option value="aro">Aro/Anillo (I = MR²)</option>
+                <option value="barra_centro">Barra (eje en centro) (I = ML²/12)</option>
+                <option value="barra_extremo">Barra (eje en extremo) (I = ML²/3)</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Masa M (kg)</label>
+              <input type="number" step="any" value={inputs.m || ''} onChange={(e) => setInputs({...inputs, m: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+            </div>
+            {(inputs.tipo !== 'barra_centro' && inputs.tipo !== 'barra_extremo') && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Radio R (m)</label>
+                <input type="number" step="any" value={inputs.r || ''} onChange={(e) => setInputs({...inputs, r: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+              </div>
+            )}
+            {(inputs.tipo === 'barra_centro' || inputs.tipo === 'barra_extremo') && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Longitud L (m)</label>
+                <input type="number" step="any" value={inputs.L || ''} onChange={(e) => setInputs({...inputs, L: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+              </div>
+            )}
+          </div>
+        )}
+
+        {calcType === 'dinamica' && (
+          <div className="space-y-4">
+            {findVariable !== 'tau' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Torque τ (N·m)</label>
+                <input type="number" step="any" value={inputs.tau || ''} onChange={(e) => setInputs({...inputs, tau: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+              </div>
+            )}
+            {findVariable !== 'I' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Momento de Inercia I (kg·m²)</label>
+                <input type="number" step="any" value={inputs.I || ''} onChange={(e) => setInputs({...inputs, I: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+              </div>
+            )}
+            {findVariable !== 'alpha' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Aceleración Angular α (rad/s²)</label>
+                <input type="number" step="any" value={inputs.alpha || ''} onChange={(e) => setInputs({...inputs, alpha: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+              </div>
+            )}
+          </div>
+        )}
+
+        {calcType === 'energia' && (
+          <div className="space-y-4">
+            {findVariable !== 'K' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Energía Cinética K (J)</label>
+                <input type="number" step="any" value={inputs.K || ''} onChange={(e) => setInputs({...inputs, K: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+              </div>
+            )}
+            {findVariable !== 'I' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Momento de Inercia I (kg·m²)</label>
+                <input type="number" step="any" value={inputs.I || ''} onChange={(e) => setInputs({...inputs, I: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+              </div>
+            )}
+            {findVariable !== 'omega' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Velocidad Angular ω (rad/s)</label>
+                <input type="number" step="any" value={inputs.omega || ''} onChange={(e) => setInputs({...inputs, omega: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+              </div>
+            )}
+          </div>
+        )}
+
+        <button onClick={handleCalculate} className="mt-6 w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors">
+          Calcular
+        </button>
+      </div>
+
+      {result && (
+        <div className="bg-green-50 border border-green-200 rounded-lg p-6">
+          <h3 className="text-xl font-bold text-gray-800 mb-4">Resultados</h3>
+          <div className="space-y-2">
+            {Object.entries(result).map(([key, value]) => (
+              <div key={key} className="flex justify-between items-center py-2 border-b border-green-100">
+                <span className="font-medium text-gray-700 capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}:</span>
+                <span className="text-lg font-semibold text-gray-900">{value}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function RotacionSimulation() {
+  const canvasRef = useRef(null);
+  const [isRunning, setIsRunning] = useState(false);
+  const [simType, setSimType] = useState('disco');
+  const [params, setParams] = useState({ omega: 3, tau: 5, I: 2 });
+  const animationRef = useRef(null);
+  const thetaRef = useRef(0);
+  const omegaRef = useRef(0);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+
+    if (isRunning) {
+      thetaRef.current = 0;
+      omegaRef.current = simType === 'aceleracion' ? 0 : params.omega;
+      
+      const animate = () => {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        const centerX = canvas.width / 2;
+        const centerY = canvas.height / 2;
+        const radius = 100;
+
+        if (simType === 'disco' || simType === 'uniforme') {
+          omegaRef.current = params.omega;
+          thetaRef.current += omegaRef.current * 0.05;
+          
+          ctx.strokeStyle = '#3b82f6';
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
+          ctx.stroke();
+          
+          ctx.fillStyle = '#3b82f6';
+          ctx.globalAlpha = 0.3;
+          ctx.beginPath();
+          ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
+          ctx.fill();
+          ctx.globalAlpha = 1;
+          
+          ctx.strokeStyle = '#ef4444';
+          ctx.lineWidth = 4;
+          ctx.beginPath();
+          ctx.moveTo(centerX, centerY);
+          const endX = centerX + radius * Math.cos(thetaRef.current);
+          const endY = centerY + radius * Math.sin(thetaRef.current);
+          ctx.lineTo(endX, endY);
+          ctx.stroke();
+          
+          ctx.fillStyle = '#1f2937';
+          ctx.beginPath();
+          ctx.arc(centerX, centerY, 8, 0, 2 * Math.PI);
+          ctx.fill();
+          
+          const K = 0.5 * params.I * Math.pow(omegaRef.current, 2);
+          const L = params.I * omegaRef.current;
+          
+          ctx.fillStyle = '#1f2937';
+          ctx.font = '14px Arial';
+          ctx.fillText('Velocidad angular ω: ' + omegaRef.current.toFixed(2) + ' rad/s', 10, 20);
+          ctx.fillText('Ángulo θ: ' + thetaRef.current.toFixed(2) + ' rad', 10, 40);
+          ctx.fillText('Energía cinética: ' + K.toFixed(2) + ' J', 10, 60);
+          ctx.fillText('Momento angular L: ' + L.toFixed(2) + ' kg·m²/s', 10, 80);
+          
+        } else if (simType === 'aceleracion') {
+          const alpha = params.tau / params.I;
+          omegaRef.current += alpha * 0.05;
+          thetaRef.current += omegaRef.current * 0.05;
+          
+          ctx.strokeStyle = '#3b82f6';
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
+          ctx.stroke();
+          
+          ctx.fillStyle = '#3b82f6';
+          ctx.globalAlpha = 0.3;
+          ctx.beginPath();
+          ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
+          ctx.fill();
+          ctx.globalAlpha = 1;
+          
+          ctx.strokeStyle = '#ef4444';
+          ctx.lineWidth = 4;
+          ctx.beginPath();
+          ctx.moveTo(centerX, centerY);
+          const endX = centerX + radius * Math.cos(thetaRef.current);
+          const endY = centerY + radius * Math.sin(thetaRef.current);
+          ctx.lineTo(endX, endY);
+          ctx.stroke();
+          
+          const torqueArrowLen = params.tau * 10;
+          ctx.strokeStyle = '#10b981';
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.arc(centerX, centerY, radius + 30, -Math.PI/4, Math.PI/4, false);
+          ctx.stroke();
+          
+          ctx.fillStyle = '#10b981';
+          ctx.beginPath();
+          ctx.moveTo(centerX + (radius + 30) * Math.cos(Math.PI/4), centerY + (radius + 30) * Math.sin(Math.PI/4));
+          ctx.lineTo(centerX + (radius + 30) * Math.cos(Math.PI/4) - 10, centerY + (radius + 30) * Math.sin(Math.PI/4) - 10);
+          ctx.lineTo(centerX + (radius + 30) * Math.cos(Math.PI/4) - 5, centerY + (radius + 30) * Math.sin(Math.PI/4) + 5);
+          ctx.fill();
+          
+          ctx.fillStyle = '#1f2937';
+          ctx.beginPath();
+          ctx.arc(centerX, centerY, 8, 0, 2 * Math.PI);
+          ctx.fill();
+          
+          ctx.fillStyle = '#1f2937';
+          ctx.font = '14px Arial';
+          ctx.fillText('Torque τ: ' + params.tau.toFixed(2) + ' N·m', 10, 20);
+          ctx.fillText('Velocidad angular ω: ' + omegaRef.current.toFixed(2) + ' rad/s', 10, 40);
+          ctx.fillText('Aceleración angular α: ' + alpha.toFixed(2) + ' rad/s²', 10, 60);
+          ctx.fillText('Momento de inercia I: ' + params.I.toFixed(2) + ' kg·m²', 10, 80);
+        }
+
+        if (thetaRef.current < 30) {
+          animationRef.current = requestAnimationFrame(animate);
+        } else {
+          setIsRunning(false);
+        }
+      };
+
+      animate();
+    }
+
+    return () => {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
+    };
+  }, [isRunning, simType, params]);
+
+  return (
+    <div className="p-8 max-w-6xl mx-auto">
+      <h2 className="text-3xl font-bold text-gray-800 mb-6">Simulación de Rotación</h2>
+
+      <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6">
+        <p className="text-sm text-gray-700">Visualiza el movimiento rotacional y la aplicación de torques.</p>
+      </div>
+
+      <div className="mb-6">
+        <label className="block text-sm font-semibold text-gray-700 mb-2">Tipo de Simulación</label>
+        <select value={simType} onChange={(e) => { setSimType(e.target.value); setIsRunning(false); }} className="w-full p-3 border border-gray-300 rounded-lg">
+          <option value="uniforme">Rotación Uniforme</option>
+          <option value="aceleracion">Rotación con Torque</option>
+        </select>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        {simType === 'uniforme' && (
+          <>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Velocidad angular: {params.omega} rad/s</label>
+              <input type="range" min="1" max="8" step="0.5" value={params.omega} onChange={(e) => setParams({...params, omega: Number(e.target.value)})} className="w-full" disabled={isRunning} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Momento de inercia: {params.I} kg·m²</label>
+              <input type="range" min="0.5" max="5" step="0.5" value={params.I} onChange={(e) => setParams({...params, I: Number(e.target.value)})} className="w-full" disabled={isRunning} />
+            </div>
+          </>
+        )}
+        {simType === 'aceleracion' && (
+          <>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Torque: {params.tau} N·m</label>
+              <input type="range" min="1" max="15" value={params.tau} onChange={(e) => setParams({...params, tau: Number(e.target.value)})} className="w-full" disabled={isRunning} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Momento de inercia: {params.I} kg·m²</label>
+              <input type="range" min="0.5" max="5" step="0.5" value={params.I} onChange={(e) => setParams({...params, I: Number(e.target.value)})} className="w-full" disabled={isRunning} />
+            </div>
+          </>
+        )}
+        <div className="flex items-end">
+          <button onClick={() => setIsRunning(!isRunning)} className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors">
+            {isRunning ? 'Detener' : 'Iniciar'}
+          </button>
+        </div>
+      </div>
+
+      <div className="bg-white border-2 border-gray-300 rounded-lg overflow-hidden">
+        <canvas ref={canvasRef} width={800} height={400} className="w-full" />
+      </div>
+    </div>
+  );
+}
+
+function EquilibrioCalculator() {
+  const [calcType, setCalcType] = useState('palanca');
+  const [inputs, setInputs] = useState({});
+  const [result, setResult] = useState(null);
+
+  const calculatePalanca = () => {
+    const { F1, d1, F2, d2 } = inputs;
+    
+    if (!F1 && d1 && F2 && d2) {
+      const fuerza = (parseFloat(F2) * parseFloat(d2)) / parseFloat(d1);
+      setResult({ fuerza1: fuerza.toFixed(3) });
+    } else if (F1 && !d1 && F2 && d2) {
+      const distancia = (parseFloat(F2) * parseFloat(d2)) / parseFloat(F1);
+      setResult({ distancia1: distancia.toFixed(3) });
+    } else if (F1 && d1 && !F2 && d2) {
+      const fuerza = (parseFloat(F1) * parseFloat(d1)) / parseFloat(d2);
+      setResult({ fuerza2: fuerza.toFixed(3) });
+    } else if (F1 && d1 && F2 && !d2) {
+      const distancia = (parseFloat(F1) * parseFloat(d1)) / parseFloat(F2);
+      setResult({ distancia2: distancia.toFixed(3) });
+    }
+  };
+
+  const calculateViga = () => {
+    const { L, F, d } = inputs;
+    const Ln = parseFloat(L);
+    const Fn = parseFloat(F);
+    const dn = parseFloat(d);
+    
+    const RA = (Fn * (Ln - dn)) / Ln;
+    const RB = (Fn * dn) / Ln;
+    
+    setResult({
+      reaccionA: RA.toFixed(3),
+      reaccionB: RB.toFixed(3),
+      verificacion: (RA + RB).toFixed(3)
+    });
+  };
+
+  const calculateTorques = () => {
+    const { F1, d1, F2, d2, F3, d3 } = inputs;
+    
+    let torqueTotal = 0;
+    let fuerzaTotal = 0;
+    
+    if (F1 && d1) {
+      torqueTotal += parseFloat(F1) * parseFloat(d1);
+      fuerzaTotal += parseFloat(F1);
+    }
+    if (F2 && d2) {
+      torqueTotal += parseFloat(F2) * parseFloat(d2);
+      fuerzaTotal += parseFloat(F2);
+    }
+    if (F3 && d3) {
+      torqueTotal += parseFloat(F3) * parseFloat(d3);
+      fuerzaTotal += parseFloat(F3);
+    }
+    
+    setResult({
+      torqueTotal: torqueTotal.toFixed(3),
+      fuerzaTotal: fuerzaTotal.toFixed(3),
+      enEquilibrio: Math.abs(torqueTotal) < 0.01 ? 'SÍ' : 'NO'
+    });
+  };
+
+  const handleCalculate = () => {
+    if (calcType === 'palanca') calculatePalanca();
+    else if (calcType === 'viga') calculateViga();
+    else if (calcType === 'torques') calculateTorques();
+  };
+
+  return (
+    <div className="p-8 max-w-4xl mx-auto">
+      <h2 className="text-3xl font-bold text-gray-800 mb-6">Calculadora de Equilibrio</h2>
+
+      <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6">
+        <p className="text-sm text-gray-700">Resuelve problemas de palancas, vigas y equilibrio de torques.</p>
+      </div>
+
+      <div className="mb-6">
+        <label className="block text-sm font-semibold text-gray-700 mb-2">Tipo de Problema</label>
+        <select value={calcType} onChange={(e) => { setCalcType(e.target.value); setInputs({}); setResult(null); }} className="w-full p-3 border border-gray-300 rounded-lg">
+          <option value="palanca">Palanca Simple</option>
+          <option value="viga">Viga con Carga</option>
+          <option value="torques">Equilibrio de Torques</option>
+        </select>
+      </div>
+
+      <div className="bg-white border border-gray-200 rounded-lg p-6 mb-6">
+        {calcType === 'palanca' && (
+          <div className="space-y-4">
+            <p className="text-sm text-gray-600 mb-2">Deja vacía la variable que quieres calcular. Ecuación: F₁·d₁ = F₂·d₂</p>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Fuerza 1 (N)</label>
+              <input type="number" step="any" value={inputs.F1 || ''} onChange={(e) => setInputs({...inputs, F1: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Distancia 1 (m)</label>
+              <input type="number" step="any" value={inputs.d1 || ''} onChange={(e) => setInputs({...inputs, d1: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Fuerza 2 (N)</label>
+              <input type="number" step="any" value={inputs.F2 || ''} onChange={(e) => setInputs({...inputs, F2: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Distancia 2 (m)</label>
+              <input type="number" step="any" value={inputs.d2 || ''} onChange={(e) => setInputs({...inputs, d2: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+            </div>
+          </div>
+        )}
+
+        {calcType === 'viga' && (
+          <div className="space-y-4">
+            <p className="text-sm text-gray-600 mb-2">Viga apoyada en dos puntos con carga puntual</p>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Longitud de la viga L (m)</label>
+              <input type="number" step="any" value={inputs.L || ''} onChange={(e) => setInputs({...inputs, L: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Fuerza aplicada F (N)</label>
+              <input type="number" step="any" value={inputs.F || ''} onChange={(e) => setInputs({...inputs, F: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Distancia desde punto A (m)</label>
+              <input type="number" step="any" value={inputs.d || ''} onChange={(e) => setInputs({...inputs, d: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+            </div>
+          </div>
+        )}
+
+        {calcType === 'torques' && (
+          <div className="space-y-4">
+            <p className="text-sm text-gray-600 mb-2">Suma de torques respecto a un punto (use valores negativos para sentido contrario)</p>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Fuerza 1 (N)</label>
+              <input type="number" step="any" value={inputs.F1 || ''} onChange={(e) => setInputs({...inputs, F1: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Distancia 1 (m)</label>
+              <input type="number" step="any" value={inputs.d1 || ''} onChange={(e) => setInputs({...inputs, d1: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Fuerza 2 (N) - Opcional</label>
+              <input type="number" step="any" value={inputs.F2 || ''} onChange={(e) => setInputs({...inputs, F2: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Distancia 2 (m) - Opcional</label>
+              <input type="number" step="any" value={inputs.d2 || ''} onChange={(e) => setInputs({...inputs, d2: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Fuerza 3 (N) - Opcional</label>
+              <input type="number" step="any" value={inputs.F3 || ''} onChange={(e) => setInputs({...inputs, F3: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Distancia 3 (m) - Opcional</label>
+              <input type="number" step="any" value={inputs.d3 || ''} onChange={(e) => setInputs({...inputs, d3: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+            </div>
+          </div>
+        )}
+
+        <button onClick={handleCalculate} className="mt-6 w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors">
+          Calcular
+        </button>
+      </div>
+
+      {result && (
+        <div className="bg-green-50 border border-green-200 rounded-lg p-6">
+          <h3 className="text-xl font-bold text-gray-800 mb-4">Resultados</h3>
+          <div className="space-y-2">
+            {Object.entries(result).map(([key, value]) => (
+              <div key={key} className="flex justify-between items-center py-2 border-b border-green-100">
+                <span className="font-medium text-gray-700 capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}:</span>
+                <span className="text-lg font-semibold text-gray-900">{value}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function EquilibrioSimulation() {
+  const canvasRef = useRef(null);
+  const [isRunning, setIsRunning] = useState(false);
+  const [simType, setSimType] = useState('palanca');
+  const [params, setParams] = useState({ F1: 50, d1: 3, F2: 30, d2: 5 });
+  const animationRef = useRef(null);
+  const angleRef = useRef(0);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+
+    if (isRunning) {
+      angleRef.current = 0;
+      
+      const animate = () => {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        const centerX = canvas.width / 2;
+        const centerY = canvas.height / 2;
+
+        if (simType === 'palanca') {
+          const torque1 = params.F1 * params.d1;
+          const torque2 = params.F2 * params.d2;
+          const torqueNet = torque1 - torque2;
+          
+          if (Math.abs(torqueNet) > 1) {
+            angleRef.current += torqueNet * 0.0001;
+            angleRef.current = Math.max(-0.3, Math.min(0.3, angleRef.current));
+          }
+          
+          const beamLength = 300;
+          const scale = 30;
+          
+          ctx.save();
+          ctx.translate(centerX, centerY);
+          ctx.rotate(angleRef.current);
+          
+          ctx.fillStyle = '#8b5cf6';
+          ctx.fillRect(-beamLength/2, -10, beamLength, 20);
+          
+          ctx.restore();
+          
+          ctx.fillStyle = '#374151';
+          ctx.beginPath();
+          ctx.moveTo(centerX - 15, centerY);
+          ctx.lineTo(centerX, centerY + 20);
+          ctx.lineTo(centerX + 15, centerY);
+          ctx.fill();
+          
+          const leftX = centerX - params.d1 * scale * Math.cos(angleRef.current);
+          const leftY = centerY - params.d1 * scale * Math.sin(angleRef.current);
+          
+          ctx.strokeStyle = '#ef4444';
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.moveTo(leftX, leftY);
+          ctx.lineTo(leftX, leftY + params.F1);
+          ctx.stroke();
+          
+          ctx.fillStyle = '#ef4444';
+          ctx.beginPath();
+          ctx.moveTo(leftX, leftY + params.F1);
+          ctx.lineTo(leftX - 8, leftY + params.F1 - 15);
+          ctx.lineTo(leftX + 8, leftY + params.F1 - 15);
+          ctx.fill();
+          
+          const rightX = centerX + params.d2 * scale * Math.cos(angleRef.current);
+          const rightY = centerY + params.d2 * scale * Math.sin(angleRef.current);
+          
+          ctx.strokeStyle = '#3b82f6';
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.moveTo(rightX, rightY);
+          ctx.lineTo(rightX, rightY + params.F2);
+          ctx.stroke();
+          
+          ctx.fillStyle = '#3b82f6';
+          ctx.beginPath();
+          ctx.moveTo(rightX, rightY + params.F2);
+          ctx.lineTo(rightX - 8, rightY + params.F2 - 15);
+          ctx.lineTo(rightX + 8, rightY + params.F2 - 15);
+          ctx.fill();
+          
+          ctx.fillStyle = '#1f2937';
+          ctx.font = '14px Arial';
+          ctx.fillText('Fuerza 1: ' + params.F1 + ' N', 10, 20);
+          ctx.fillText('Distancia 1: ' + params.d1 + ' m', 10, 40);
+          ctx.fillText('Torque 1: ' + torque1.toFixed(2) + ' N·m', 10, 60);
+          ctx.fillText('Fuerza 2: ' + params.F2 + ' N', 10, 90);
+          ctx.fillText('Distancia 2: ' + params.d2 + ' m', 10, 110);
+          ctx.fillText('Torque 2: ' + torque2.toFixed(2) + ' N·m', 10, 130);
+          ctx.fillText('Torque neto: ' + torqueNet.toFixed(2) + ' N·m', 10, 160);
+          ctx.fillText(Math.abs(torqueNet) < 1 ? 'EQUILIBRIO' : 'DESEQUILIBRIO', 10, 180);
+          
+        } else if (simType === 'viga') {
+          const beamLength = 400;
+          const beamY = centerY;
+          
+          ctx.fillStyle = '#8b5cf6';
+          ctx.fillRect(centerX - beamLength/2, beamY - 10, beamLength, 20);
+          
+          ctx.fillStyle = '#374151';
+          ctx.beginPath();
+          ctx.moveTo(centerX - beamLength/2, beamY + 10);
+          ctx.lineTo(centerX - beamLength/2 - 10, beamY + 30);
+          ctx.lineTo(centerX - beamLength/2 + 10, beamY + 30);
+          ctx.fill();
+          
+          ctx.fillStyle = '#374151';
+          ctx.beginPath();
+          ctx.moveTo(centerX + beamLength/2, beamY + 10);
+          ctx.lineTo(centerX + beamLength/2 - 10, beamY + 30);
+          ctx.lineTo(centerX + beamLength/2 + 10, beamY + 30);
+          ctx.fill();
+          
+          const loadX = centerX - beamLength/2 + (params.d1 / 10) * beamLength;
+          
+          ctx.strokeStyle = '#ef4444';
+          ctx.lineWidth = 4;
+          ctx.beginPath();
+          ctx.moveTo(loadX, beamY - 60);
+          ctx.lineTo(loadX, beamY - 10);
+          ctx.stroke();
+          
+          ctx.fillStyle = '#ef4444';
+          ctx.beginPath();
+          ctx.moveTo(loadX, beamY - 10);
+          ctx.lineTo(loadX - 8, beamY - 25);
+          ctx.lineTo(loadX + 8, beamY - 25);
+          ctx.fill();
+          
+          const L = 10;
+          const F = params.F1;
+          const d = params.d1;
+          const RA = (F * (L - d)) / L;
+          const RB = (F * d) / L;
+          
+          ctx.fillStyle = '#1f2937';
+          ctx.font = '14px Arial';
+          ctx.fillText('Carga: ' + F + ' N', 10, 20);
+          ctx.fillText('Posición: ' + d + ' m desde A', 10, 40);
+          ctx.fillText('Longitud viga: ' + L + ' m', 10, 60);
+          ctx.fillText('Reacción A: ' + RA.toFixed(2) + ' N', 10, 90);
+          ctx.fillText('Reacción B: ' + RB.toFixed(2) + ' N', 10, 110);
+          ctx.fillText('Suma fuerzas: ' + (RA + RB).toFixed(2) + ' N', 10, 130);
+        }
+
+        animationRef.current = requestAnimationFrame(animate);
+      };
+
+      animate();
+    }
+
+    return () => {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
+    };
+  }, [isRunning, simType, params]);
+
+  return (
+    <div className="p-8 max-w-6xl mx-auto">
+      <h2 className="text-3xl font-bold text-gray-800 mb-6">Simulación de Equilibrio</h2>
+
+      <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6">
+        <p className="text-sm text-gray-700">Visualiza el equilibrio de fuerzas y torques en diferentes sistemas.</p>
+      </div>
+
+      <div className="mb-6">
+        <label className="block text-sm font-semibold text-gray-700 mb-2">Tipo de Sistema</label>
+        <select value={simType} onChange={(e) => { setSimType(e.target.value); setIsRunning(false); }} className="w-full p-3 border border-gray-300 rounded-lg">
+          <option value="palanca">Palanca</option>
+          <option value="viga">Viga con Carga</option>
+        </select>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        {simType === 'palanca' && (
+          <>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Fuerza 1: {params.F1} N</label>
+              <input type="range" min="10" max="100" value={params.F1} onChange={(e) => setParams({...params, F1: Number(e.target.value)})} className="w-full" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Distancia 1: {params.d1} m</label>
+              <input type="range" min="1" max="5" value={params.d1} onChange={(e) => setParams({...params, d1: Number(e.target.value)})} className="w-full" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Fuerza 2: {params.F2} N</label>
+              <input type="range" min="10" max="100" value={params.F2} onChange={(e) => setParams({...params, F2: Number(e.target.value)})} className="w-full" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Distancia 2: {params.d2} m</label>
+              <input type="range" min="1" max="5" value={params.d2} onChange={(e) => setParams({...params, d2: Number(e.target.value)})} className="w-full" />
+            </div>
+          </>
+        )}
+        {simType === 'viga' && (
+          <>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Carga: {params.F1} N</label>
+              <input type="range" min="50" max="200" value={params.F1} onChange={(e) => setParams({...params, F1: Number(e.target.value)})} className="w-full" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Posición: {params.d1} m</label>
+              <input type="range" min="1" max="9" value={params.d1} onChange={(e) => setParams({...params, d1: Number(e.target.value)})} className="w-full" />
+            </div>
+          </>
+        )}
+      </div>
+
+      <div className="mb-6">
+        <button onClick={() => setIsRunning(!isRunning)} className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors">
+          {isRunning ? 'Detener' : 'Iniciar'}
+        </button>
+      </div>
+
+      <div className="bg-white border-2 border-gray-300 rounded-lg overflow-hidden">
+        <canvas ref={canvasRef} width={800} height={400} className="w-full" />
+      </div>
+    </div>
+  );
+}
+
+function GravitacionCalculador() {
+  return (
+    <div className="p-8">
+      <h2 className="text-3xl font-bold text-gray-800 mb-6">Calculadora de Gravitación</h2>
+      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6">
+        <p className="text-yellow-800">En desarrollo - Próximamente disponible</p>
+      </div>
+    </div>
+  );
+}
+
+function GravitacionSimulacion() {
+  return (
+    <div className="p-8">
+      <h2 className="text-3xl font-bold text-gray-800 mb-6">Simulación de Gravitación</h2>
+      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6">
+        <p className="text-yellow-800">En desarrollo - Próximamente disponible</p>
+      </div>
+    </div>
+  );
+}function DinamicaCalculator() {
+  const [calcType, setCalcType] = useState('segunda_ley');
+  const [inputs, setInputs] = useState({});
+  const [result, setResult] = useState(null);
+  const [findVariable, setFindVariable] = useState('F');
+
+  const calculateSegundaLey = () => {
+    const { F, m, a } = inputs;
+    if (findVariable === 'F') {
+      const fuerza = parseFloat(m) * parseFloat(a);
+      setResult({ fuerza: fuerza.toFixed(3), unidad: 'N' });
+    } else if (findVariable === 'm') {
+      const masa = parseFloat(F) / parseFloat(a);
+      setResult({ masa: masa.toFixed(3), unidad: 'kg' });
+    } else if (findVariable === 'a') {
+      const aceleracion = parseFloat(F) / parseFloat(m);
+      setResult({ aceleracion: aceleracion.toFixed(3), unidad: 'm/s²' });
+    }
+  };
+
+  const calculateFriccion = () => {
+    const { mu, N, f } = inputs;
+    if (findVariable === 'f') {
+      const friccion = parseFloat(mu) * parseFloat(N);
+      setResult({ fuerzaFriccion: friccion.toFixed(3), unidad: 'N' });
+    } else if (findVariable === 'mu') {
+      const coeficiente = parseFloat(f) / parseFloat(N);
+      setResult({ coeficienteFriccion: coeficiente.toFixed(3) });
+    } else if (findVariable === 'N') {
+      const normal = parseFloat(f) / parseFloat(mu);
+      setResult({ fuerzaNormal: normal.toFixed(3), unidad: 'N' });
+    }
+  };
+
+  const calculatePlanoInclinado = () => {
+    const { m, theta, mu } = inputs;
+    const g = 9.81;
+    const thetaRad = parseFloat(theta) * Math.PI / 180;
+    const W = parseFloat(m) * g;
+    const N = parseFloat(m) * g * Math.cos(thetaRad);
+    const Fp = parseFloat(m) * g * Math.sin(thetaRad);
+    const Fr = parseFloat(mu || 0) * N;
+    const Fneta = Fp - Fr;
+    const a = Fneta / parseFloat(m);
+    setResult({
+      peso: W.toFixed(3),
+      fuerzaNormal: N.toFixed(3),
+      fuerzaParalela: Fp.toFixed(3),
+      fuerzaFriccion: Fr.toFixed(3),
+      fuerzaNeta: Fneta.toFixed(3),
+      aceleracion: a.toFixed(3)
+    });
+  };
+
+  const handleCalculate = () => {
+    if (calcType === 'segunda_ley') calculateSegundaLey();
+    else if (calcType === 'friccion') calculateFriccion();
+    else if (calcType === 'plano_inclinado') calculatePlanoInclinado();
+  };
+
+  return (
+    <div className="p-8 max-w-4xl mx-auto">
+      <h2 className="text-3xl font-bold text-gray-800 mb-6">Calculadora de Dinámica</h2>
+
+      <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6">
+        <p className="text-sm text-gray-700">Resuelve problemas de fuerzas, fricción y planos inclinados.</p>
+      </div>
+
+      <div className="mb-6">
+        <label className="block text-sm font-semibold text-gray-700 mb-2">Tipo de Problema</label>
+        <select value={calcType} onChange={(e) => { setCalcType(e.target.value); setInputs({}); setResult(null); }} className="w-full p-3 border border-gray-300 rounded-lg">
+          <option value="segunda_ley">Segunda Ley de Newton</option>
+          <option value="friccion">Fuerza de Fricción</option>
+          <option value="plano_inclinado">Plano Inclinado</option>
+        </select>
+      </div>
+
+      {calcType !== 'plano_inclinado' && (
+        <div className="mb-6">
+          <label className="block text-sm font-semibold text-gray-700 mb-2">Variable a encontrar</label>
+          <select value={findVariable} onChange={(e) => { setFindVariable(e.target.value); setInputs({}); setResult(null); }} className="w-full p-3 border border-gray-300 rounded-lg">
+            {calcType === 'segunda_ley' && (
+              <>
+                <option value="F">Fuerza (F)</option>
+                <option value="m">Masa (m)</option>
+                <option value="a">Aceleración (a)</option>
+              </>
+            )}
+            {calcType === 'friccion' && (
+              <>
+                <option value="f">Fuerza de fricción (f)</option>
+                <option value="mu">Coeficiente (μ)</option>
+                <option value="N">Fuerza normal (N)</option>
+              </>
+            )}
+          </select>
+        </div>
+      )}
+
+      <div className="bg-white border border-gray-200 rounded-lg p-6 mb-6">
+        {calcType === 'segunda_ley' && (
+          <div className="space-y-4">
+            {findVariable !== 'F' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Fuerza F (N)</label>
+                <input type="number" step="any" value={inputs.F || ''} onChange={(e) => setInputs({...inputs, F: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+              </div>
+            )}
+            {findVariable !== 'm' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Masa m (kg)</label>
+                <input type="number" step="any" value={inputs.m || ''} onChange={(e) => setInputs({...inputs, m: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+              </div>
+            )}
+            {findVariable !== 'a' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Aceleración a (m/s²)</label>
+                <input type="number" step="any" value={inputs.a || ''} onChange={(e) => setInputs({...inputs, a: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+              </div>
+            )}
+          </div>
+        )}
+
+        {calcType === 'friccion' && (
+          <div className="space-y-4">
+            {findVariable !== 'f' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Fuerza de fricción f (N)</label>
+                <input type="number" step="any" value={inputs.f || ''} onChange={(e) => setInputs({...inputs, f: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+              </div>
+            )}
+            {findVariable !== 'mu' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Coeficiente μ</label>
+                <input type="number" step="any" value={inputs.mu || ''} onChange={(e) => setInputs({...inputs, mu: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+              </div>
+            )}
+            {findVariable !== 'N' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Fuerza normal N (N)</label>
+                <input type="number" step="any" value={inputs.N || ''} onChange={(e) => setInputs({...inputs, N: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+              </div>
+            )}
+          </div>
+        )}
+
+        {calcType === 'plano_inclinado' && (
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Masa m (kg)</label>
+              <input type="number" step="any" value={inputs.m || ''} onChange={(e) => setInputs({...inputs, m: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Ángulo θ (grados)</label>
+              <input type="number" step="any" value={inputs.theta || ''} onChange={(e) => setInputs({...inputs, theta: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Coeficiente μ (opcional)</label>
+              <input type="number" step="any" value={inputs.mu || ''} onChange={(e) => setInputs({...inputs, mu: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" placeholder="0" />
+            </div>
+          </div>
+        )}
+
+        <button onClick={handleCalculate} className="mt-6 w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors">
+          Calcular
+        </button>
+      </div>
+
+      {result && (
+        <div className="bg-green-50 border border-green-200 rounded-lg p-6">
+          <h3 className="text-xl font-bold text-gray-800 mb-4">Resultados</h3>
+          <div className="space-y-2">
+            {Object.entries(result).map(([key, value]) => (
+              <div key={key} className="flex justify-between items-center py-2 border-b border-green-100">
+                <span className="font-medium text-gray-700 capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}:</span>
+                <span className="text-lg font-semibold text-gray-900">{value}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DinamicaSimulation() {
+  const canvasRef = useRef(null);
+  const [isRunning, setIsRunning] = useState(false);
+  const [simType, setSimType] = useState('fuerza');
+  const [params, setParams] = useState({ m: 5, F: 20, mu: 0.2, theta: 30 });
+  const animationRef = useRef(null);
+  const timeRef = useRef(0);
+  const posRef = useRef(50);
+  const velRef = useRef(0);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+
+    if (isRunning) {
+      timeRef.current = 0;
+      posRef.current = 50;
+      velRef.current = 0;
+      
+      const animate = () => {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        const t = timeRef.current;
+        let x = posRef.current;
+        let shouldContinue = true;
+
+        if (simType === 'fuerza') {
+          const a = params.F / params.m;
+          velRef.current += a * 0.05;
+          posRef.current += velRef.current * 0.05 * 10;
+          x = posRef.current;
+          
+          ctx.fillStyle = '#374151';
+          ctx.fillRect(0, canvas.height - 50, canvas.width, 50);
+          
+          ctx.fillStyle = '#3b82f6';
+          ctx.fillRect(x, canvas.height - 90, 40, 40);
+          
+          ctx.strokeStyle = '#ef4444';
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.moveTo(x + 40, canvas.height - 70);
+          ctx.lineTo(x + 40 + params.F * 2, canvas.height - 70);
+          ctx.stroke();
+          
+          ctx.fillStyle = '#ef4444';
+          ctx.beginPath();
+          ctx.moveTo(x + 40 + params.F * 2, canvas.height - 70);
+          ctx.lineTo(x + 40 + params.F * 2 - 10, canvas.height - 75);
+          ctx.lineTo(x + 40 + params.F * 2 - 10, canvas.height - 65);
+          ctx.fill();
+          
+          ctx.fillStyle = '#1f2937';
+          ctx.font = '14px Arial';
+          ctx.fillText('F = ' + params.F + ' N', x + 45 + params.F * 2, canvas.height - 75);
+          ctx.fillText('m = ' + params.m + ' kg', x + 5, canvas.height - 95);
+          ctx.fillText('v = ' + velRef.current.toFixed(2) + ' m/s', 10, 20);
+          ctx.fillText('a = ' + a.toFixed(2) + ' m/s²', 10, 40);
+          
+          if (x > canvas.width) shouldContinue = false;
+          
+        } else if (simType === 'friccion') {
+          const g = 9.81;
+          const N = params.m * g;
+          const Fr = params.mu * N;
+          const Fneta = params.F - Fr;
+          const a = Fneta / params.m;
+          
+          if (a > 0) {
+            velRef.current += a * 0.05;
+            posRef.current += velRef.current * 0.05 * 10;
+          }
+          x = posRef.current;
+          
+          ctx.fillStyle = '#374151';
+          ctx.fillRect(0, canvas.height - 50, canvas.width, 50);
+          
+          ctx.fillStyle = '#3b82f6';
+          ctx.fillRect(x, canvas.height - 90, 40, 40);
+          
+          ctx.strokeStyle = '#ef4444';
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.moveTo(x + 40, canvas.height - 70);
+          ctx.lineTo(x + 40 + params.F * 2, canvas.height - 70);
+          ctx.stroke();
+          
+          ctx.fillStyle = '#ef4444';
+          ctx.beginPath();
+          ctx.moveTo(x + 40 + params.F * 2, canvas.height - 70);
+          ctx.lineTo(x + 40 + params.F * 2 - 10, canvas.height - 75);
+          ctx.lineTo(x + 40 + params.F * 2 - 10, canvas.height - 65);
+          ctx.fill();
+          
+          ctx.strokeStyle = '#f59e0b';
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.moveTo(x, canvas.height - 70);
+          ctx.lineTo(x - Fr * 2, canvas.height - 70);
+          ctx.stroke();
+          
+          ctx.fillStyle = '#f59e0b';
+          ctx.beginPath();
+          ctx.moveTo(x - Fr * 2, canvas.height - 70);
+          ctx.lineTo(x - Fr * 2 + 10, canvas.height - 75);
+          ctx.lineTo(x - Fr * 2 + 10, canvas.height - 65);
+          ctx.fill();
+          
+          ctx.fillStyle = '#1f2937';
+          ctx.font = '12px Arial';
+          ctx.fillText('F = ' + params.F + ' N', x + 45 + params.F * 2, canvas.height - 75);
+          ctx.fillText('Fr = ' + Fr.toFixed(2) + ' N', x - Fr * 2 - 60, canvas.height - 75);
+          ctx.fillText('μ = ' + params.mu, x + 5, canvas.height - 95);
+          ctx.fillText('v = ' + velRef.current.toFixed(2) + ' m/s', 10, 20);
+          
+          if (x > canvas.width) shouldContinue = false;
+          
+        } else if (simType === 'plano') {
+          const g = 9.81;
+          const thetaRad = params.theta * Math.PI / 180;
+          const Fp = params.m * g * Math.sin(thetaRad);
+          const a = Fp / params.m;
+          
+          velRef.current += a * 0.05;
+          posRef.current += velRef.current * 0.05 * 10;
+          x = posRef.current;
+          
+          const planeY = canvas.height - 100;
+          const planeEndX = canvas.width - 100;
+          const planeEndY = planeY - (planeEndX * Math.tan(thetaRad));
+          
+          ctx.strokeStyle = '#6b7280';
+          ctx.lineWidth = 4;
+          ctx.beginPath();
+          ctx.moveTo(0, planeY);
+          ctx.lineTo(planeEndX, planeEndY);
+          ctx.stroke();
+          
+          const boxY = planeY - (x * Math.tan(thetaRad));
+          
+          ctx.save();
+          ctx.translate(x + 20, boxY - 20);
+          ctx.rotate(-thetaRad);
+          ctx.fillStyle = '#3b82f6';
+          ctx.fillRect(-20, -20, 40, 40);
+          ctx.restore();
+          
+          ctx.fillStyle = '#1f2937';
+          ctx.font = '14px Arial';
+          ctx.fillText('θ = ' + params.theta + '°', 10, 20);
+          ctx.fillText('v = ' + velRef.current.toFixed(2) + ' m/s', 10, 40);
+          ctx.fillText('a = ' + a.toFixed(2) + ' m/s²', 10, 60);
+          
+          if (x > planeEndX - 50) shouldContinue = false;
+        }
+
+        timeRef.current += 0.05;
+
+        if (shouldContinue) {
+          animationRef.current = requestAnimationFrame(animate);
+        } else {
+          setIsRunning(false);
+        }
+      };
+
+      animate();
+    }
+
+    return () => {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
+    };
+  }, [isRunning, simType, params]);
+
+  return (
+    <div className="p-8 max-w-6xl mx-auto">
+      <h2 className="text-3xl font-bold text-gray-800 mb-6">Simulación de Dinámica</h2>
+
+      <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6">
+        <p className="text-sm text-gray-700">Visualiza fuerzas, fricción y movimiento en planos inclinados.</p>
+      </div>
+
+      <div className="mb-6">
+        <label className="block text-sm font-semibold text-gray-700 mb-2">Tipo de Simulación</label>
+        <select value={simType} onChange={(e) => { setSimType(e.target.value); setIsRunning(false); }} className="w-full p-3 border border-gray-300 rounded-lg">
+          <option value="fuerza">Fuerza Aplicada (F = ma)</option>
+          <option value="friccion">Fuerza con Fricción</option>
+          <option value="plano">Plano Inclinado</option>
+        </select>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Masa: {params.m} kg</label>
+          <input type="range" min="1" max="20" value={params.m} onChange={(e) => setParams({...params, m: Number(e.target.value)})} className="w-full" disabled={isRunning} />
+        </div>
+        {(simType === 'fuerza' || simType === 'friccion') && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Fuerza: {params.F} N</label>
+            <input type="range" min="5" max="50" value={params.F} onChange={(e) => setParams({...params, F: Number(e.target.value)})} className="w-full" disabled={isRunning} />
+          </div>
+        )}
+        {simType === 'friccion' && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Coef. fricción: {params.mu}</label>
+            <input type="range" min="0" max="1" step="0.05" value={params.mu} onChange={(e) => setParams({...params, mu: Number(e.target.value)})} className="w-full" disabled={isRunning} />
+          </div>
+        )}
+        {simType === 'plano' && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Ángulo: {params.theta}°</label>
+            <input type="range" min="10" max="60" value={params.theta} onChange={(e) => setParams({...params, theta: Number(e.target.value)})} className="w-full" disabled={isRunning} />
+          </div>
+        )}
+        <div className="flex items-end">
+          <button onClick={() => setIsRunning(!isRunning)} className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors">
+            {isRunning ? 'Detener' : 'Iniciar'}
+          </button>
+        </div>
+      </div>
+
+      <div className="bg-white border-2 border-gray-300 rounded-lg overflow-hidden">
+        <canvas ref={canvasRef} width={800} height={400} className="w-full" />
+      </div>
+    </div>
+  );
+}
+
+const ClassicalMechanicsApp = () => {
+  const [selectedTopic, setSelectedTopic] = useState(null);
+  const [selectedSection, setSelectedSection] = useState('historia');
+
+  const topics = [
+    { id: 'cinematica', title: 'Cinemática del Movimiento', subtitle: 'En una y varias dimensiones' },
+    { id: 'dinamica', title: 'Dinámica', subtitle: 'Leyes de Newton y fuerzas fundamentales' },
+    { id: 'trabajo', title: 'Trabajo, Energía y Potencia', subtitle: 'Principios fundamentales' },
+    { id: 'conservacion', title: 'Conservación de la Energía', subtitle: 'Principio de conservación' },
+    { id: 'momentum', title: 'Cantidad de Movimiento', subtitle: 'Y colisiones' },
+    { id: 'rotacion', title: 'Rotación de Cuerpos Rígidos', subtitle: 'Y torque' },
+    { id: 'equilibrio', title: 'Equilibrio Estático y Dinámico', subtitle: 'Condiciones de equilibrio' },
+    { id: 'gravitacion', title: 'Gravitación Universal', subtitle: 'Y movimiento planetario' },
+     { id: 'Temperatura', title: 'Temperatura', subtitle: 'Y Escalas Térmicas' },
+     { id: 'calor_trabajo', title: 'Calor, Trabajo y Energía Interna', subtitle: 'Transferencia y conservación de energía' },
+  { id: 'procesos', title: 'Procesos Termodinámicos', subtitle: 'Isotérmico, adiabático, isobárico e isocórico' },
+  { id: 'primer_principio', title: 'Primer Principio de la Termodinámica', subtitle: 'Conservación de la energía interna' },
+  { id: 'segundo_principio', title: 'Segundo Principio de la Termodinámica', subtitle: 'Dirección de los procesos y máquinas térmicas' },
+  { id: 'entropia', title: 'Entropía y Eficiencia de Motores Térmicos', subtitle: 'Desorden, reversibilidad y eficiencia' },
+
+  // ⚡ ELECTROMAGNETISMO
+  { id: 'electrostatica', title: 'Electrostática', subtitle: 'Carga eléctrica, Ley de Coulomb y potencial eléctrico' },
+  { id: 'capacitancia', title: 'Capacitancia y Energía Almacenada', subtitle: 'Capacitores y dieléctricos' },
+  { id: 'corriente', title: 'Corriente Eléctrica y Ley de Ohm', subtitle: 'Resistencias, potencia y conducción eléctrica' },
+  { id: 'circuitos', title: 'Circuitos Eléctricos', subtitle: 'Leyes de Kirchhoff y análisis de mallas' },
+  { id: 'magnetismo', title: 'Magnetismo y Fuerza de Lorentz', subtitle: 'Campos magnéticos y movimiento de cargas' },
+  { id: 'induccion', title: 'Inducción Electromagnética', subtitle: 'Leyes de Faraday y Lenz' },
+  { id: 'rlc', title: 'Autoinducción e Inductores', subtitle: 'Circuitos RL, RC y RLC' },
+  { id: 'maxwell', title: 'Ondas Electromagnéticas', subtitle: 'Ecuaciones de Maxwell y espectro electromagnético' }
+  ];
+
+  const sections = [
+    { id: 'historia', label: 'Historia', icon: Clock },
+    { id: 'teoria', label: 'Teoría', icon: BookOpen },
+    { id: 'calculadora', label: 'Calculadora', icon: Calculator },
+    { id: 'simulacion', label: 'Simulación', icon: Activity }
+  ];
+
+  const content = {
+    cinematica: {
+      historia: {
+        title: 'Historia de la Cinemática',
+        content: `La cinemática, entendida como la rama de la física que estudia el movimiento de los cuerpos sin atender a las causas que lo producen, tiene sus raíces en las primeras reflexiones filosóficas de la antigüedad griega. Filósofos como Aristóteles (384–322 a.C.) intentaron describir y categorizar los distintos tipos de movimiento observables en la naturaleza, distinguiendo entre movimientos naturales y violentos. No obstante, sus planteamientos eran de carácter cualitativo y especulativo, basados más en la observación empírica y el razonamiento lógico que en la experimentación cuantitativa. Según Aristóteles, la velocidad de un cuerpo dependía directamente de la fuerza aplicada y del medio en el que se movía, una concepción que, aunque influyente durante más de un milenio, se aleja de la física moderna.
+
+Durante la Edad Media, pensadores como Juan Filópono y posteriormente los escolásticos de la Escuela de París, entre ellos Jean Buridan (siglo XIV), comenzaron a cuestionar la física aristotélica. Buridan introdujo la idea del impetus, una noción precursora del concepto moderno de inercia, al sostener que un cuerpo en movimiento conservaba una cierta tendencia a seguir desplazándose incluso sin la acción continua de una fuerza externa. Estas ideas, aunque todavía imprecisas, prepararon el terreno para la revolución científica que se desarrollaría en los siglos posteriores.
+
+El Renacimiento marcó un punto de inflexión fundamental con la figura de Galileo Galilei (1564–1642). Galileo fue el primero en aplicar de manera rigurosa el método experimental al estudio del movimiento. Mediante planos inclinados y dispositivos de medición, demostró que los cuerpos en caída libre experimentan una aceleración constante, independiente de su masa, contradiciendo la doctrina aristotélica. Además, formuló las primeras ecuaciones matemáticas del movimiento uniformemente acelerado y estableció la relación entre distancia, tiempo y velocidad, sentando así las bases cuantitativas de la cinemática moderna.
+
+El siglo XVII consolidó definitivamente estos avances con la obra de Isaac Newton (1642–1727). En su tratado Philosophiæ Naturalis Principia Mathematica (1687), Newton unificó los principios de la cinemática y la dinámica al introducir sus tres leyes del movimiento y la ley de gravitación universal. Su enfoque permitió describir el movimiento de los cuerpos celestes y terrestres bajo un mismo marco teórico y matemático, dando origen a la mecánica clásica. Gracias a Newton, la cinemática dejó de ser una descripción empírica del movimiento para convertirse en una disciplina matemática precisa, capaz de predecir trayectorias, velocidades y aceleraciones con exactitud.
+
+En los siglos posteriores, la cinemática evolucionó con el desarrollo de nuevas herramientas matemáticas, como el cálculo diferencial e integral, introducido por Newton y Leibniz. Estas herramientas permitieron describir movimientos más complejos, incluyendo el movimiento en dos y tres dimensiones, así como el estudio de trayectorias curvas, rotaciones y sistemas de referencia no inerciales. En el siglo XIX, la cinemática se consolidó como un componente esencial de la mecánica analítica, complementando los enfoques de Lagrange y Hamilton, que reformularon la física clásica desde una perspectiva más general y elegante.
+
+Hoy en día, la cinemática continúa siendo una parte fundamental del estudio de la mecánica clásica y constituye la base para comprender fenómenos en ramas más avanzadas de la física, como la dinámica de fluidos, la mecánica relativista y la física cuántica. Su desarrollo histórico refleja la evolución del pensamiento científico: desde las conjeturas filosóficas de la antigüedad hasta la precisión matemática de la ciencia moderna.`
+      },
+      teoria: {
+        title: 'Teoría de la Cinemática',
+        content: `La cinemática es la rama de la física que estudia el movimiento de los cuerpos sin considerar las causas que lo producen. Su propósito es describir cómo se mueven los objetos en función del tiempo, la posición, la velocidad y la aceleración.
+
+🧭 Conceptos fundamentales
+
+Partícula: cuerpo cuyas dimensiones se consideran despreciables frente a las distancias del movimiento.
+
+Trayectoria: línea que describe un cuerpo al moverse.
+
+Desplazamiento (Δx): cambio de posición de un cuerpo:
+Δx = x - x₀
+
+Velocidad media (vₘ): razón entre el desplazamiento y el tiempo empleado:
+vₘ = Δx / Δt
+
+Velocidad instantánea (v): valor de la velocidad en un instante determinado:
+v = dx / dt
+
+Aceleración (a): variación de la velocidad con respecto al tiempo:
+a = dv / dt
+
+🟢 Movimiento Rectilíneo Uniforme (MRU)
+
+En el MRU, el cuerpo se desplaza en línea recta con velocidad constante, es decir, la aceleración es nula (a = 0).
+
+La ecuación general del movimiento es:
+x(t) = x₀ + v·t
+
+Donde:
+
+x(t): posición en el instante t
+
+x₀: posición inicial
+
+v: velocidad constante
+
+t: tiempo transcurrido
+
+La gráfica posición-tiempo (x vs t) es una línea recta, cuya pendiente representa la velocidad del cuerpo.
+
+🟠 Movimiento Rectilíneo Uniformemente Acelerado (MRUA)
+
+En el MRUA, el cuerpo se mueve en línea recta con aceleración constante (a = cte).
+Esto significa que la velocidad varía de forma uniforme con el tiempo.
+
+Las ecuaciones fundamentales son:
+
+Velocidad en función del tiempo:
+v(t) = v₀ + a·t
+
+Posición en función del tiempo:
+x(t) = x₀ + v₀·t + (1/2)·a·t²
+
+Velocidad en función de la posición:
+v² = v₀² + 2·a·(x - x₀)
+
+Donde:
+
+x(t): posición final
+
+x₀: posición inicial
+
+v₀: velocidad inicial
+
+v: velocidad final
+
+a: aceleración
+
+t: tiempo transcurrido
+
+Estas ecuaciones se aplican en movimientos como la caída libre, el movimiento vertical de proyectiles y cualquier desplazamiento en línea recta con aceleración constante.
+
+🔵 Movimiento en Dos Dimensiones
+
+Cuando el movimiento ocurre en el plano, las magnitudes se expresan mediante componentes vectoriales.
+
+Posición:
+r(t) = x(t)·î + y(t)·ĵ
+
+Velocidad:
+v(t) = dr/dt = vₓ(t)·î + v_y(t)·ĵ
+
+Aceleración:
+a(t) = dv/dt = aₓ(t)·î + a_y(t)·ĵ
+
+Cada componente puede analizarse de manera independiente utilizando las ecuaciones del MRUA:
+
+x(t) = x₀ + v₀ₓ·t + (1/2)·aₓ·t²
+y(t) = y₀ + v₀_y·t + (1/2)·a_y·t²
+
+🟣 Movimiento Parabólico
+
+Un caso especial del movimiento en dos dimensiones es el movimiento parabólico, que ocurre cuando un cuerpo es lanzado con una velocidad inicial formando un ángulo θ con respecto a la horizontal.
+
+Las componentes iniciales de la velocidad son:
+v₀ₓ = v₀·cos(θ)
+v₀_y = v₀·sin(θ)
+
+Las ecuaciones del movimiento son:
+x(t) = v₀·cos(θ)·t
+y(t) = v₀·sin(θ)·t - (1/2)·g·t²
+
+La trayectoria es una parábola, y el movimiento resulta de la combinación de un MRU en el eje x y un MRUA en el eje y.`
+      },
+      calculadora: { component: CinematicaCalculator },
+      simulacion: { component: CinematicaSimulation }
+    },
+    dinamica: {
+      historia: {
+        title: 'Historia de la Dinámica',
+        content: `La dinámica es una de las ramas fundamentales de la mecánica clásica, encargada de estudiar las causas del movimiento y las fuerzas que lo originan o modifican. A diferencia de la cinemática, que solo describe el movimiento, la dinámica busca comprender por qué los cuerpos se mueven.
+
+Los orígenes de la dinámica se remontan a la antigua Grecia, donde Aristóteles (384–322 a.C.) fue uno de los primeros en intentar explicar el movimiento. Sin embargo, su concepción era errónea: afirmaba que todo movimiento requería una causa o fuerza constante, y que los cuerpos más pesados caían más rápido que los livianos. Estas ideas predominaron durante más de mil años en el pensamiento científico.
+
+El cambio comenzó en el Renacimiento, gracias a los experimentos y observaciones de Galileo Galilei (1564–1642). Galileo demostró que todos los cuerpos, en ausencia de resistencia del aire, caen con la misma aceleración, sentando las bases del estudio moderno del movimiento. Además, introdujo el concepto de inercia, según el cual un cuerpo tiende a mantener su estado de movimiento o reposo si no actúa sobre él una fuerza externa.
+
+El desarrollo definitivo de la dinámica llegó con Isaac Newton (1642–1727). En su obra Philosophiæ Naturalis Principia Mathematica (1687), formuló las tres leyes del movimiento que constituyen los cimientos de la mecánica clásica:
+
+Primera Ley o Ley de la Inercia:
+Un cuerpo permanece en reposo o en movimiento rectilíneo uniforme mientras no actúe sobre él una fuerza externa.
+
+Segunda Ley o Ley Fundamental de la Dinámica:
+La aceleración de un cuerpo es directamente proporcional a la fuerza neta que actúa sobre él e inversamente proporcional a su masa.
+F = m·a
+
+Tercera Ley o Ley de Acción y Reacción:
+A toda acción corresponde una reacción de igual magnitud y en sentido opuesto.
+
+Estas leyes unificaron la cinemática y la estática dentro de un mismo marco teórico, permitiendo explicar el movimiento de los cuerpos tanto en la Tierra como en el espacio. Con ellas, Newton logró también describir el movimiento planetario mediante su Ley de la Gravitación Universal, conectando la dinámica terrestre con la celeste.
+
+Durante los siglos XVIII y XIX, la dinámica evolucionó gracias a científicos como Leonhard Euler, quien extendió las leyes de Newton al movimiento de cuerpos rígidos, y Joseph-Louis Lagrange, quien formuló la mecánica analítica, una versión más general basada en la energía y las coordenadas generalizadas. Más tarde, William Hamilton refinó estos conceptos y sentó las bases de la mecánica moderna, utilizada incluso en la física cuántica.
+
+En síntesis, la historia de la dinámica representa la transición del pensamiento filosófico al método científico, al pasar de las ideas cualitativas de Aristóteles a la rigurosa formulación matemática de Newton y sus sucesores. Esta evolución permitió comprender no solo el movimiento cotidiano, sino también los fenómenos astronómicos y tecnológicos que sustentan la ciencia contemporánea.`
+      },
+      teoria: {
+        title: 'Teoría de la Dinámica',
+        content: `La dinámica es la rama de la mecánica que estudia las causas que originan o modifican el movimiento de los cuerpos. Su fundamento principal es el concepto de fuerza, entendida como toda interacción capaz de alterar el estado de reposo o movimiento de un objeto.
+
+🧭 Conceptos fundamentales
+
+Masa (m): medida de la inercia de un cuerpo, es decir, su resistencia al cambio de movimiento.
+
+Fuerza (F): toda acción que al aplicarse sobre un cuerpo puede producir una aceleración o una deformación.
+
+Peso (P): fuerza con la que la Tierra atrae a un cuerpo debido a la gravedad.
+P = m * g
+donde g = 9.8 m/s² es la aceleración de la gravedad.
+
+Normal (N): fuerza de reacción perpendicular a la superficie de contacto.
+
+Tensión (T): fuerza transmitida a través de un cable, cuerda o resorte.
+
+Fricción (f): fuerza que se opone al movimiento entre dos superficies en contacto.
+
+📘 Leyes Fundamentales de Newton
+🔹 Primera Ley o Ley de la Inercia
+
+Todo cuerpo tiende a mantener su estado de reposo o de movimiento rectilíneo uniforme mientras no actúe sobre él una fuerza externa neta.
+Matemáticamente, si la fuerza neta (ΣF = 0), entonces la aceleración (a = 0).
+
+🔹 Segunda Ley o Ley Fundamental de la Dinámica
+
+La aceleración de un cuerpo es directamente proporcional a la fuerza neta que actúa sobre él e inversamente proporcional a su masa:
+
+ΣF = m * a
+
+Esta ecuación es el principio fundamental de toda la dinámica clásica.
+Cada componente vectorial de la fuerza produce una aceleración en la misma dirección.
+
+🔹 Tercera Ley o Ley de Acción y Reacción
+
+A toda fuerza de acción corresponde una fuerza de reacción igual en magnitud y opuesta en dirección, que actúa sobre cuerpos distintos.
+Ejemplo: si un cuerpo A ejerce una fuerza F_AB sobre un cuerpo B, este último ejerce sobre A una fuerza F_BA = -F_AB.
+
+⚖️ Tipos de fuerzas en la dinámica
+
+Fuerza de gravedad:
+P = m * g
+
+Fuerza normal (N):
+Reacción perpendicular de una superficie. En un plano horizontal sin aceleración:
+N = P = m * g
+
+Fuerza de tensión (T):
+Aparece en cuerdas, cables o resortes idealmente sin masa.
+
+Fuerza de fricción (f):
+Se opone al movimiento.
+
+Fricción estática: fₑ ≤ μₑ * N
+
+Fricción cinética: f_c = μ_c * N
+donde μₑ y μ_c son los coeficientes de fricción estática y cinética.
+
+Fuerza elástica (Ley de Hooke):
+F = -k * x
+donde k es la constante elástica del resorte y x la elongación.
+
+🟠 Aplicaciones de la Segunda Ley de Newton
+🔹 Movimiento en plano horizontal (sin fricción)
+
+ΣF = m * a
+Si una fuerza F actúa sobre un cuerpo:
+a = F / m
+
+🔹 Movimiento en plano inclinado sin fricción
+
+Componentes del peso:
+Pₓ = m * g * sen(θ)
+P_y = m * g * cos(θ)
+
+Fuerza neta sobre el plano:
+ΣF = m * g * sen(θ) = m * a
+
+Por tanto:
+a = g * sen(θ)
+
+🔹 Plano inclinado con fricción
+
+Fuerza de fricción:
+f = μ * N = μ * m * g * cos(θ)
+
+La aceleración se obtiene de:
+a = g * (sen(θ) - μ * cos(θ))
+
+🧮 Diagrama de cuerpo libre
+
+El diagrama de cuerpo libre (DCL) es una herramienta esencial en dinámica. Consiste en aislar un cuerpo y representar todas las fuerzas que actúan sobre él.
+Cada fuerza debe indicarse con su dirección y punto de aplicación.
+Este método permite aplicar correctamente la ecuación fundamental ΣF = m * a en cada eje de coordenadas.
+
+🔵 Movimiento circular dinámico
+
+Cuando un cuerpo se mueve en trayectoria circular, experimenta una aceleración centrípeta dirigida hacia el centro del círculo.
+La fuerza neta responsable de este movimiento es la fuerza centrípeta (F_c):
+
+F_c = m * v² / r
+
+donde:
+
+m: masa del cuerpo
+
+v: velocidad tangencial
+
+r: radio de la trayectoria
+
+Si la velocidad es constante, el movimiento es circular uniforme.
+Si cambia la magnitud de la velocidad, se dice que es circular no uniforme, y aparece además una aceleración tangencial (a_t = dv/dt).`
+      },
+      calculadora: { component: DinamicaCalculator },
+      simulacion: { component: DinamicaSimulation }
+    },
+    trabajo: {
+      historia: {
+        title: 'Historia del Trabajo y la Energía',
+        content: `El estudio del trabajo, la energía y la potencia tiene sus raíces en el desarrollo histórico de la física clásica, especialmente durante los siglos XVII y XVIII, cuando los científicos comenzaron a comprender la relación entre las fuerzas y el movimiento desde una perspectiva cuantitativa.
+
+En la Antigüedad, los filósofos griegos como Aristóteles (384–322 a.C.) ya reflexionaban sobre el movimiento y el esfuerzo humano, aunque sin una formulación matemática rigurosa. Aristóteles consideraba que para mantener el movimiento era necesario aplicar continuamente una fuerza, una idea que posteriormente sería refutada por la física moderna.
+
+El verdadero avance comenzó en el Renacimiento, con los experimentos de Galileo Galilei (1564–1642). Galileo introdujo el concepto de aceleración constante en la caída libre y demostró que el movimiento podía describirse mediante leyes matemáticas, sentando así las bases de la cinemática y preparando el camino para una comprensión más profunda de la energía.
+
+El siguiente gran salto se produjo con Isaac Newton (1642–1727), quien formuló las Leyes del Movimiento y la Ley de Gravitación Universal. Estas leyes explicaron cómo las fuerzas generan aceleraciones y, en consecuencia, cómo el trabajo de una fuerza puede cambiar el estado de movimiento de un cuerpo. Sin embargo, el concepto de “energía” aún no estaba completamente desarrollado.
+
+Durante el siglo XVIII, científicos como Gottfried Wilhelm Leibniz introdujeron el término “vis viva” (fuerza viva), que más tarde evolucionaría hacia el concepto moderno de energía cinética. Leibniz propuso que la magnitud 
+𝑚
+∗
+𝑣
+2
+m∗v
+2
+ se conservaba en ciertos procesos mecánicos, anticipando el principio de conservación de la energía.
+
+A mediados del siglo XIX, el concepto de energía adquirió una nueva dimensión con los estudios de James Prescott Joule (1818–1889). A través de experimentos cuidadosos, Joule demostró la equivalencia entre el trabajo mecánico y el calor, estableciendo el Principio de Conservación de la Energía, según el cual la energía no se crea ni se destruye, solo se transforma de una forma a otra. En su honor, la unidad del trabajo y de la energía en el Sistema Internacional recibe el nombre de julio (J).
+
+Por otro lado, la noción de potencia surgió de la necesidad práctica de medir la capacidad de las máquinas para realizar trabajo en un tiempo determinado. El ingeniero escocés James Watt (1736–1819), al mejorar la máquina de vapor, definió la potencia mecánica y propuso la unidad caballo de fuerza (horsepower) como medida de comparación. Este concepto resultó fundamental para el desarrollo de la ingeniería y la Revolución Industrial.
+
+Con el paso del tiempo, el estudio del trabajo, la energía y la potencia se integró en un marco más amplio de la física, extendiéndose a la termodinámica, la electrodinámica y la mecánica relativista. No obstante, sus principios fundamentales siguen siendo los mismos formulados durante la física clásica: el trabajo de una fuerza produce cambios en la energía de un sistema, y la potencia determina la rapidez con la que dichos cambios ocurren.
+
+En la actualidad, estos conceptos son esenciales no solo en la mecánica teórica, sino también en el diseño de máquinas, la generación de energía, la biomecánica y prácticamente todas las ramas de la ingeniería. Su estudio permite comprender cómo la naturaleza transforma y conserva la energía, revelando una de las leyes más universales y poderosas del mundo físico.`
+      },
+      teoria: {
+        title: 'Teoría del Trabajo, Energía y Potencia',
+        content: `En el estudio de la dinámica, el movimiento de los cuerpos no solo se explica mediante fuerzas, sino también a través de conceptos energéticos que permiten describir los cambios en el estado físico de un sistema. Entre estos conceptos fundamentales se encuentran el trabajo, la energía y la potencia, los cuales establecen la conexión entre la fuerza y el movimiento.
+
+1. Trabajo mecánico
+
+El trabajo (W) representa la transferencia de energía que ocurre cuando una fuerza actúa sobre un cuerpo y produce un desplazamiento en la dirección de esa fuerza.
+
+W = F * d * cos(θ)
+
+Donde:
+
+W = trabajo (julios, J)
+
+F = magnitud de la fuerza aplicada (newtons, N)
+
+d = desplazamiento del cuerpo (metros, m)
+
+θ = ángulo entre la fuerza y el desplazamiento
+
+Cuando la fuerza y el desplazamiento tienen la misma dirección, el trabajo es máximo y positivo.
+Si la fuerza se opone al movimiento, el trabajo es negativo.
+Cuando son perpendiculares, el trabajo es nulo.
+
+En el caso de una fuerza variable, el trabajo se obtiene mediante la integral:
+
+W = ∫(x1 → x2) F(x) dx
+
+2. Energía cinética
+
+La energía cinética (Ec) es la energía asociada al movimiento de un cuerpo. Todo objeto con masa que se mueve a cierta velocidad posee energía cinética dada por:
+
+Ec = (1/2) * m * v²
+
+Donde:
+
+m = masa del cuerpo (kg)
+
+v = velocidad del cuerpo (m/s)
+
+Esta expresión se obtiene aplicando el teorema trabajo-energía, que establece que el trabajo total realizado por las fuerzas sobre un cuerpo es igual al cambio en su energía cinética:
+
+Wtotal = ΔEc = Ec2 - Ec1
+
+3. Energía potencial
+
+La energía potencial (Ep) es la energía almacenada en un sistema debido a la posición o configuración de un cuerpo bajo la acción de una fuerza conservativa.
+
+Energía potencial gravitatoria:
+
+Ep = m * g * h
+
+Donde h es la altura con respecto a un nivel de referencia, y g es la aceleración de la gravedad (9.8 m/s²).
+
+Energía potencial elástica:
+
+Ep = (1/2) * k * x²
+
+Donde k es la constante elástica del resorte (N/m), y x es la deformación del resorte (m).
+
+4. Energía mecánica y su conservación
+
+La energía mecánica total (Em) de un cuerpo o sistema es la suma de su energía cinética y potencial:
+
+Em = Ec + Ep
+
+En ausencia de fuerzas no conservativas (como la fricción o el rozamiento), la energía mecánica se conserva:
+
+Em1 = Em2
+
+o, en términos de variación:
+
+ΔEc + ΔEp = 0
+
+Esto significa que la energía no se pierde, sino que se transforma entre formas cinéticas y potenciales dentro del sistema.
+
+5. Potencia
+
+La potencia (P) mide la rapidez con la que se realiza un trabajo o se transforma energía en un sistema físico.
+
+P = W / t
+
+Donde:
+
+P = potencia (vatios, W)
+
+W = trabajo realizado (julios, J)
+
+t = tiempo empleado (segundos, s)
+
+También puede expresarse instantáneamente como:
+
+P = F * v * cos(θ)
+
+6. Principio de conservación de la energía
+
+El principio de conservación de la energía establece que la energía total del universo permanece constante. Aunque puede transformarse de una forma a otra (por ejemplo, de potencial a cinética o de mecánica a térmica), la cantidad total de energía nunca varía:
+
+Etotal = constante
+
+En sistemas donde actúan fuerzas no conservativas, como el rozamiento, la pérdida de energía mecánica se convierte en otras formas de energía, generalmente calor o sonido.`
+      },
+      calculadora: { component: TrabajoCalculator },
+      simulacion: { component: TrabajoSimulation }
+    },
+    conservacion: {
+      historia: {
+        title: 'Historia de la Conservación de la Energía',
+        content: `El principio de conservación de la energía es uno de los pilares fundamentales de la física moderna, pero su desarrollo tomó varios siglos de observación, experimentación y reflexión teórica.
+
+En la Antigüedad, filósofos como Aristóteles creían que el movimiento requería una fuerza continua, y que los objetos tendían naturalmente a detenerse si esa fuerza desaparecía. No existía aún una noción clara de energía, y mucho menos de su conservación.
+
+Durante los siglos XVI y XVII, con el surgimiento de la Revolución Científica, científicos como Galileo Galilei y René Descartes comenzaron a cuestionar estas ideas. Galileo observó que un cuerpo en movimiento continuaría moviéndose indefinidamente en ausencia de fricción, introduciendo el concepto de inercia, mientras que Descartes habló de la cantidad de movimiento, una magnitud que se mantenía constante en los choques.
+
+En el siglo XVII, Isaac Newton formuló sus Leyes del Movimiento y la Ley de Gravitación Universal, estableciendo una base sólida para comprender las fuerzas y los movimientos. Aunque Newton no utilizó el término “energía”, sus leyes permitieron entender cómo se relacionaban la fuerza, el trabajo y el movimiento.
+
+A mediados del siglo XIX, la ciencia avanzó hacia una comprensión más completa. Físicos como James Prescott Joule, Julius Robert Mayer y Hermann von Helmholtz demostraron experimentalmente que la energía no se crea ni se destruye, solo se transforma de una forma a otra, por ejemplo, de energía mecánica a energía térmica. Joule, en particular, realizó experimentos donde mostraba que el trabajo mecánico podía generar calor, estableciendo así la equivalencia entre trabajo y energía.
+
+Finalmente, se formuló el Principio de Conservación de la Energía, que establece que la energía total de un sistema aislado permanece constante con el tiempo. Este principio fue la base para el desarrollo de la termodinámica y, más adelante, para la física moderna, incluyendo la teoría de la relatividad, donde Albert Einstein mostró que la masa también es una forma de energía mediante su famosa ecuación:
+E = m·c².
+
+Hoy en día, este principio es esencial en todas las ramas de la ciencia y la ingeniería, ya que permite comprender, analizar y predecir los procesos naturales y tecnológicos, desde el movimiento de los planetas hasta el funcionamiento de una central eléctrica o una célula biológica.`
+      },
+      teoria: {
+        title: 'Teoría de la Conservación de la Energía',
+        content: `El principio de conservación de la energía es uno de los fundamentos más importantes de la física clásica. Establece que la energía no se crea ni se destruye, solo se transforma de una forma a otra. En un sistema aislado, la cantidad total de energía permanece constante en el tiempo.
+
+1. Concepto general
+
+La energía puede presentarse bajo diversas formas: mecánica, térmica, eléctrica, química, nuclear, entre otras. Aunque puede transformarse entre ellas, la energía total del universo siempre permanece constante.
+Este principio es aplicable a todos los sistemas físicos, desde el movimiento de una partícula hasta los procesos astrofísicos más complejos.
+
+Matemáticamente, puede expresarse como:
+
+Etotal = constante
+
+o de forma diferencial:
+
+ΔEtotal = 0
+
+2. Energía mecánica total
+
+En la mecánica clásica, el tipo de energía más común es la energía mecánica, que resulta de la combinación de la energía cinética y la energía potencial de un cuerpo o sistema.
+
+Em = Ec + Ep
+
+Donde:
+
+Em = energía mecánica total
+
+Ec = energía cinética (movimiento)
+
+Ep = energía potencial (posición o configuración)
+
+Si sobre el cuerpo actúan únicamente fuerzas conservativas (como la gravedad o la elasticidad), la energía mecánica se conserva:
+
+Em1 = Em2
+
+Es decir:
+
+Ec1 + Ep1 = Ec2 + Ep2
+
+o también:
+
+ΔEc + ΔEp = 0
+
+3. Fuerzas conservativas y no conservativas
+
+Fuerzas conservativas:
+Son aquellas cuyo trabajo no depende del camino seguido, sino únicamente de los puntos inicial y final. Ejemplos: fuerza gravitatoria y fuerza elástica.
+El trabajo realizado por una fuerza conservativa se expresa como la variación negativa de la energía potencial:
+
+Wc = -ΔEp
+
+Fuerzas no conservativas:
+Son aquellas en las que parte de la energía mecánica se transforma en otras formas de energía (como calor o sonido). Ejemplo: fuerza de fricción.
+En estos casos, la energía mecánica no se conserva, sino que:
+
+Wnc = ΔEm
+
+donde Wnc es el trabajo de las fuerzas no conservativas.
+
+4. Principio de conservación de la energía mecánica
+
+Cuando un cuerpo o sistema está sometido solo a fuerzas conservativas, la energía mecánica total permanece constante.
+Este principio se expresa como:
+
+Em = Ec + Ep = constante
+
+Por lo tanto, si la energía potencial disminuye, la energía cinética aumenta en la misma proporción, y viceversa.
+
+5. Transformaciones de energía
+
+Durante el movimiento, la energía puede cambiar de forma, pero la suma total se mantiene constante:
+
+Un objeto que cae convierte su energía potencial gravitatoria (Ep = m * g * h) en energía cinética (Ec = (1/2) * m * v²).
+
+En un resorte comprimido, la energía potencial elástica (Ep = (1/2) * k * x²) se transforma en energía cinética cuando el resorte se libera.
+
+En un péndulo ideal, la energía oscila continuamente entre Ep y Ec, sin pérdida total.
+
+6. Conservación de la energía en presencia de rozamiento
+
+Cuando existen fuerzas de fricción o resistencia, parte de la energía mecánica se convierte en energía térmica (Q).
+En estos casos, la ecuación general se expresa como:
+
+Em1 + Wnc = Em2
+
+o:
+
+Ec1 + Ep1 + Wnc = Ec2 + Ep2
+
+donde Wnc representa el trabajo realizado por las fuerzas no conservativas.
+
+7. Aplicaciones
+
+El principio de conservación de la energía se aplica en numerosos campos de la física y la ingeniería:
+
+En el diseño de máquinas y motores, para optimizar la eficiencia energética.
+
+En la astronomía, para estudiar órbitas planetarias y energías gravitatorias.
+
+En la mecánica, para resolver problemas de movimiento sin necesidad de usar directamente las leyes de Newton.
+
+En la termodinámica, como base del primer principio (conservación de la energía interna).
+
+Conclusión
+
+El principio de conservación de la energía constituye una de las leyes universales más poderosas de la naturaleza. Permite comprender que, aunque la energía cambie de forma —de potencial a cinética, o de mecánica a térmica—, la cantidad total de energía siempre se mantiene constante.
+Este principio no solo unifica toda la física clásica, sino que también sirve como base para las teorías modernas, como la relatividad y la mecánica cuántica.`
+      },
+      calculadora: { component: ConservacionCalculator },
+      simulacion: { component: ConservacionSimulation }
+    },
+    momentum: {
+      historia: {
+        title: 'Historia de la Cantidad de Movimiento',
+        content: `El concepto de cantidad de movimiento (también conocida como momento lineal) tiene una larga evolución que refleja el desarrollo del pensamiento científico sobre el movimiento y las fuerzas.
+
+En la Antigüedad, los filósofos griegos, especialmente Aristóteles (384-322 a.C.), sostenían que un objeto solo podía mantenerse en movimiento si una fuerza actuaba constantemente sobre él. Esta idea dominó el pensamiento durante siglos, ya que no se comprendía el papel de la inercia ni la naturaleza del movimiento sin fricción.
+
+Durante la Edad Media, pensadores como Juan Filópono y más tarde Jean Buridan comenzaron a cuestionar las ideas aristotélicas. Buridan introdujo el concepto de ímpetu, una especie de “fuerza interna” que el objeto conservaba mientras se movía. Este fue un antecedente directo del concepto moderno de cantidad de movimiento.
+
+En el siglo XVII, con el surgimiento de la Revolución Científica, el estudio del movimiento cambió radicalmente. René Descartes (1596-1650) propuso que en el universo existía una cantidad total de movimiento que permanecía constante, siendo uno de los primeros en hablar de un principio de conservación del movimiento. Aunque su formulación no era del todo correcta, sentó las bases para futuras investigaciones.
+
+Más tarde, Galileo Galilei (1564-1642) estudió la caída de los cuerpos y el movimiento en planos inclinados, demostrando que los objetos tienden a conservar su estado de movimiento, es decir, introdujo el concepto de inercia, fundamental para la física moderna.
+
+El desarrollo definitivo llegó con Isaac Newton (1643-1727), quien formuló las Leyes del Movimiento. En la segunda ley, estableció que la fuerza neta aplicada sobre un cuerpo es igual a la variación temporal de su cantidad de movimiento:
+F = Δ(m·v) / Δt
+Si la masa es constante, se simplifica a la forma más conocida:
+F = m·a
+
+A partir de entonces, la cantidad de movimiento se definió como:
+p = m·v
+donde p es la cantidad de movimiento, m la masa y v la velocidad.
+
+En el siglo XVIII y XIX, el principio de conservación de la cantidad de movimiento se consolidó, mostrando que en todo sistema aislado (sin fuerzas externas) la cantidad total de movimiento antes y después de una interacción se mantiene constante. Este principio fue comprobado experimentalmente en colisiones elásticas e inelásticas, y se convirtió en una ley fundamental de la mecánica clásica.
+
+Con el avance de la física moderna, especialmente con la teoría de la relatividad de Albert Einstein, se descubrió que la cantidad de movimiento también se ve afectada por la velocidad de la luz, dando lugar a una nueva expresión relativista:
+p = γ·m·v,
+donde γ = 1 / √(1 - v² / c²).
+
+Hoy en día, el concepto de cantidad de movimiento es esencial en todas las ramas de la física —desde la mecánica clásica hasta la cuántica—, ya que permite describir y predecir el comportamiento de cuerpos en movimiento, desde partículas subatómicas hasta planetas y galaxias.`
+      },
+      teoria: {
+        title: 'Teoría de Cantidad de Movimiento y Colisiones',
+        content: `La cantidad de movimiento o momento lineal es una magnitud vectorial que describe el estado dinámico de un cuerpo en movimiento. Se define como el producto de la masa por la velocidad del cuerpo:
+
+
+p=m∗v
+
+donde:
+
+p = cantidad de movimiento (kg·m/s)
+
+m = masa del cuerpo (kg)
+
+v = velocidad (m/s)
+
+Esta magnitud representa la inercia en movimiento de un cuerpo: cuanto mayor sea su masa o su velocidad, mayor será su cantidad de movimiento.
+
+Relación con la Segunda Ley de Newton
+
+La segunda ley de Newton establece que la fuerza neta aplicada sobre un cuerpo es igual a la variación de su cantidad de movimiento en el tiempo:
+
+F=Δp/Δt
+
+Si la masa del cuerpo es constante, esta ecuación se simplifica a la forma más conocida:
+
+
+F=m∗a
+
+donde a es la aceleración.
+Esto demuestra que la fuerza actúa modificando la cantidad de movimiento de un cuerpo.
+
+Principio de Conservación de la Cantidad de Movimiento
+
+En un sistema aislado, es decir, sin fuerzas externas, la cantidad total de movimiento se conserva.
+Esto se expresa como:
+
+
+
+p inicial=p final
+
+o en sistemas con varios cuerpos:
+
+
+m1∗v1i+m2∗v2i=m1∗v1f+m2∗v2f
+
+Este principio es fundamental en el estudio de colisiones (choques) y explosiones:
+
+En una colisión elástica, se conserva tanto la cantidad de movimiento como la energía cinética.
+
+En una colisión inelástica, se conserva la cantidad de movimiento, pero parte de la energía cinética se transforma en calor o deformación.
+
+Impulso y Cantidad de Movimiento
+
+El impulso es otra forma de expresar la acción de una fuerza durante un intervalo de tiempo. Se define como:
+
+
+I=F∗Δt
+
+y está relacionado directamente con la variación de la cantidad de movimiento:
+
+
+I=Δp=m∗vf−m∗vi
+
+donde:
+
+I = impulso (N*s)
+
+v_i = velocidad inicial (m/s)
+
+v_f = velocidad final (m/s)
+
+📘 En resumen:
+La cantidad de movimiento describe el estado dinámico de un cuerpo; la fuerza cambia ese estado; el impulso mide la acción de la fuerza en el tiempo; y en ausencia de fuerzas externas, la cantidad total de movimiento se conserva.`
+      },
+      calculadora: { component: MomentumCalculator },
+      simulacion: { component: MomentumSimulation }
+    },
+    rotacion: {
+      historia: {
+        title: 'Historia de la Rotación de Cuerpos Rígidos',
+        content: `El estudio de la rotación de los cuerpos rígidos y del torque tiene sus raíces en la antigüedad, cuando los primeros filósofos y científicos intentaron comprender cómo los objetos giraban y mantenían el equilibrio.
+
+En la Grecia antigua, Aristóteles (384–322 a.C.) analizó el movimiento de rotación desde una perspectiva filosófica. Aunque sus ideas carecían de una base experimental rigurosa, sentó las primeras nociones sobre el movimiento circular y la influencia de las fuerzas en los objetos. Aristóteles consideraba que todo cuerpo necesitaba una causa constante para mantener su movimiento, idea que luego sería refutada.
+
+El verdadero avance comenzó en el siglo XVII, durante la Revolución Científica, con el trabajo de Galileo Galilei (1564–1642). Galileo investigó la caída de los cuerpos y el movimiento pendular, estableciendo las primeras relaciones entre rotación, tiempo y aceleración angular. Fue el primero en describir experimentalmente cómo la aceleración angular se mantiene constante cuando se aplica una fuerza constante a una rueda o polea.
+
+Posteriormente, Isaac Newton (1642–1727) formuló las leyes del movimiento, que también se aplican a los cuerpos rotacionales. En su obra Philosophiæ Naturalis Principia Mathematica (1687), Newton extendió sus principios de la dinámica lineal al movimiento circular, introduciendo conceptos como momento angular y torque (llamado en esa época “momento de la fuerza”). Con esto, estableció la base matemática para describir el movimiento rotacional de los cuerpos rígidos.
+
+En el siglo XVIII, el matemático suizo Leonhard Euler (1707–1783) amplió estas ideas al desarrollar las ecuaciones de Euler del movimiento rotacional, que describen cómo un cuerpo rígido rota bajo la acción de fuerzas y torques. Estas ecuaciones permitieron analizar fenómenos complejos, como el giro de los planetas o el movimiento de una peonza.
+
+Más adelante, en el siglo XIX, Joseph Lagrange y William Rowan Hamilton formularon teorías más generales de la mecánica (lagrangiana y hamiltoniana) que integraron la rotación y la traslación dentro de un mismo marco matemático. Estas formulaciones facilitaron el estudio de sistemas dinámicos, desde moléculas hasta satélites artificiales.
+
+En la actualidad, los principios de la rotación y el torque son esenciales en la ingeniería, la robótica, la física moderna y la astronomía, aplicándose en el diseño de motores, giroscopios, sistemas de estabilización y simulaciones físicas computacionales.`
+      },
+      teoria: {
+        title: 'Teoría de Rotación y Torque',
+        content: `La rotación de cuerpos rígidos estudia el movimiento de objetos cuyas partes mantienen una distancia constante entre sí, incluso cuando giran. A diferencia de la traslación, donde todo el cuerpo se mueve en la misma dirección, en la rotación las distintas partes del cuerpo siguen trayectorias circulares alrededor de un eje de rotación.
+
+1. Movimiento Angular
+
+En la rotación, las magnitudes lineales tienen sus equivalentes angulares:
+
+
+Posicion angular: θ
+Velocidad angular: ω=Δθ/Δt
+
+Aceleracion angular: α=Δω/Δt
+
+donde:
+
+θ = desplazamiento angular (radianes)
+
+ω = velocidad angular (rad/s)
+
+α = aceleración angular (rad/s²)
+
+t = tiempo (s)
+
+Cuando α es constante, se pueden usar las ecuaciones cinemáticas angulares, análogas a las del movimiento lineal:
+
+ω =ω0+α∗t
+𝜃 =𝜃0+𝜔0∗𝑡+(1/2)∗𝛼∗𝑡^2
+
+𝜔^2 =𝜔02+2∗𝛼∗(𝜃−𝜃0)
+
+2. Relación entre Magnitudes Lineales y Angulares
+
+Un punto que gira a una distancia r del eje tiene una velocidad lineal (v) y una aceleración tangencial (a_t) dadas por:
+
+𝑣 =𝜔∗𝑟
+𝑎𝑡=𝛼∗𝑟
+
+Además, el punto experimenta una aceleración centrípeta (a_c) dirigida hacia el eje de rotación:
+
+𝑎𝑐 =𝜔^2∗𝑟 
+3. Torque (Momento de Fuerza)
+
+El torque es la magnitud que mide la capacidad de una fuerza para producir rotación respecto a un punto o eje. Se define como el producto vectorial del radio de giro y la fuerza aplicada:
+
+𝜏=𝑟∗𝐹∗sin⁡(𝜃)
+
+
+donde:
+
+τ = torque (N*m)
+
+r = distancia desde el eje de rotación hasta el punto de aplicación de la fuerza (m)
+
+F = magnitud de la fuerza (N)
+
+θ = ángulo entre r y F
+
+El torque cumple un papel análogo al de la fuerza en la traslación, ya que provoca una aceleración angular en el cuerpo.
+
+4. Segunda Ley de Newton para la Rotación
+
+Así como en la traslación se cumple F = m * a, en el movimiento rotacional se cumple:
+
+τ=I∗α
+
+donde:
+
+I = momento de inercia (kg·m²)
+
+α = aceleración angular (rad/s²)
+
+El momento de inercia (I) mide la resistencia del cuerpo a cambiar su estado de rotación, y depende de cómo está distribuida la masa respecto al eje de rotación.
+
+Por ejemplo:
+
+Varilla girando sobre un extremo: 
+I=(1/3)∗m∗L^2
+
+Disco sólido: 
+I=(1/2)∗m∗r^2
+
+Esfera sólida: 
+I=(2/5)∗m∗r^2
+
+5. Energía de Rotación
+
+El cuerpo en rotación posee energía cinética rotacional, expresada como:
+
+
+Ek =(1/2)∗I∗ω^2
+
+Esta energía depende tanto del momento de inercia como de la velocidad angular del cuerpo.
+
+6. Momento Angular
+
+El momento angular (L) es la magnitud que representa el estado de rotación de un cuerpo, y se define como:
+
+
+L=I∗ω
+
+La conservación del momento angular establece que, en ausencia de torques externos:
+
+𝐿
+𝑖
+𝑛
+𝑖
+𝑐
+𝑖
+𝑎
+𝑙
+=
+𝐿
+𝑓
+𝑖
+𝑛
+𝑎
+𝑙
+
+
+
+
+Este principio explica fenómenos como el giro más rápido de un patinador cuando acerca los brazos al cuerpo (disminuye I y aumenta ω).`
+      },
+      calculadora: { component: RotacionCalculator },
+      simulacion: { component: RotacionSimulation }
+    },
+    equilibrio: {
+      historia: {
+        title: 'Historia del Equilibrio',
+        content: `El estudio del equilibrio tiene raíces muy antiguas, remontándose a las primeras civilizaciones que buscaron comprender cómo mantener la estabilidad de estructuras y objetos. Desde los antiguos constructores egipcios y babilonios, que aplicaban principios empíricos de balance y simetría para erigir pirámides y templos, hasta los filósofos griegos que comenzaron a formular teorías más abstractas, el concepto de equilibrio siempre ha sido esencial para el desarrollo de la ciencia y la ingeniería.
+
+Antigüedad y Filosofía Natural
+
+En la antigua Grecia, Arquímedes de Siracusa (287–212 a.C.) fue el primero en establecer los fundamentos teóricos del equilibrio. En su obra Sobre el equilibrio de los planos, Arquímedes formuló el principio de la palanca, demostrando que un cuerpo puede mantenerse en equilibrio cuando el momento de fuerza es el mismo a ambos lados del punto de apoyo:
+
+“Dadme un punto de apoyo y moveré el mundo.”
+
+Sus estudios sobre centros de gravedad y flotación también marcaron el nacimiento de la estática, rama de la mecánica que analiza los cuerpos en reposo o en equilibrio de fuerzas.
+
+Renacimiento y Mecánica Clásica
+
+Durante el Renacimiento, científicos como Galileo Galilei (1564–1642) y Simon Stevin (1548–1620) ampliaron los conocimientos de equilibrio. Galileo aplicó métodos experimentales y matemáticos para estudiar la inclinación de planos y la resistencia de materiales, sentando las bases de la estática estructural. Stevin, por su parte, formuló el principio de la balanza inclinada, demostrando que el equilibrio depende de la relación entre fuerzas y distancias.
+
+Con la publicación de los Principia Mathematica de Isaac Newton (1687), el equilibrio adquirió un marco teórico sólido dentro de la mecánica clásica. Las tres leyes del movimiento de Newton explicaron que el equilibrio de un cuerpo (ya sea estático o dinámico) ocurre cuando la suma de las fuerzas y torques que actúan sobre él es igual a cero.
+
+Siglo XIX: Ingeniería y Física Moderna
+
+Durante los siglos XVIII y XIX, el concepto de equilibrio se volvió crucial para la ingeniería civil y mecánica, especialmente en el diseño de puentes, edificaciones, maquinaria y estructuras. Los estudios de Leonhard Euler y Joseph-Louis Lagrange aportaron un enfoque matemático riguroso, permitiendo analizar el equilibrio de sistemas complejos mediante ecuaciones diferenciales.
+
+En la física moderna, el equilibrio no solo se limita a cuerpos rígidos, sino también a sistemas de partículas, fluidos, y sistemas termodinámicos, extendiéndose a campos como la mecánica de materiales y la termodinámica del equilibrio.
+
+Actualidad
+
+Hoy en día, el equilibrio estático y dinámico es un concepto fundamental en todas las ramas de la ingeniería y la física aplicada. Desde el diseño de rascacielos, robots o vehículos espaciales, hasta el estudio del cuerpo humano y los ecosistemas, el equilibrio continúa siendo una herramienta esencial para comprender la estabilidad, resistencia y movimiento de los sistemas físicos.
+
+En resumen, la historia del equilibrio refleja la evolución del pensamiento científico: desde la observación intuitiva de Arquímedes hasta el análisis matemático y computacional de la era moderna.`
+      },
+      teoria: {
+        title: 'Teoría del Equilibrio Estático y Dinámico',
+        content: `El equilibrio es una condición fundamental en la mecánica que describe el estado en el cual un cuerpo mantiene su posición o su movimiento sin experimentar cambios.
+Existen dos tipos principales de equilibrio: estático y dinámico, y ambos se rigen por las leyes de Newton y los principios del torque.
+
+1. Equilibrio Estático
+
+Un cuerpo se encuentra en equilibrio estático cuando permanece en reposo y la suma de todas las fuerzas y de todos los momentos (torques) que actúan sobre él es igual a cero.
+
+Matemáticamente:
+
+∑𝐹=0 ∑F=0 ∑𝜏=0 ∑τ=0
+
+donde:
+
+ΣF = 0 significa que no existe una fuerza neta que produzca traslación.
+
+Στ = 0 indica que no hay un momento resultante que genere rotación.
+
+Ejemplo clásico: una viga apoyada por dos soportes o una balanza en equilibrio.
+
+Condiciones de equilibrio estático
+
+Para que un cuerpo rígido esté en equilibrio:
+
+La suma de las fuerzas horizontales debe ser cero.
+
+∑𝐹𝑥=0
+∑Fx=0
+
+La suma de las fuerzas verticales debe ser cero.
+
+∑𝐹𝑦=0
+∑Fy=0
+
+La suma de los torques (momentos) respecto a cualquier punto debe ser cero.
+
+∑𝜏=0
+∑τ=0
+Momento o torque
+
+El torque (τ) es la tendencia de una fuerza a producir rotación sobre un punto o eje. Se calcula como:
+
+𝜏=𝑟∗𝐹∗sin(𝜃)
+τ=r∗F∗sin(θ)
+
+donde:
+
+τ = torque (N·m)
+
+r = distancia desde el eje hasta el punto de aplicación de la fuerza (m)
+
+F = fuerza aplicada (N)
+
+θ = ángulo entre el vector fuerza y el brazo de palanca
+
+Un torque positivo genera rotación antihoraria, y uno negativo, rotación horaria.
+
+2. Equilibrio Dinámico
+
+Un cuerpo se encuentra en equilibrio dinámico cuando se mueve con velocidad constante en línea recta (sin aceleración). En este caso, la suma de las fuerzas que actúan sobre él sigue siendo cero, pero el cuerpo no está en reposo, sino en movimiento uniforme.
+
+∑𝐹=0y𝑎=0
+∑F=0ya=0
+
+Ejemplo:
+Un automóvil que avanza en carretera a velocidad constante con el motor compensando exactamente la resistencia del aire y la fricción.
+
+El equilibrio dinámico es una extensión directa de la Primera Ley de Newton (Ley de la Inercia), la cual establece que un cuerpo continuará en su estado de reposo o movimiento uniforme si no actúan fuerzas netas sobre él.
+
+3. Tipos de Equilibrio según la Estabilidad
+
+La estabilidad describe la tendencia de un cuerpo a conservar o perder su posición de equilibrio después de una perturbación:
+
+Equilibrio estable: el cuerpo retorna a su posición inicial después de ser desplazado (ej. un péndulo).
+
+Equilibrio inestable: el cuerpo se aleja más al ser desplazado (ej. una pelota sobre una colina).
+
+Equilibrio indiferente: el cuerpo permanece en equilibrio en cualquier nueva posición (ej. una esfera sobre una superficie plana).
+
+4. Aplicaciones del Equilibrio
+
+El análisis del equilibrio es esencial en:
+
+Ingeniería estructural: cálculo de vigas, puentes y edificios.
+
+Biomecánica: estudio de articulaciones y posturas del cuerpo humano.
+
+Diseño mecánico: estabilidad de máquinas, palancas y mecanismos.
+
+Arquitectura y robótica: balance de estructuras y sistemas móviles.`
+      },
+      calculadora: { component: EquilibrioCalculator },
+      simulacion: { component: EquilibrioSimulation }
+    },
+    gravitacion: {
+      historia: {
+        title: 'Historia de la Gravitación Universal',
+        content: `La historia de la Gravitación Universal es una de las más importantes en la física, porque permitió entender que los mismos principios que rigen en la Tierra también se aplican en el universo.
+
+En la antigüedad, filósofos como Aristóteles pensaban que los cuerpos caían porque buscaban su “posición natural” en el centro del mundo, y que los astros se movían en círculos perfectos. No existía aún una explicación matemática que unificara estos fenómenos.
+
+En el siglo XVI, Nicolás Copérnico propuso el modelo heliocéntrico, donde el Sol estaba en el centro del sistema solar. Más tarde, Johannes Kepler, usando las observaciones de Tycho Brahe, descubrió que los planetas se movían en órbitas elípticas, formulando sus tres leyes del movimiento planetario. Sin embargo, aún faltaba una causa que explicara ese movimiento.
+
+El gran avance llegó con Isaac Newton, quien en 1687 publicó su obra Philosophiae Naturalis Principia Mathematica. Allí formuló la Ley de la Gravitación Universal, que afirma que toda masa en el universo atrae a otra masa con una fuerza directamente proporcional al producto de sus masas e inversamente proporcional al cuadrado de la distancia que las separa.
+
+La ecuación es:
+
+𝐹=𝐺×(𝑚1×𝑚2)/𝑟^2
+
+
+donde:
+
+𝐹
+F = fuerza de atracción gravitatoria
+
+𝐺
+G = constante de gravitación universal = 
+6.67×10^−11𝑁*𝑚^2/𝑘𝑔^2
+6.67×10
+^−11
+N*m
+^2
+/kg
+^2
+
+𝑚
+1
+m
+1
+
+
+ y 
+𝑚
+2
+m
+2
+	​
+
+ = masas de los cuerpos
+
+𝑟
+r = distancia entre los centros de masa de los cuerpos
+
+Con esta ley, Newton explicó que la misma fuerza que hace caer una manzana es la que mantiene a la Luna en órbita alrededor de la Tierra. Así unificó los movimientos terrestres y celestes bajo una sola ley matemática.
+
+Años después, Albert Einstein propuso la Teoría General de la Relatividad (1915), donde explicó que la gravedad no es una fuerza a distancia, sino la curvatura del espacio-tiempo causada por la masa.
+
+Aun así, la ley de Newton sigue siendo válida y muy precisa para la mayoría de los cálculos astronómicos y de ingeniería.
+
+En conclusión, la historia de la gravitación universal marcó el paso de las ideas filosóficas a las leyes científicas expresadas con ecuaciones, revolucionando nuestra comprensión del universo.`
+      },
+      teoria: {
+        title: 'Teoría de Gravitación y Movimiento Planetario',
+        content: `La Gravitación Universal es una de las leyes fundamentales de la física clásica que describe la interacción entre todos los cuerpos con masa en el universo. Fue formulada por Isaac Newton en 1687 y establece que toda partícula de materia en el universo atrae a otra con una fuerza directamente proporcional al producto de sus masas e inversamente proporcional al cuadrado de la distancia que las separa.
+
+La ecuación general es:
+
+𝐹=𝐺×(𝑚1×𝑚2)/𝑟^2
+
+donde:
+
+𝐹 = fuerza gravitacional (N)
+
+𝐺 = constante de gravitación universal = 
+6.67×10^−11 𝑁*𝑚^2/𝑘𝑔^2
+
+
+𝑚1 y 𝑚2 = masas de los dos cuerpos (kg)
+
+𝑟 = distancia entre los centros de masa de los cuerpos (m)
+
+Campo Gravitatorio
+
+El campo gravitatorio es la región del espacio en la cual una masa ejerce una fuerza gravitacional sobre otra. La intensidad del campo gravitatorio (también llamada aceleración de la gravedad) se define como:
+
+𝑔 = 𝐹/𝑚
+
+
+Sustituyendo 
+𝐹 =𝐺×(𝑚×𝑀)/𝑟2 , se obtiene:
+
+𝑔 =𝐺×𝑀/𝑟^2
+
+
+donde:
+
+𝑔 = intensidad del campo gravitatorio (m/s²)
+
+𝑀 = masa del cuerpo que genera el campo (kg)
+
+𝑟 = distancia al centro del cuerpo (m)
+
+En la superficie terrestre, el valor promedio de 
+𝑔 es aproximadamente 9.8 m/s².
+
+Potencial Gravitatorio
+
+El potencial gravitatorio (V) en un punto se define como el trabajo que se debe realizar por unidad de masa para trasladar una masa desde el infinito hasta ese punto. Se expresa como:
+
+𝑉 =−𝐺×𝑀/𝑟
+
+
+El signo negativo indica que el trabajo es realizado por el campo gravitatorio (fuerza atractiva).
+
+Energía Potencial Gravitatoria
+
+La energía potencial gravitatoria (U) de un cuerpo de masa 
+𝑚
+m en el campo de otro cuerpo de masa 
+𝑀
+M es:
+
+𝑈 =−𝐺×(𝑀×𝑚)/𝑟
+
+Esta energía es negativa porque la fuerza gravitatoria es atractiva: el sistema tiende a disminuir su energía al acercarse los cuerpos.
+
+Peso y Fuerza Gravitatoria en la Tierra
+
+En la superficie terrestre, la fuerza con que la Tierra atrae a un cuerpo se conoce como peso (P):
+
+𝑃 =𝑚×𝑔
+
+donde 
+𝑔=𝐺×𝑀𝑇/𝑅𝑇^2 , siendo:
+
+𝑀𝑇 = masa de la Tierra
+
+𝑅𝑇 = radio de la Tierra
+
+Aplicaciones
+
+Cálculo de la fuerza gravitatoria entre planetas, satélites y estrellas.
+
+Determinación de órbitas de cuerpos celestes.
+
+Predicción del movimiento de satélites artificiales.
+
+Cálculo del peso de los cuerpos en distintos planetas.`
+      },
+      calculadora: { component: GravitacionCalculator },
+      simulacion: { component: GravitacionSimulation }
+    },
+    Temperatura: {
+      historia: {
+        title: 'Historia del Concepto de Temperatura ',
+        content: `1. Concepto de temperatura: energía cinética promedio de las partículas
+
+La idea de temperatura ha existido desde las civilizaciones antiguas, cuando las personas notaban que algunos objetos estaban “calientes” y otros “fríos”. Sin embargo, por siglos se creyó que el calor era una sustancia invisible llamada calórico, que fluía de los cuerpos calientes a los fríos.
+Esta idea dominó hasta el siglo XIX, cuando los científicos comenzaron a entender que el calor no era una sustancia, sino una forma de energía.
+
+Con los trabajos de James Prescott Joule (1818–1889) y Rudolf Clausius (1822–1888) se estableció que la temperatura está relacionada con el movimiento de las partículas.
+Gracias al desarrollo de la teoría cinética de los gases, se comprendió que la temperatura mide la energía cinética promedio de las moléculas: cuanto más rápido se mueven, más alta es la temperatura.
+
+2. Equilibrio térmico y la Ley Cero de la Termodinámica
+
+El concepto de equilibrio térmico fue fundamental para poder medir la temperatura de manera coherente.
+A fines del siglo XIX, los científicos se dieron cuenta de que si dos cuerpos en contacto no intercambian calor, se dice que están en equilibrio térmico.
+
+A partir de este principio se formuló la Ley Cero de la Termodinámica, llamada así porque fue enunciada después de la primera y segunda leyes, pero resulta más fundamental.
+Esta ley establece que:
+
+Si un cuerpo A está en equilibrio térmico con un cuerpo B, y B está en equilibrio térmico con un cuerpo C, entonces A y C también están en equilibrio térmico.
+
+Esta ley permitió definir de forma universal la temperatura como una propiedad medible que determina el equilibrio térmico entre cuerpos.
+
+3. Termómetros y medición de temperatura
+
+Los primeros intentos de medir la temperatura se remontan al siglo XVII.
+
+En 1592, Galileo Galilei diseñó un instrumento llamado termoscopio, que mostraba cambios de temperatura mediante el movimiento de un líquido en un tubo.
+
+Más tarde, Santorio Santorio, un médico italiano, fue el primero en añadir una escala graduada, convirtiendo el termoscopio en el primer termómetro clínico.
+
+Durante los siglos XVII y XVIII, varios científicos propusieron diferentes sustancias termométricas (como el alcohol o el mercurio) y escalas numéricas, lo que dio origen a los termómetros modernos.
+
+4. Escalas de temperatura: Celsius, Fahrenheit y Kelvin
+
+Las escalas de temperatura surgieron como una necesidad de estandarizar las mediciones:
+
+Escala Fahrenheit (1724):
+Creada por Daniel Gabriel Fahrenheit, usó como puntos de referencia la temperatura de congelación de una mezcla de agua con sal (0 °F) y la temperatura del cuerpo humano (~96 °F). El agua pura congela a 32 °F y hierve a 212 °F.
+
+Escala Celsius (1742):
+Propuesta por Anders Celsius, define 0 °C como el punto de congelación del agua y 100 °C como el de ebullición, bajo condiciones normales de presión. Esta escala fue adoptada ampliamente en Europa y en la ciencia.
+
+Escala Kelvin (1848):
+El físico William Thomson (Lord Kelvin) introdujo una escala absoluta, donde el cero absoluto (0 K) representa el punto en que las partículas tienen energía cinética mínima.
+No tiene valores negativos y se usa en física porque está directamente relacionada con la energía molecular.
+
+5. Conversión entre escalas térmicas
+
+Con el tiempo, se establecieron fórmulas de conversión entre las escalas para unificar las mediciones:
+
+°C = (5/9) × (°F − 32)
+°F = (9/5) × °C + 32
+K = °C + 273.15
+
+Estas conversiones permiten expresar la temperatura en cualquier escala sin perder precisión, lo que fue esencial para el avance de la termodinámica y la ingeniería.
+
+6. Temperatura absoluta y el cero absoluto
+
+El cero absoluto es el límite inferior de la temperatura, donde la energía cinética molecular es mínima.
+Este concepto fue propuesto en el siglo XIX, cuando Lord Kelvin observó que los gases tienden a disminuir su volumen con el enfriamiento, y extrapolando las curvas de comportamiento, dedujo que el volumen se volvería cero a −273,15 °C, es decir, 0 K.
+
+En el siglo XX, con los avances de la física cuántica, se comprobó que al acercarse al cero absoluto, los átomos casi dejan de moverse, y se descubrieron fenómenos extraordinarios como la superconductividad y la superfluidez.
+Hasta hoy, el cero absoluto no se ha alcanzado en la práctica, pero se ha logrado aproximarse a unos 10⁻⁹ kelvin, lo que permite estudiar la materia en condiciones extremas.`
+      },
+      teoria: {
+        title: 'Teoría: Temperatura y Escalas Térmicas',
+        content: ` 1. Concepto de Temperatura
+
+La temperatura es una magnitud física que indica el grado de movimiento o agitación de las partículas que forman un cuerpo.
+Cuanto mayor es la temperatura, mayor es la energía cinética promedio de las partículas.
+
+La relación entre la energía cinética y la temperatura se expresa con la siguiente fórmula:
+
+Ek = (3/2) · k · T
+
+Donde:
+
+Ek = energía cinética promedio de una molécula (en joules, J)
+
+k = constante de Boltzmann = 1.38 × 10⁻²³ J/K
+
+T = temperatura absoluta (en kelvins, K)
+
+Esto significa que la temperatura es una medida directa de la energía interna asociada al movimiento molecular.
+
+2. Equilibrio Térmico y Ley Cero de la Termodinámica
+
+El equilibrio térmico ocurre cuando dos cuerpos en contacto no intercambian calor, lo cual sucede únicamente si tienen la misma temperatura.
+
+La Ley Cero de la Termodinámica establece que:
+
+Si un cuerpo A está en equilibrio térmico con un cuerpo B,
+y B está en equilibrio térmico con un cuerpo C,
+entonces A y C están también en equilibrio térmico entre sí.
+
+Esta ley permite definir la temperatura como una propiedad medible, base para la construcción de los termómetros.
+
+ 3. Termómetros y Medición de la Temperatura
+
+Un termómetro es un instrumento que mide la temperatura utilizando el cambio de una propiedad física que varía con el calor, como:
+
+Dilatación de líquidos (mercurio o alcohol).
+
+Variación de presión de un gas.
+
+Cambio de resistencia eléctrica en metales o semiconductores.
+
+El valor obtenido depende de la escala térmica usada.
+
+ 4. Escalas de Temperatura
+
+Existen tres escalas principales de medición de temperatura:
+
+ Escala Celsius (°C):
+
+Basada en las propiedades del agua:
+
+Punto de congelación: 0 °C
+
+Punto de ebullición: 100 °C
+
+ Escala Fahrenheit (°F):
+
+Usada principalmente en Estados Unidos:
+
+Punto de congelación del agua: 32 °F
+
+Punto de ebullición: 212 °F
+
+ Escala Kelvin (K):
+
+Es la escala absoluta del Sistema Internacional.
+Su punto de partida es el cero absoluto, donde la energía cinética molecular es mínima.
+
+Relación con Celsius: K = °C + 273.15
+
+ 5. Conversión entre Escalas Térmicas
+
+Las fórmulas de conversión son:
+
+°C = (5/9) · (°F − 32)
+
+°F = (9/5) · °C + 32
+
+K = °C + 273.15
+
+°C = K − 273.15
+
+°F = (9/5) · (K − 273.15) + 32
+
+K = (5/9) · (°F − 32) + 273.15
+
+Estas fórmulas permiten pasar de una escala a otra sin alterar el valor físico de la temperatura.
+
+ 6. Temperatura Absoluta y el Cero Absoluto
+
+El cero absoluto es la temperatura más baja posible, donde las partículas tienen energía cinética mínima.
+Su valor es:
+0 K = −273.15 °C = −459.67 °F
+
+En este punto, el movimiento molecular se detiene casi por completo, aunque la mecánica cuántica indica que persiste una mínima energía llamada energía del punto cero.
+
+La escala Kelvin, propuesta por Lord Kelvin (William Thomson) en 1848, utiliza este valor como origen y por eso no presenta temperaturas negativas.
+Es la escala más usada en física, química y termodinámica, ya que permite expresar las leyes del calor y la energía de manera exacta.`
+      },
+      calculadora: { component: TemperaturaCalculator },
+      simulacion: { component: TemperaturaSimulation }
+    },
+    calor_trabajo: {
+      historia: {
+        title: 'Calor, Trabajo y Energía Interna ',
+        content: `A lo largo de la historia, el estudio del calor, el trabajo y la energía interna ha sido fundamental para el desarrollo de la termodinámica. Desde los experimentos de James Prescott Joule en el siglo XIX, se comprendió que el calor no era una sustancia material, como proponía la teoría del calórico, sino una forma de energía en tránsito. Esta idea revolucionó la física, estableciendo las bases para el Primer Principio de la Termodinámica.
+
+El calor se define como la transferencia de energía térmica entre cuerpos o sistemas debido a una diferencia de temperatura. Se representa por la letra Q, y su unidad en el Sistema Internacional es el joule (J). Cuando un sistema absorbe calor, se considera Q > 0, y cuando lo libera, Q < 0.
+
+Por su parte, la temperatura (T) es una medida del estado térmico de un cuerpo, relacionada con la energía cinética promedio de sus partículas. La diferencia entre ambos conceptos es fundamental: la temperatura describe un estado, mientras que el calor describe un proceso de transferencia.
+
+El trabajo (W) en termodinámica representa la energía transferida por acción mecánica. Se define matemáticamente como:
+
+
+W=∫PdV
+
+donde P es la presión del sistema y dV el diferencial de volumen. Si el sistema realiza trabajo sobre el entorno (W > 0), la energía interna disminuye; si el entorno realiza trabajo sobre el sistema (W < 0), la energía interna aumenta.
+
+La energía interna (U) es la suma de todas las formas de energía microscópica (cinética y potencial) de las partículas que componen un sistema. Su variación se expresa mediante la ecuación fundamental del Primer Principio de la Termodinámica:
+
+
+ΔU=Q−W
+
+Este principio establece que la energía no se crea ni se destruye, solo se transforma. La variación de energía interna de un sistema es igual al calor que recibe menos el trabajo que realiza.
+
+En un gas ideal, la energía interna depende únicamente de la temperatura. Matemáticamente:
+
+𝑈=𝑛𝐶𝑉𝑇
+
+
+donde n es el número de moles, C_V la capacidad calorífica molar a volumen constante y T la temperatura absoluta. A nivel microscópico, la energía cinética promedio por molécula se expresa como:
+
+𝐸𝑘=3/2𝑘𝑇
+
+
+donde k es la constante de Boltzmann (k = 1.38 × 10⁻²³ J/K).
+
+La capacidad calorífica (C) mide la cantidad de calor necesaria para elevar la temperatura de un cuerpo en una unidad. Por su parte, el calor específico (c) se define mediante la relación:
+
+
+Q=mcΔT
+
+donde m es la masa del cuerpo y ΔT el cambio de temperatura. Estos parámetros dependen de la naturaleza del material y del tipo de proceso termodinámico.
+
+Por último, durante los cambios de fase —como la fusión, vaporización o sublimación— el calor absorbido o liberado no modifica la temperatura, sino el estado físico del cuerpo. Este fenómeno se describe a través del calor latente (L):
+
+
+Q=mL
+
+donde L representa el calor latente de cambio de fase. Este concepto es esencial para comprender los procesos de transferencia energética en sistemas naturales e industriales, como la refrigeración, la climatización o la conversión de energía térmica en trabajo mecánico.`
+      },
+      teoria: {
+        title: 'Teoría de Calor, Trabajo y Energía Interna',
+        content: `El estudio del calor, el trabajo y la energía interna ha sido esencial en la historia de la termodinámica. A partir de los experimentos de James Prescott Joule, se estableció que el calor no es una sustancia material, sino una forma de energía en tránsito.
+
+El calor (Q) se define como la transferencia de energía térmica entre cuerpos o sistemas debido a una diferencia de temperatura.
+
+Si el sistema absorbe calor, se toma Q > 0.
+
+Si el sistema libera calor, se toma Q < 0.
+
+La temperatura (T) mide el estado térmico de un cuerpo, y está relacionada con la energía cinética promedio de sus partículas.
+→ El calor representa un proceso de transferencia de energía.
+→ La temperatura representa un estado de equilibrio térmico.
+
+El trabajo (W) en termodinámica se define como la energía transferida por acción mecánica. Matemáticamente:
+
+W = ∫ P dV
+
+donde:
+
+P = presión del sistema
+
+dV = cambio infinitesimal de volumen
+
+→ Si el sistema realiza trabajo sobre el entorno: W > 0
+→ Si el entorno realiza trabajo sobre el sistema: W < 0
+
+La energía interna (U) es la suma de todas las formas de energía microscópica de las partículas del sistema (cinética + potencial).
+Su variación se expresa mediante el Primer Principio de la Termodinámica:
+
+ΔU = Q - W
+
+Esto significa que la energía no se crea ni se destruye, solo se transforma.
+La variación de energía interna es igual al calor que el sistema recibe menos el trabajo que realiza.
+
+En un gas ideal, la energía interna depende únicamente de la temperatura:
+
+U = n * Cv * T
+
+donde:
+
+n = número de moles
+
+Cv = capacidad calorífica molar a volumen constante
+
+T = temperatura absoluta
+
+A nivel microscópico, la energía cinética promedio de una molécula se expresa como:
+
+Ek = (3/2) * k * T
+
+donde:
+
+k = constante de Boltzmann = 1.38 × 10^-23 J/K
+
+La capacidad calorífica (C) mide el calor necesario para elevar la temperatura de un cuerpo en una unidad.
+El calor específico (c) se define mediante:
+
+Q = m * c * ΔT
+
+donde:
+
+m = masa del cuerpo
+
+ΔT = cambio de temperatura
+
+Estos valores dependen del tipo de sustancia y del proceso (a presión o volumen constante).
+
+Durante un cambio de fase (fusión, vaporización o sublimación), el calor absorbido o liberado no cambia la temperatura, sino el estado físico.
+En este caso, se usa el calor latente (L):
+
+Q = m * L
+
+donde L es el calor latente de cambio de fase.
+
+Estos conceptos son fundamentales para comprender cómo la energía térmica se transforma en trabajo mecánico y cómo los sistemas físicos intercambian energía con su entorno, sustentando las leyes básicas de la termodinámica moderna.`
+      },
+      calculadora: { component: ThermodynamicsCalculator },
+      simulacion: { component: ThermodynamicsSimulator }
+    },
+    procesos: {
+      historia: {
+        title: 'Historia de los Procesos Termodinámicos ',
+        content: `El estudio de los procesos termodinámicos surgió a lo largo del siglo XIX, en el contexto del rápido desarrollo de la Revolución Industrial. La necesidad de comprender y optimizar el funcionamiento de las máquinas térmicas, como las calderas y los motores de vapor, impulsó la creación de una nueva rama de la física: la termodinámica.
+
+El ingeniero y físico francés Sadi Carnot (1796–1832) fue uno de los pioneros al analizar la eficiencia de las máquinas térmicas en su obra Reflexiones sobre la potencia motriz del fuego (1824). Carnot introdujo el concepto de ciclo ideal, un proceso cerrado en el que un sistema pasa por diferentes estados termodinámicos y retorna a su condición inicial. Su trabajo sentó las bases del concepto moderno de proceso termodinámico.
+
+Posteriormente, científicos como Rudolf Clausius y William Thomson (Lord Kelvin) ampliaron la teoría de Carnot, formulando las leyes de la termodinámica. Ellos establecieron que cualquier transformación energética que ocurra en un sistema puede describirse mediante variables de estado como la presión (P), el volumen (V) y la temperatura (T). Cada combinación de estas variables define un estado termodinámico, y cualquier cambio entre dos estados constituye un proceso termodinámico.
+
+Con el avance de la física y la ingeniería, se clasificaron los procesos según la magnitud que se mantiene constante durante la transformación. Así surgieron los términos isotérmico (T constante), isobárico (P constante), isocórico o isovolumétrico (V constante) y adiabático (sin intercambio de calor). Estas clasificaciones resultaron fundamentales para describir de manera precisa el comportamiento de los gases y el rendimiento de los motores térmicos.
+
+En el siglo XX, el uso de diagramas P–V (presión–volumen) permitió visualizar gráficamente los distintos procesos y calcular de forma más sencilla el trabajo realizado durante una transformación. Dichos diagramas se convirtieron en una herramienta esencial para ingenieros y científicos, ya que muestran de manera clara cómo varía la presión con el volumen durante un ciclo.
+
+Hoy en día, el estudio de los procesos termodinámicos no solo tiene aplicación en motores o sistemas industriales, sino también en campos avanzados como la astrofísica, la energía nuclear, la climatización y la tecnología de materiales. Gracias a su comprensión, se han desarrollado sistemas más eficientes y sostenibles, consolidando a la termodinámica como una de las ciencias fundamentales del conocimiento moderno. `
+      },
+      teoria: {
+        title: 'Teoría de los Procesos Termodinámicos',
+        content: ` Un proceso termodinámico es toda transformación en la cual un sistema pasa de un estado de equilibrio inicial a otro estado final, cambiando una o más de sus variables de estado: presión (P), volumen (V) y temperatura (T).
+Cada estado queda definido por estas tres magnitudes, y los procesos se representan comúnmente en diagramas P–V (presión–volumen).
+
+En cualquier proceso termodinámico se cumple el Primer Principio de la Termodinámica:
+
+ΔU = Q - W
+
+donde:
+
+ΔU = cambio de energía interna del sistema
+
+Q = calor absorbido o liberado
+
+W = trabajo realizado
+
+Si el sistema absorbe calor → Q > 0
+Si el sistema realiza trabajo sobre el entorno → W > 0
+
+1. Proceso Isotérmico (T constante)
+
+En este proceso la temperatura permanece constante (ΔT = 0).
+Por tanto, en un gas ideal, la energía interna (U) no cambia (ΔU = 0), y todo el calor transferido se convierte en trabajo:
+
+Q = W
+
+Para un gas ideal, la ecuación del proceso isotérmico se expresa como:
+
+P * V = constante
+
+y el trabajo realizado durante el proceso es:
+
+W = n * R * T * ln(V2 / V1)
+
+donde:
+
+n = número de moles
+
+R = constante de los gases (8.314 J/mol·K)
+
+T = temperatura constante
+
+V1, V2 = volúmenes inicial y final
+
+2. Proceso Isobárico (P constante)
+
+En este caso, la presión permanece constante (ΔP = 0).
+El trabajo realizado se obtiene mediante:
+
+W = P * (V2 - V1)
+
+El calor transferido está relacionado con la capacidad calorífica a presión constante (Cp):
+
+Q = n * Cp * ΔT
+
+y la variación de energía interna se obtiene aplicando el primer principio:
+
+ΔU = Q - W = n * Cv * ΔT
+
+donde Cv es la capacidad calorífica a volumen constante.
+
+3. Proceso Isocórico o Isovolumétrico (V constante)
+
+En este proceso el volumen no cambia (ΔV = 0), por lo tanto W = 0 (no hay trabajo mecánico).
+Todo el calor transferido modifica la energía interna del sistema:
+
+Q = ΔU = n * Cv * ΔT
+
+Como el volumen es constante, la presión varía proporcionalmente con la temperatura según la ley de los gases ideales:
+
+P / T = constante
+
+4. Proceso Adiabático (sin intercambio de calor)
+
+En este proceso no hay intercambio de calor con el entorno, es decir:
+
+Q = 0
+
+Entonces, el primer principio se reduce a:
+
+ΔU = -W
+
+Esto significa que si el sistema realiza trabajo, su energía interna disminuye.
+Para un gas ideal, la relación entre las variables se describe mediante las ecuaciones de Poisson:
+
+P * V^γ = constante
+T * V^(γ - 1) = constante
+T * P^((1 - γ)/γ) = constante
+
+donde γ = Cp / Cv es el coeficiente adiabático.
+
+El trabajo realizado en un proceso adiabático se calcula como:
+
+W = (P1 * V1 - P2 * V2) / (γ - 1)
+
+y el cambio de energía interna:
+
+ΔU = n * Cv * (T2 - T1)
+
+5. Diagramas P–V y trabajo realizado
+
+En los diagramas P–V (Presión–Volumen), cada proceso termodinámico se representa mediante una curva.
+El área bajo la curva representa el trabajo (W) realizado por el sistema durante la expansión o compresión.
+
+Si el área está bajo la curva de expansión → W > 0 (trabajo hecho por el sistema).
+
+Si el área está bajo la curva de compresión → W < 0 (trabajo hecho sobre el sistema).
+
+Los diagramas P–V permiten visualizar el comportamiento de los diferentes procesos:
+
+El isotérmico tiene una curva hiperbólica.
+
+El isobárico es una línea horizontal.
+
+El isocórico es una línea vertical.
+
+El adiabático es una curva más empinada que la isotérmica.`
+      },
+      calculadora: { component: ThermodynamicProcessesCalculator },
+      simulacion: { component: TermodinamicaSimulation }
+    },
+    primer_principio: {
+      historia: {
+        title: 'Historia del Primer Principio de la Termodinámica',
+        content: `El Primer Principio de la Termodinámica tiene sus raíces en el siglo XIX, cuando los científicos comenzaron a comprender la relación entre el calor, el trabajo mecánico y la energía. Antes de esto, se creía que el calor era una sustancia material llamada calórico, que fluía de los cuerpos calientes hacia los fríos. Sin embargo, diversos experimentos demostraron que el calor no era una sustancia, sino una forma de energía en tránsito.
+
+Uno de los pioneros en derribar la teoría del calórico fue Benjamin Thompson (Conde de Rumford), quien en 1798 observó que al perforar cañones se generaba una gran cantidad de calor sin una fuente aparente de “calórico”. Rumford concluyó que el calor debía estar relacionado con el movimiento de las partículas, anticipando la idea moderna de energía interna.
+
+Posteriormente, en 1842, el médico alemán Julius Robert Mayer estableció la equivalencia entre trabajo mecánico y calor, proponiendo que ambas magnitudes eran formas distintas de una misma realidad física: la energía. De manera independiente, James Prescott Joule realizó experimentos entre 1843 y 1849 en los que midió con precisión la conversión del trabajo mecánico en calor, determinando la constante de equivalencia mecánica del calor.
+
+Sus resultados confirmaron cuantitativamente que:
+
+
+1 cal=4.186 J
+
+De este modo, Joule formuló el principio de conservación de la energía aplicado a los sistemas termodinámicos.
+
+Más tarde, Rudolf Clausius y William Thomson (Lord Kelvin) desarrollaron el marco teórico que consolidó la Termodinámica Clásica, estableciendo el Primer Principio de la Termodinámica en su forma moderna:
+
+
+ΔU=Q−W
+
+Este principio unificó el estudio del calor y el trabajo bajo una misma ley fundamental, sentando las bases de la física energética moderna y de todas las tecnologías que dependen de la conversión de energía, como los motores, compresores, turbinas y sistemas de refrigeración.`
+      },
+      teoria: {
+        title: 'Teoría: Primer Principio de la Termodinámica',
+        content: `El Primer Principio de la Termodinámica es una formulación del principio general de conservación de la energía, aplicado a los sistemas termodinámicos.
+Establece que la energía no se crea ni se destruye, solo se transforma de una forma a otra dentro de un sistema o entre el sistema y su entorno.
+
+Matemáticamente, se expresa como:
+
+ΔU = Q - W
+
+donde:
+
+ΔU = cambio de energía interna del sistema (J)
+
+Q = calor transferido al sistema (J)
+
+W = trabajo realizado por el sistema (J)
+
+Convención de signos:
+
+Si el sistema absorbe calor, entonces Q > 0.
+
+Si el sistema cede calor, entonces Q < 0.
+
+Si el sistema realiza trabajo, entonces W > 0.
+
+Si el entorno realiza trabajo sobre el sistema, entonces W < 0.
+
+Este principio puede interpretarse como un balance de energía:
+La variación de energía interna de un sistema es igual al calor que recibe menos el trabajo que realiza.
+
+Energía Interna (U)
+
+La energía interna es la suma de todas las energías microscópicas de las partículas del sistema:
+la energía cinética debida al movimiento molecular y la energía potencial debida a las fuerzas entre ellas.
+
+En los gases ideales, la energía interna depende solo de la temperatura (T) y no del volumen o la presión:
+
+U = n * Cv * T
+
+donde:
+
+n = número de moles
+
+Cv = capacidad calorífica molar a volumen constante (J/mol·K)
+
+T = temperatura absoluta (K)
+
+El cambio de energía interna entre dos estados es:
+
+ΔU = n * Cv * (T2 - T1)
+
+Aplicaciones del Primer Principio a Procesos Termodinámicos
+
+Proceso Isotérmico (T constante):
+Como ΔU = 0, entonces Q = W.
+Todo el calor absorbido se transforma en trabajo.
+Ejemplo: expansión lenta de un gas ideal a temperatura constante.
+
+Proceso Isocórico (V constante):
+Como W = 0, entonces Q = ΔU.
+Todo el calor recibido modifica la energía interna.
+Ejemplo: calentamiento de un gas en un recipiente rígido.
+
+Proceso Isobárico (P constante):
+Se cumple Q = ΔU + W.
+El calor suministrado se reparte entre el aumento de energía interna y el trabajo de expansión.
+Ejemplo: expansión del gas en un pistón móvil.
+
+Proceso Adiabático (Q = 0):
+No hay intercambio de calor.
+Entonces ΔU = -W, lo que significa que si el gas realiza trabajo, su energía interna (y temperatura) disminuye.
+Ejemplo: compresión rápida en un compresor o expansión en una turbina.
+
+Ejemplos Prácticos
+
+Gas ideal:
+En un gas ideal, la relación entre las magnitudes termodinámicas está dada por la ecuación:
+
+P * V = n * R * T
+
+Si el gas se comprime o se expande, las variaciones de presión, volumen y temperatura obedecen el primer principio.
+
+Compresores:
+En un compresor adiabático, el gas se comprime sin intercambiar calor con el entorno (Q = 0).
+El trabajo realizado sobre el gas aumenta su energía interna y, por tanto, su temperatura.
+
+Pistones:
+En un pistón, cuando el gas se expande empujando el émbolo, realiza trabajo (W > 0) y su energía interna disminuye.
+Si se comprime, ocurre lo contrario: el entorno realiza trabajo sobre el gas (W < 0) y su temperatura aumenta.`
+      },
+      calculadora: { component: TermodinamicaCalculator },
+      simulacion: { component: TermodinamicaSimulacion }
+    },
+    segundo_principio: {
+      historia: {
+        title: 'Historia del Segundo Principio de la Termodinámica ',
+        content: `El Segundo Principio de la Termodinámica surgió a mediados del siglo XIX, como consecuencia de la necesidad de comprender por qué ciertos procesos físicos ocurren espontáneamente en una dirección y no en la inversa, a pesar de no violar el principio de conservación de la energía. Mientras el Primer Principio explicaba la cantidad de energía en juego, el Segundo se ocupó de su calidad y de la dirección natural de los procesos térmicos.
+
+El desarrollo de este principio comenzó con los estudios del ingeniero francés Sadi Carnot en 1824. En su obra “Reflexiones sobre la potencia motriz del fuego”, Carnot analizó el funcionamiento ideal de las máquinas térmicas y dedujo que la eficiencia de un motor dependía únicamente de las temperaturas entre las que operaba, no de su sustancia de trabajo. Así introdujo el concepto de ciclo reversible, conocido hoy como el Ciclo de Carnot, que representa el límite máximo teórico de eficiencia para cualquier máquina térmica.
+
+Posteriormente, en 1848, William Thomson (Lord Kelvin) formalizó la escala de temperatura absoluta y el concepto de eficiencia térmica, mientras que Rudolf Clausius (1850) reformuló las ideas de Carnot desde una base energética. Clausius introdujo el concepto de entropía (S) para cuantificar el grado de irreversibilidad de los procesos y enunció el principio de que:
+
+“El calor no puede pasar espontáneamente de un cuerpo frío a uno caliente”.
+
+De manera complementaria, Kelvin y Clausius expresaron el Segundo Principio en dos enunciados equivalentes:
+
+Enunciado de Kelvin–Planck:
+Es imposible construir una máquina térmica que convierta en trabajo toda la energía absorbida del calor, sin que se produzcan otros efectos.
+→ En otras palabras, no existe máquina 100% eficiente.
+
+Enunciado de Clausius:
+Es imposible que el calor fluya de manera espontánea desde un cuerpo frío hacia otro más caliente sin intervención externa.
+
+A partir de estos fundamentos, surgió la termodinámica moderna, que permitió diseñar y comprender el funcionamiento de motores térmicos, refrigeradores, bombas de calor y procesos industriales de conversión energética. El Segundo Principio no solo transformó la ingeniería y la física, sino que también influyó en otras áreas del conocimiento, al introducir el concepto de irreversibilidad y entropía como medida del desorden y la dirección del tiempo en los sistemas naturales.`
+      },
+      teoria: {
+        title: 'Teoría del Segundo Principio de la Termodinámica',
+        content: `El Segundo Principio de la Termodinámica establece las condiciones y la dirección natural en la que ocurren los procesos energéticos. Mientras el Primer Principio garantiza la conservación de la energía (ΔU = Q − W), el segundo explica por qué no toda la energía térmica puede transformarse en trabajo útil y por qué ciertos procesos son irreversibles.
+
+Dirección natural de los procesos
+
+En la naturaleza, los procesos ocurren espontáneamente en una sola dirección:
+
+El calor fluye del cuerpo caliente al frío, nunca al revés sin intervención externa.
+
+Los gases se expanden para ocupar el espacio disponible.
+
+Los cuerpos calientes se enfrían hasta alcanzar el equilibrio térmico.
+
+Estos fenómenos son consecuencia de la irreversibilidad natural de los procesos energéticos.
+
+ Máquinas térmicas y refrigeradores
+
+Una máquina térmica es un dispositivo que convierte calor (Q) en trabajo (W), funcionando mediante ciclos termodinámicos.
+En cada ciclo:
+
+Absorbe calor Q₁ de una fuente caliente a temperatura T₁.
+
+Expulsa calor Q₂ a una fuente fría a temperatura T₂.
+
+Realiza un trabajo neto W = Q₁ − Q₂.
+
+
+W=Q1−Q2
+
+
+
+En cambio, un refrigerador o bomba de calor funciona en sentido inverso, consumiendo trabajo W para extraer calor de un cuerpo frío (Q₂) y transferirlo a uno más caliente (Q₁).
+
+
+W=Q1−Q2
+
+
+ Ciclo de Carnot
+
+El Ciclo de Carnot representa el proceso reversible ideal de una máquina térmica, compuesto por cuatro etapas:
+
+Expansión isotérmica → (T constante)
+
+Expansión adiabática → (Q = 0)
+
+Compresión isotérmica → (T constante)
+
+Compresión adiabática → (Q = 0)
+
+La eficiencia teórica máxima de una máquina de Carnot se expresa como:
+
+
+η=1−(T2/T1)
+
+donde:
+
+η = rendimiento o eficiencia (sin unidades)
+
+T₁ = temperatura absoluta de la fuente caliente (K)
+
+T₂ = temperatura absoluta de la fuente fría (K)
+
+ Enunciados del Segundo Principio
+
+1. Enunciado de Kelvin–Planck:
+Es imposible construir una máquina térmica que convierta todo el calor absorbido (Q₁) en trabajo (W).
+
+
+η<1
+
+No existe máquina 100% eficiente.
+
+2. Enunciado de Clausius:
+El calor no puede fluir espontáneamente de un cuerpo frío a uno caliente sin realizar trabajo externo.
+
+ Entropía (S)
+
+Introducida por Rudolf Clausius, la entropía mide el grado de desorden o la irreversibilidad de un sistema.
+Para un proceso reversible:
+
+dS=dQrev/T
+
+Y para un ciclo completo:
+
+
+ΔSuniverso≥0
+
+Si ΔS = 0, el proceso es reversible.
+
+Si ΔS > 0, el proceso es irreversible.`
+      },
+      calculadora: { component: SegundoPrincipioCalculator },
+      simulacion: { component: SegundoPrincipioSimulacion }
+    },
+    entropia: {
+      historia: {
+        title: 'Historia de la Entropía y la Eficiencia de los Motores Térmicos',
+        content: `El concepto de entropía y la búsqueda de una mayor eficiencia en los motores térmicos surgieron en el siglo XIX, durante la Revolución Industrial, cuando la humanidad comenzó a depender de las máquinas de vapor y se necesitaba comprender por qué no era posible convertir todo el calor en trabajo útil.
+
+ Orígenes con Sadi Carnot (1824)
+
+El ingeniero francés Sadi Carnot fue el primero en analizar científicamente las máquinas térmicas en su obra “Reflexiones sobre la potencia motriz del fuego” (1824).
+Aunque todavía se creía en la teoría del “calórico” como sustancia, Carnot entendió que el rendimiento de una máquina no dependía del tipo de fluido, sino de las temperaturas de las fuentes de calor.
+
+Formuló el concepto de ciclo ideal reversible (hoy conocido como Ciclo de Carnot) y estableció que ninguna máquina real podría superarlo en eficiencia. Su trabajo sentó las bases para la termodinámica moderna.
+
+ Desarrollo del Segundo Principio y la idea de irreversibilidad
+
+En la década de 1850, Rudolf Clausius y William Thomson (Lord Kelvin) reinterpretaron las ideas de Carnot bajo el marco del Primer Principio de la Termodinámica, que ya afirmaba la conservación de la energía.
+Clausius observó que, aunque la energía total se conserva, su capacidad para realizar trabajo disminuye en cada transformación debido a la irreversibilidad de los procesos.
+
+Fue Clausius quien, en 1865, introdujo el término “entropía” (del griego trope, transformación) y la definió mediante la ecuación:
+
+dS=dQrev/T
+
+Esta formulación permitió medir el grado de desorden molecular y cuantificar la degradación de la energía.
+
+ James Clerk Maxwell y Ludwig Boltzmann: visión microscópica
+
+A fines del siglo XIX, la entropía adquirió una interpretación estadística gracias a los trabajos de Ludwig Boltzmann y James Clerk Maxwell.
+Boltzmann vinculó la entropía con el número de configuraciones microscópicas posibles de un sistema:
+
+
+S=k⋅ln(W)
+
+donde k es la constante de Boltzmann y W el número de microestados.
+Esta ecuación reveló que la entropía está relacionada con el desorden molecular y la probabilidad de los estados del sistema.
+
+Aplicación a motores térmicos reales
+
+Con el avance tecnológico, el estudio de la entropía permitió comprender por qué las máquinas térmicas, como los motores de vapor, Otto y Diesel, nunca alcanzan la eficiencia ideal de Carnot.
+Las pérdidas por fricción, conducción, expansión no reversible y disipación de calor incrementan la entropía del sistema, reduciendo la eficiencia energética real:
+
+
+ηreal<ηCarnot
+	
+
+Impacto científico e industrial
+
+El concepto de entropía transformó la forma en que se comprendía la energía y su aprovechamiento.
+Además de explicar los límites de los motores térmicos, se convirtió en una ley universal aplicable a todos los procesos naturales, desde la física y la química hasta la biología y la información.
+
+La entropía no solo se consolidó como una medida del desorden o de la irreversibilidad, sino también como un indicador del tiempo termodinámico, explicando por qué los procesos naturales son irreversibles y por qué el universo evoluciona hacia un estado de equilibrio térmico.`
+      },
+      teoria: {
+        title: 'Teoría: Entropía y Eficiencia de Motores Térmicos',
+        content: `El concepto de entropía (S) constituye uno de los pilares del Segundo Principio de la Termodinámica. Describe la tendencia natural de los sistemas hacia el desorden y permite cuantificar la irreversibilidad de los procesos físicos. A diferencia del Primer Principio, que trata de la cantidad de energía, la entropía se ocupa de su calidad y de la dirección del cambio energético.
+
+ Definición de Entropía (S)
+
+La entropía (S) se define como una magnitud que mide el grado de desorden molecular o la dispersión de la energía en un sistema.
+Para un proceso reversible, se expresa mediante:
+
+
+dS=dQrev/T
+
+En texto plano:
+dS = dQrev / T
+
+dS: cambio infinitesimal de entropía (J/K)
+
+dQrev: calor absorbido o liberado en un proceso reversible (J)
+
+T: temperatura absoluta (K)
+
+Procesos Reversibles e Irreversibles
+
+Proceso reversible: No hay pérdida de energía útil; el sistema y el entorno pueden volver a su estado inicial sin cambios permanentes.
+
+
+ΔS=0
+
+Proceso irreversible: Siempre hay pérdida de energía útil; el universo aumenta su entropía.
+
+
+ΔS>0
+
+En cualquier proceso real:
+
+
+ΔSuniverso≥0
+ Interpretación Física de la Entropía
+
+La entropía representa el nivel de desorden microscópico de las partículas de un sistema.
+
+Un sistema ordenado (baja entropía) tiene menos formas posibles de organizar su energía.
+
+Un sistema desordenado (alta entropía) posee más configuraciones posibles y mayor dispersión de energía.
+
+En términos estadísticos:
+
+
+S=k⋅ln(W)
+
+En texto plano:
+S = k · ln(W)
+
+Donde:
+
+k = constante de Boltzmann = 1.38 × 10⁻²³ J/K
+
+W = número de microestados posibles del sistema
+
+ Entropía en el Ciclo de Carnot
+
+En el Ciclo de Carnot, los procesos son reversibles y la variación total de entropía durante un ciclo completo es nula:
+
+
+ΔSciclo=0
+
+Durante las etapas isotérmicas:
+
+Q1/T1=Q2/T2
+
+
+Y de allí se obtiene la eficiencia máxima teórica de un motor térmico:
+
+
+η=1−(T2/T1)
+
+En texto plano:
+η = 1 - (T2 / T1)
+
+Eficiencia de Motores Térmicos Reales
+
+En la práctica, ningún motor alcanza la eficiencia del ciclo de Carnot debido a:
+
+Pérdidas por fricción
+
+Transferencias de calor no reversibles
+
+Expansiones y compresiones irreversibles
+
+Por ello, los motores reales cumplen:
+
+
+ηreal<ηCarnot
+
+
+
+En texto plano:
+ηreal < ηCarnot
+
+ Ejemplos de Motores Térmicos
+
+Motor Otto: usado en automóviles; mezcla aire-combustible comprimida y encendida por chispa.
+
+Motor Diesel: compresión del aire hasta alta temperatura antes de inyectar el combustible.
+
+Motor de Carnot: modelo teórico reversible, base para medir la eficiencia máxima posible.`
+      },
+      calculadora: { component: EntropiaMotoresCalculator },
+      simulacion: { component: EntropiaMotoresSimulacion }
+    },
+    electrostatica: {
+      historia: {
+        title: 'Historia de la Electrostática',
+        content: `La electrostática tiene sus raíces en la antigüedad. Ya en el siglo VI a.C., Tales de Mileto observó que al frotar el ámbar (en griego, elektron) con piel de animal, este adquiría la capacidad de atraer pequeños objetos, como plumas o pajas. Este fue el primer registro del fenómeno eléctrico, aunque en ese tiempo no se comprendía su naturaleza.
+
+Durante los siglos XVII y XVIII, el estudio de la electricidad comenzó a desarrollarse científicamente. William Gilbert (1600) fue uno de los primeros en estudiar sistemáticamente las fuerzas eléctricas y magnéticas, introduciendo el término “eléctrico” para describir estos efectos. Más tarde, Charles François de Cisternay du Fay descubrió que existían dos tipos de cargas eléctricas, una positiva y otra negativa, que se atraen o repelen según su signo.
+
+En 1785, Charles-Augustin de Coulomb formuló la Ley de Coulomb, que cuantificó la fuerza de atracción o repulsión entre dos cargas puntuales. Este descubrimiento fue fundamental para entender cómo interactúan las cargas eléctricas y sentó las bases de la teoría del campo eléctrico.
+
+A lo largo del siglo XIX, Michael Faraday introdujo el concepto de líneas de campo, una forma visual de representar la influencia de una carga eléctrica en el espacio que la rodea. Poco después, James Clerk Maxwell unificó los conocimientos de electricidad y magnetismo en sus célebres ecuaciones de Maxwell, consolidando así la electrodinámica clásica.
+
+Estos aportes permitieron no solo comprender el comportamiento de las cargas en reposo, sino también el de las cargas en movimiento, dando origen a la electricidad moderna y a innumerables aplicaciones tecnológicas que hoy sustentan nuestra vida cotidiana.`
+      },
+      teoria: {
+        title: 'Teoría de la Electrostática',
+        content: `La Electrostática es la rama de la física que estudia las cargas eléctricas en reposo y las fuerzas, campos y potenciales que generan en el espacio que las rodea. Su objetivo principal es comprender cómo las cargas eléctricas interactúan entre sí y con los materiales que las contienen.
+
+Naturaleza de la carga eléctrica
+La carga eléctrica es una propiedad fundamental de la materia. Existen dos tipos de carga: positiva y negativa. Cargas del mismo signo se repelen, mientras que cargas de signo contrario se atraen. Además, la carga se conserva (no se crea ni se destruye, solo se transfiere) y está cuantizada, es decir, siempre es un múltiplo de la carga elemental del electrón (1,6 × 10⁻¹⁹ C).
+
+Conductores, aisladores y semiconductores
+
+Los conductores permiten el movimiento libre de electrones (como los metales).
+
+Los aisladores impiden el movimiento de cargas (como el vidrio o el plástico).
+
+Los semiconductores tienen un comportamiento intermedio y su conductividad puede controlarse (como el silicio o el germanio).
+
+Ley de Coulomb
+La fuerza entre dos cargas puntuales q1 y q2 separadas por una distancia r está dada por:
+
+𝐹=(𝑘∣𝑞1𝑞2∣)/𝑟2
+
+donde 
+k es la constante de Coulomb (≈ 9 × 10⁹ N·m²/C²). Esta ley muestra que la fuerza es directamente proporcional al producto de las cargas e inversamente proporcional al cuadrado de la distancia entre ellas.
+
+Campo eléctrico (E)
+El campo eléctrico es la región del espacio donde una carga experimenta una fuerza eléctrica. Se define como la fuerza por unidad de carga:
+
+
+E=qF
+
+Sus líneas de campo muestran la dirección y sentido de la fuerza sobre una carga positiva.
+
+Potencial eléctrico (V)
+El potencial eléctrico en un punto se define como el trabajo necesario para trasladar una carga positiva desde el infinito hasta ese punto, dividido por el valor de la carga. Está relacionado con el campo eléctrico mediante:
+
+
+E=−∇V
+
+La diferencia de potencial o voltaje entre dos puntos indica cuánta energía se requiere para mover una carga entre ellos.
+
+Energía potencial eléctrica
+Una carga en un campo eléctrico posee energía potencial eléctrica, que depende de su posición. Si la carga se mueve, esta energía puede transformarse en energía cinética o en trabajo realizado por el campo.
+
+Superficies equipotenciales
+Son superficies donde el potencial eléctrico es constante. El campo eléctrico siempre es perpendicular a ellas y no realiza trabajo al mover una carga sobre estas superficies.
+
+En conjunto, la electrostática constituye la base de muchos fenómenos eléctricos y tecnológicos, como los condensadores, los sensores de carga y los principios que rigen el comportamiento de los materiales eléctricos y electrónicos.`
+      },
+      calculadora: { component: CalculadoraElectrostatica },
+      simulacion: { component: SimulacionElectrostatica }
+    },
+    capacitancia: {
+      historia: {
+        title: 'Historia de la capacitancia y la energía almacenada',
+        content: `El concepto de capacitancia (C) y el desarrollo de los capacitores tienen sus orígenes en el siglo XVIII, durante los primeros estudios sobre la electricidad estática y la acumulación de carga (Q).
+
+En 1745, el físico alemán Ewald Georg von Kleist construyó el primer dispositivo capaz de almacenar electricidad: un frasco de vidrio parcialmente lleno de agua y con una varilla metálica en su interior. Casi simultáneamente, el científico neerlandés Pieter van Musschenbroek perfeccionó el diseño y lo denominó frasco de Leyden. Este fue el primer capacitor de la historia, y podía retener una cantidad significativa de energía eléctrica (U) para liberarla posteriormente en forma de descarga.
+
+La experiencia con el frasco de Leyden demostró que el vidrio actuaba como un dieléctrico, separando las cargas positivas y negativas en las superficies metálicas opuestas. De esta observación nació el principio fundamental de la capacitancia, que relaciona la carga (Q) con la diferencia de potencial (V) mediante la ecuación:
+
+C = Q / V
+
+Durante los siglos XIX y XX, la comprensión teórica de los capacitores avanzó gracias a los estudios de James Clerk Maxwell, quien integró la capacitancia dentro de su teoría del campo electromagnético. Maxwell demostró que el campo eléctrico (E) en el interior del capacitor almacena energía potencial eléctrica (U), expresada como:
+
+U = (1/2) * C * V²
+
+Con el desarrollo de nuevos materiales dieléctricos (κ), como la mica, el papel impregnado y posteriormente los polímeros y cerámicas, los capacitores se volvieron más eficientes y compactos. La introducción de la permitividad eléctrica (ε₀) permitió expresar la capacitancia de un capacitor plano mediante:
+
+C = ε₀ * (A / d)
+
+donde A es el área de las placas y d la distancia entre ellas.
+
+En la era moderna, los capacitores evolucionaron desde simples dispositivos experimentales hasta componentes esenciales de la tecnología electrónica. Se utilizan en computadoras, fuentes de alimentación, automóviles, telecomunicaciones y dispositivos médicos, desempeñando un papel clave en el almacenamiento temporal de energía, la estabilización de voltaje y el filtrado de señales eléctricas.
+
+En la actualidad, la investigación en capacitancia se centra en los supercapacitores y nanocapacitores, capaces de almacenar energías mucho mayores gracias al uso de materiales avanzados como el grafeno y los nanotubos de carbono. Su funcionamiento sigue los mismos principios básicos establecidos en el siglo XVIII, pero optimizados mediante la ecuación general:
+
+U = (1/2) * C * V²
+
+Así, la historia de la capacitancia refleja la evolución del conocimiento científico desde la observación empírica hasta la ingeniería moderna, demostrando que los principios físicos más simples pueden transformarse en tecnologías de alto impacto cuando se comprenden y aplican correctamente.`
+      },
+      teoria: {
+        title: 'Teoría de la Capacitancia y Energía Almacenada',
+        content: `La capacitancia (C) es la propiedad de un sistema para almacenar carga eléctrica (Q) al aplicar una diferencia de potencial (V). Se define como:
+
+C = Q / V
+
+La unidad en el Sistema Internacional es el faradio (F), donde 1 F = 1 C/V.
+
+ 1. Capacitor plano 
+
+Un capacitor formado por dos placas paralelas de área A y separadas una distancia d tiene capacitancia:
+
+C = ε₀ * (A / d)
+
+donde ε₀ = 8.85 × 10⁻¹² C²/(N·m²) es la permitividad del vacío.
+
+2. Capacitor esférico 
+
+Dos esferas concéntricas de radios r₁ y r₂:
+
+C = 4 * π * ε₀ * (r₁ * r₂) / (r₂ - r₁)
+
+ 3. Capacitor cilíndrico 
+
+Dos cilindros coaxiales de longitud L, radios a y b:
+
+C = (2 * π * ε₀ * L) / ln(b / a)
+
+ 4. Asociación de capacitores 
+
+En serie:
+
+1 / C_eq = 1 / C₁ + 1 / C₂ + ...
+
+En paralelo:
+
+C_eq = C₁ + C₂ + ...
+
+En serie, la carga (Q) es igual en todos los capacitores, mientras que el voltaje (V) se divide.
+En paralelo, el voltaje (V) es el mismo y las cargas (Q) se suman.
+
+ 5. Energía almacenada en un capacitor 
+
+La energía (U) almacenada en el campo eléctrico del capacitor se calcula como:
+
+U = (1/2) * C * V² = Q² / (2 * C) = (1/2) * Q * V
+
+Esta energía puede liberarse para mantener la tensión en circuitos eléctricos o para producir descargas rápidas.
+
+ 6. Dieléctricos 
+
+Al introducir un material dieléctrico (constante κ) entre las placas, la capacitancia aumenta:
+
+C = κ * ε₀ * (A / d)
+
+El dieléctrico se polariza, reduciendo el campo eléctrico interno y permitiendo almacenar más carga (Q) para el mismo voltaje (V).
+
+ 7. Aplicaciones de los capacitores 
+
+En filtros de corriente alterna y continua (AC/DC).
+
+En circuitos de temporización y osciladores.
+
+En encendido de motores eléctricos.
+
+En sistemas de almacenamiento de energía.
+
+En pantallas táctiles y sensores electrónicos.`
+      },
+      calculadora: { component: CalculadoraCapacitancia },
+      simulacion: { component: CapacitanciaSimulation }
+    },
+    corriente: {
+      historia: {
+        title: 'Historia de la corriente eléctrica, resistencias y ley de OHM',
+        content: `El estudio de la corriente eléctrica (I) y la resistencia (R) tiene sus raíces en los siglos XVIII y XIX, cuando los científicos comenzaron a investigar el comportamiento de la electricidad en los materiales conductores.
+
+En 1799, Alessandro Volta inventó la pila voltaica, el primer generador continuo de diferencia de potencial (V). Este invento permitió observar por primera vez un flujo sostenido de carga eléctrica (Q) a través de un conductor, fenómeno que más tarde sería denominado corriente eléctrica (I = Q / t).
+
+Posteriormente, André-Marie Ampère estudió la relación entre la corriente y los campos magnéticos, estableciendo las bases del electromagnetismo. Sin embargo, fue el físico alemán Georg Simon Ohm (1789–1854) quien formuló en 1827 la relación cuantitativa entre el voltaje (V), la corriente (I) y la resistencia (R), conocida como la Ley de Ohm:
+
+V = I * R
+
+Ohm demostró experimentalmente que, para un material conductor a temperatura constante, la corriente eléctrica (I) es directamente proporcional al voltaje (V) aplicado e inversamente proporcional a la resistencia (R) del material.
+
+Sus investigaciones, publicadas en su obra “Die galvanische Kette, mathematisch bearbeitet” (El circuito galvánico tratado matemáticamente), establecieron los fundamentos de la electrónica y la ingeniería eléctrica moderna. Aunque al principio fue criticado, el trabajo de Ohm fue posteriormente reconocido por su rigor científico y su impacto en la comprensión de los circuitos eléctricos.
+
+En los años siguientes, el físico inglés James Prescott Joule (1818–1889) descubrió la relación entre la corriente eléctrica y el calor generado por ella, fenómeno que hoy se conoce como Efecto Joule, expresado como:
+
+P = I² * R
+
+Este principio mostró que la energía eléctrica podía transformarse en energía térmica (E = I² * R * t), sentando las bases de la conservación de la energía dentro de los sistemas eléctricos.
+
+La introducción del concepto de resistividad (ρ) permitió caracterizar los materiales según su capacidad para oponerse al paso de la corriente, estableciendo la ecuación:
+
+R = ρ * (L / A)
+
+donde L es la longitud del conductor y A su área transversal.
+
+A lo largo del siglo XX, los avances en la física de materiales y la aparición de semiconductores revolucionaron el estudio de la resistencia, dando lugar a dispositivos como los resistores variables, los termistores y los transistores, esenciales en la electrónica moderna.
+
+En la actualidad, los principios enunciados por Ohm y Joule continúan aplicándose en todos los ámbitos de la ingeniería eléctrica y electrónica. Desde los circuitos más simples hasta los sistemas computacionales más complejos, la relación V = I * R sigue siendo el fundamento matemático del flujo controlado de la corriente eléctrica.`
+      },
+      teoria: {
+        title: 'Teoria de la corriente eléctrica, resistencias y ley de OHM ',
+        content: `La corriente eléctrica (I) es el flujo ordenado de cargas eléctricas (Q) a través de un conductor en un tiempo determinado (t). Se define matemáticamente como:
+
+I = Q / t
+
+La unidad de corriente en el Sistema Internacional es el ampere (A), donde 1 A = 1 C/s.
+
+ 1. Sentido de la corriente 
+
+Por convención, el sentido de la corriente eléctrica se considera del polo positivo (+) al polo negativo (−) de una fuente de energía, aunque en realidad los electrones (e⁻) se mueven en sentido contrario.
+
+ 2. Ley de Ohm 
+
+La Ley de Ohm, enunciada por Georg Simon Ohm (1827), establece que la diferencia de potencial (V) aplicada entre los extremos de un conductor es directamente proporcional a la corriente (I) que lo atraviesa, siempre que la temperatura se mantenga constante:
+
+V = I * R
+
+donde:
+
+V = voltaje o diferencia de potencial (voltios, V)
+
+I = corriente (amperios, A)
+
+R = resistencia eléctrica (ohmios, Ω)
+
+ 3. Resistencia eléctrica y resistividad 
+
+La resistencia (R) es la oposición que presenta un material al paso de la corriente eléctrica. Depende de su longitud (L), área transversal (A) y de la resistividad (ρ) del material:
+
+R = ρ * (L / A)
+
+donde ρ se mide en Ω·m.
+Los buenos conductores (como Cu o Ag) tienen valores bajos de ρ, mientras que los aisladores (como el vidrio o el plástico) tienen valores muy altos.
+
+ 4. Efecto Joule y potencia disipada 
+
+Cuando una corriente eléctrica atraviesa una resistencia, parte de la energía eléctrica se transforma en energía térmica (calor). Este fenómeno se conoce como efecto Joule, y la potencia (P) disipada se calcula mediante:
+
+P = V * I = I² * R = V² / R
+
+La energía total liberada en un tiempo t es:
+
+E = P * t = I² * R * t
+
+Este principio se aplica en calentadores eléctricos, focos incandescentes, fusibles y resistencias térmicas.
+
+ 5. Asociación de resistencias 
+
+a) En serie:
+La corriente es la misma en todas las resistencias, y el voltaje total es la suma de los voltajes individuales:
+
+R_eq = R₁ + R₂ + R₃ + ...
+
+V_total = V₁ + V₂ + V₃
+
+b) En paralelo:
+El voltaje es el mismo en todas las resistencias, y la corriente total se reparte entre ellas:
+
+1 / R_eq = 1 / R₁ + 1 / R₂ + 1 / R₃ + ...
+
+I_total = I₁ + I₂ + I₃
+
+ 6. Aplicaciones 
+
+Circuitos eléctricos domésticos y electrónicos.
+
+Control de corriente y voltaje en dispositivos eléctricos.
+
+Medición y protección de sistemas eléctricos (fusibles, resistores, sensores).
+
+Diseño de circuitos de potencia y señales.
+
+En conclusión, la Ley de Ohm (V = I * R) y las relaciones de potencia (P = V * I) constituyen la base de la electrodinámica clásica, permitiendo analizar y diseñar circuitos eléctricos con precisión. La comprensión de la resistencia (R) y la resistividad (ρ) es esencial para optimizar materiales y controlar el flujo de energía eléctrica en aplicaciones prácticas.`
+      },
+      calculadora: { component: CalculadoraElectricidad },
+      simulacion: { component: CorrienteSimulation }
+    },
+    circuitos: {
+       historia: {
+        title: 'Historia de los Circuitos Eléctricos: Leyes de Kirchhoff',
+        content: `Las Leyes de Kirchhoff fueron formuladas en el año 1845 por el físico alemán Gustav Robert Kirchhoff (1824–1887), cuando aún era estudiante en la Universidad de Königsberg. Su trabajo marcó un antes y un después en la comprensión de los circuitos eléctricos, ya que permitió establecer un método matemático riguroso para analizar redes eléctricas complejas, mucho antes de que existieran los instrumentos modernos de medición.
+
+Antes de Kirchhoff, los estudios sobre electricidad se basaban principalmente en los descubrimientos de Ohm, quien había formulado la Ley de Ohm (1827). Sin embargo, esta ley solo describía la relación entre voltaje, corriente y resistencia en un elemento aislado del circuito. Kirchhoff dio el paso siguiente: analizó el comportamiento global de los circuitos, considerando cómo la corriente y la tensión se distribuyen entre múltiples componentes interconectados.
+
+Sus investigaciones se publicaron en un artículo titulado "Über den Durchgang eines elektrischen Stromes durch eine Ebene, insbesondere durch eine kreisförmige" (“Sobre el paso de una corriente eléctrica a través de una superficie, especialmente una circular”), donde estableció las bases de lo que hoy conocemos como las Leyes de Kirchhoff de corrientes y tensiones.
+
+Estas leyes se convirtieron rápidamente en herramientas esenciales para los ingenieros y físicos, ya que permitían analizar circuitos eléctricos complejos sin necesidad de desmontarlos, solo con cálculos teóricos.
+
+ Concepto de nodo y malla:
+Un nodo es un punto de unión entre dos o más conductores o elementos eléctricos.
+Una malla es cualquier lazo cerrado dentro de un circuito eléctrico.
+El estudio de nodos y mallas es esencial para aplicar correctamente las leyes de Kirchhoff.
+
+ Primera Ley de Kirchhoff (Ley de Corrientes o KCL):
+Formulada a partir del principio de conservación de la carga eléctrica, esta ley indica que la suma algebraica de las corrientes que entran a un nodo es igual a la suma de las corrientes que salen de él.
+→ ∑I_entrantes = ∑I_salientes
+Esto significa que la corriente no se pierde ni se acumula en los nodos; simplemente se distribuye entre las ramas del circuito.
+
+Ejemplo práctico: en un nodo donde entran 6 A y salen dos ramas de 2 A y 4 A, la ley se cumple perfectamente, ya que 6 A = 2 A + 4 A.
+
+ Segunda Ley de Kirchhoff (Ley de Tensiones o KVL):
+Basada en el principio de conservación de la energía, esta ley establece que la suma algebraica de las diferencias de potencial (tensiones) en un lazo cerrado es igual a cero.
+→ ∑V = 0
+Esto se debe a que toda la energía suministrada por las fuentes (como baterías o generadores) se consume en los resistores y demás componentes del circuito.
+
+Ejemplo: si en una malla una batería de 12 V alimenta dos resistencias de 4 V y 8 V, la suma de las caídas de tensión (4 + 8) = 12 V coincide con la tensión total suministrada, cumpliendo la ley.
+
+ Análisis de circuitos mixtos:
+Los circuitos mixtos combinan resistencias en serie y en paralelo, lo que hace necesario aplicar las Leyes de Kirchhoff para encontrar las corrientes, voltajes y potencias en cada rama.
+Con la KCL se determinan las corrientes en los nodos.
+Con la KVL se determinan las tensiones en cada malla.
+
+ Métodos de resolución:
+
+Método de Mallas: se aplica la Ley de Tensiones de Kirchhoff a cada lazo cerrado. Se definen corrientes de malla y se plantean ecuaciones que luego se resuelven simultáneamente.
+
+Método de Nodos: se basa en la Ley de Corrientes de Kirchhoff. Se elige un nodo de referencia (tierra) y se calculan los potenciales eléctricos de los demás nodos.
+
+Método de Superposición: se utiliza cuando existen varias fuentes independientes. Se analiza el circuito con una fuente activa a la vez (las demás se reemplazan por sus equivalentes: fuentes de voltaje por cortocircuito, fuentes de corriente por circuito abierto) y luego se suman los efectos.
+
+ Aplicaciones prácticas en electrónica básica:
+Las Leyes de Kirchhoff se utilizan en prácticamente todas las ramas de la electrónica y la ingeniería eléctrica:
+
+Diseño de fuentes de alimentación.
+
+Divisores de tensión y corriente.
+
+Amplificadores y filtros electrónicos.
+
+Análisis de redes eléctricas en corriente continua (DC) y alterna (AC).
+
+Sistemas de medición y control industrial.
+
+En resumen, las Leyes de Kirchhoff son la base de todo análisis de circuitos eléctricos y electrónicos. Gracias a ellas, los ingenieros pueden predecir el comportamiento de un sistema antes de construirlo físicamente, optimizando así el diseño y funcionamiento de los dispositivos eléctricos modernos.`
+      },
+      teoria: {
+        title: 'Teoria de los Circuitos Eléctricos: Leyes de Kirchhoff',
+        content: `1. Concepto de nodo y malla
+
+Nodo:
+Un nodo es el punto de conexión entre dos o más elementos eléctricos de un circuito. En dicho punto, las corrientes pueden dividirse o combinarse, y se considera que todos los conductores unidos en un nodo poseen el mismo potencial eléctrico.
+
+Ejemplo: Si tres resistencias se unen en un punto, ese punto es un nodo común.
+
+Malla:
+Una malla es cualquier trayectoria cerrada dentro de un circuito eléctrico que no contenga otra trayectoria cerrada en su interior. En otras palabras, es un lazo independiente donde se puede aplicar la Ley de Kirchhoff de tensiones.
+
+Las mallas se utilizan para formular ecuaciones que relacionan las caídas de tensión y las fuentes presentes en el circuito.
+
+2. Primera Ley de Kirchhoff (Ley de Corrientes o Ley de Nodos)
+
+La Primera Ley de Kirchhoff establece que la suma algebraica de las corrientes que entran a un nodo es igual a la suma de las corrientes que salen de él.
+Esta ley se basa en el principio de conservación de la carga eléctrica, que indica que la carga no se crea ni se destruye en un punto del circuito.
+
+∑𝐼entrantes=∑𝐼salientes
+
+
+O de forma algebraica:
+
+
+∑I=0
+
+donde las corrientes entrantes al nodo se consideran positivas y las salientes negativas (o viceversa, pero de forma coherente en todo el análisis).
+
+Ejemplo:
+Si en un nodo confluyen tres corrientes 
+
+I1,I2,I3
+
+
+, donde 
+
+I1 y I2
+
+
+ entran al nodo y 
+I3
+
+ sale, entonces:
+
+
+I1+I2−I3=0
+3. Segunda Ley de Kirchhoff (Ley de Tensiones o Ley de Mallas)
+
+La Segunda Ley de Kirchhoff establece que en toda malla cerrada, la suma algebraica de todas las tensiones (caídas y elevaciones de potencial) es igual a cero.
+Esta ley se fundamenta en el principio de conservación de la energía eléctrica, que indica que la energía ganada al recorrer una fuente se pierde en las resistencias u otros elementos del circuito.
+
+
+∑V=0
+
+O, expresada detalladamente:
+
+
+∑E−∑VR=0
+
+donde:
+
+
+E = fuerza electromotriz (voltaje de las fuentes)
+
+
+VR=I⋅R = caída de tensión en una resistencia
+
+Ejemplo:
+En una malla con una fuente de 12 V y dos resistencias 
+
+R1=2Ω y R2=4Ω, 
+la ley se expresa como:
+
+
+12V−I(2Ω)−I(4Ω)=0
+4. Análisis de circuitos mixtos
+
+Los circuitos mixtos son aquellos que contienen conexiones en serie y en paralelo simultáneamente.
+Para analizarlos se pueden emplear las Leyes de Kirchhoff o métodos equivalentes.
+
+Procedimiento general:
+
+Identificar los nodos, ramas y mallas del circuito.
+
+Aplicar la Ley de Corrientes de Kirchhoff (LCK) a los nodos seleccionados.
+
+Aplicar la Ley de Tensiones de Kirchhoff (LTK) a las mallas independientes.
+
+Resolver el sistema de ecuaciones lineales resultante para obtener las corrientes o tensiones desconocidas.
+
+Ejemplo general de ecuación mixta:
+
+{𝐼1+𝐼2−𝐼3=0	(LCK)
+𝐸1−𝐼1𝑅1−𝐼2𝑅2=0	(LTK)
+
+
+5. Métodos de resolución
+
+Existen tres métodos principales para resolver circuitos mediante las leyes de Kirchhoff:
+
+a) Método de las mallas
+
+Se aplica la Ley de Tensiones de Kirchhoff (LTK) a cada malla independiente.
+
+Se plantean ecuaciones en función de las corrientes de malla.
+
+Se resuelve el sistema resultante.
+
+
+∑V=0
+b) Método de los nodos
+
+Se aplica la Ley de Corrientes de Kirchhoff (LCK) a cada nodo, tomando un nodo de referencia (tierra).
+
+Se expresan las corrientes en función de las tensiones nodales.
+
+Se obtiene un sistema de ecuaciones con las tensiones como incógnitas.
+
+(∑𝑉𝑛−𝑉𝑚)/𝑅𝑛𝑚=0
+
+
+donde 
+Vn y Vm
+
+ son los potenciales de los nodos conectados por una resistencia 
+
+Rnm
+
+
+c) Método de superposición
+
+Se utiliza en circuitos lineales con varias fuentes (de tensión o corriente).
+
+Consiste en analizar el efecto de una fuente a la vez, anulando las demás:
+
+Las fuentes de tensión se reemplazan por un corto circuito.
+
+Las fuentes de corriente se reemplazan por un circuito abierto.
+
+Luego, se suman algebraicamente los efectos individuales sobre cada elemento.
+
+6. Aplicaciones prácticas en electrónica básica
+
+Las Leyes de Kirchhoff se aplican en múltiples áreas de la electrónica básica y el análisis de circuitos, tales como:
+
+Cálculo de corrientes y tensiones en redes resistivas complejas.
+
+Diseño y análisis de divisores de tensión y corrientes.
+
+Verificación de la correcta distribución de energía en un circuito.
+
+Determinación de potenciales nodales en amplificadores y sistemas de control.
+
+Estudio de circuitos equivalentes y comprobación experimental con instrumentos como el multímetro.`
+      },
+      calculadora: { component: CalculadoraKirchhoff },
+      simulacion: { component: KirchhoffSimulation }
+    },
+    magnetismo: {
+       historia: {
+        title: 'Historia del Magnetismo y la Fuerza de Lorentz',
+        content: `El estudio del magnetismo constituye uno de los pilares fundamentales de la física clásica y moderna. Su desarrollo histórico abarca desde observaciones empíricas de la Antigüedad hasta formulaciones teóricas precisas en el siglo XIX, que culminaron en la comprensión del electromagnetismo como una manifestación unificada de las fuerzas eléctricas y magnéticas.
+
+1. Los orígenes del magnetismo
+
+Las primeras observaciones sobre el magnetismo se remontan a la antigua Grecia, alrededor del siglo VI a. C., cuando Tales de Mileto describió la capacidad de ciertos minerales, como la magnetita (Fe₃O₄), para atraer fragmentos de hierro. Estos minerales fueron encontrados en la región de Magnesia, de donde proviene el término magnetismo.
+
+En China, hacia el siglo IV a. C., se desarrollaron las primeras brújulas rudimentarias, que utilizaban imanes naturales suspendidos para orientarse según el campo magnético terrestre. Este fenómeno permitió el progreso de la navegación marítima, siendo uno de los primeros usos prácticos del magnetismo.
+
+Durante siglos, el fenómeno magnético fue considerado una curiosidad natural, sin relación con otros campos de la física. No fue sino hasta el Renacimiento que surgió un interés sistemático por su estudio.
+
+2. La etapa experimental: del siglo XVI al XIX
+
+En 1600, el médico y físico inglés William Gilbert publicó su obra De Magnete, considerada el primer tratado científico sobre magnetismo. Gilbert propuso que la Tierra se comporta como un gigantesco imán, introduciendo así el concepto de campo magnético terrestre. Su trabajo marcó el inicio del estudio experimental del magnetismo como una ciencia empírica.
+
+Posteriormente, en el siglo XIX, se produjo un avance decisivo gracias a la unificación entre electricidad y magnetismo. En 1820, el físico danés Hans Christian Ørsted descubrió que una corriente eléctrica podía desviar la aguja de una brújula, demostrando así que la electricidad genera un campo magnético. Este hallazgo dio origen al electromagnetismo.
+
+Casi de inmediato, André-Marie Ampère formuló las leyes cuantitativas que describen la interacción entre corrientes eléctricas, estableciendo las bases del magnetismo originado por la electricidad. En 1824, Jean-Baptiste Biot y Félix Savart formularon la Ley de Biot–Savart, que permite calcular el campo magnético producido por una corriente.
+
+En 1831, Michael Faraday descubrió el fenómeno de la inducción electromagnética, demostrando que una corriente variable puede generar un campo magnético variable y viceversa. Este descubrimiento fue el fundamento para la invención de los generadores y transformadores eléctricos, pilares de la tecnología moderna.
+
+3. La formulación teórica: James Clerk Maxwell
+
+El físico escocés James Clerk Maxwell integró los conocimientos dispersos sobre electricidad y magnetismo en un conjunto coherente de ecuaciones diferenciales, conocidas como las Ecuaciones de Maxwell (1865).
+Estas ecuaciones unificaron los fenómenos eléctricos y magnéticos dentro de una sola teoría: el campo electromagnético.
+
+Maxwell demostró, además, que las ondas electromagnéticas (como la luz visible, las ondas de radio o los rayos X) se propagan en el vacío a una velocidad c = 3×10⁸ m/s, idéntica a la velocidad de la luz, confirmando así que la luz es una manifestación del electromagnetismo.
+
+4. La contribución de Hendrik Antoon Lorentz
+
+A finales del siglo XIX, el físico neerlandés Hendrik Antoon Lorentz formuló la expresión matemática de la fuerza magnética sobre una carga en movimiento dentro de un campo magnético, conocida como la Fuerza de Lorentz.
+
+La ley se expresa como:
+
+→F = q · (→E + →v × →B)
+
+donde:
+
+→F = fuerza total ejercida sobre la carga (N)
+
+q = carga eléctrica (C)
+
+→E = campo eléctrico (N/C)
+
+→v = velocidad de la carga (m/s)
+
+→B = campo magnético (T)
+
+Esta ecuación generaliza la interacción entre campos eléctricos y magnéticos sobre partículas cargadas, constituyendo la base del electromagnetismo clásico y explicando fenómenos como la trayectoria circular de electrones en campos magnéticos y el funcionamiento de aceleradores de partículas.
+
+5. El magnetismo en la era moderna
+
+Durante el siglo XX, el estudio del magnetismo se extendió a la estructura atómica y cuántica de la materia.
+Los experimentos de Stern y Gerlach (1922) demostraron que el momento magnético del electrón está cuantizado, lo que dio lugar al concepto de espín.
+
+Con el desarrollo de la electrodinámica cuántica (QED) y la teoría del campo unificado, el magnetismo se comprendió como una manifestación del intercambio de fotones virtuales entre partículas cargadas.
+
+En la actualidad, los principios del magnetismo y de la fuerza de Lorentz tienen aplicaciones tecnológicas fundamentales en:
+
+Motores y generadores eléctricos
+
+Transformadores
+
+Equipos de resonancia magnética (RMN)
+
+Aceleradores de partículas
+
+Dispositivos de almacenamiento magnético (discos duros, cintas, etc.)`
+      },
+      teoria: {
+        title: 'Teoria de Magnetismo y Fuerza de Lorentz',
+        content: `1. Campo magnético (B) y líneas de inducción
+
+El campo magnético (B) es una región del espacio donde actúan fuerzas magnéticas sobre cargas eléctricas en movimiento o sobre materiales magnéticos.
+Su unidad en el Sistema Internacional (SI) es el tesla (T), definido como:
+
+1 T = 1 N / (A·m)
+
+El campo magnético se representa mediante líneas de inducción magnética, que tienen las siguientes características:
+
+Salen del polo norte y entran al polo sur de un imán.
+
+La densidad de líneas indica la intensidad del campo (más líneas = mayor B).
+
+Las líneas no se cruzan y forman lazos cerrados.
+
+Dentro del imán, las líneas van del polo sur al polo norte.
+
+El vector que representa el campo magnético es →B.
+
+2. Imán natural y polos magnéticos
+
+Un imán natural es aquel que posee propiedades magnéticas de forma espontánea, como la magnetita (Fe₃O₄).
+Los imanes artificiales se obtienen al magnetizar materiales ferromagnéticos (hierro, níquel, cobalto, etc.) mediante corriente eléctrica o campos magnéticos intensos.
+
+Propiedades de los polos magnéticos:
+
+Polos iguales se repelen y opuestos se atraen.
+
+No existen monopolos magnéticos (si se corta un imán, cada parte tiene ambos polos).
+
+Los polos son las zonas donde la fuerza magnética es más intensa.
+
+3. Movimiento de cargas en un campo magnético
+
+Cuando una carga eléctrica q se mueve con velocidad →v dentro de un campo magnético →B, actúa sobre ella una fuerza magnética →F_B, dada por la Ley de Lorentz:
+
+→F_B = q · (→v × →B)
+
+donde:
+
+→F_B = fuerza magnética (N)
+
+q = carga eléctrica (C)
+
+→v = velocidad (m/s)
+
+→B = campo magnético (T)
+
+× = producto vectorial
+
+La dirección de la fuerza se determina por la regla de la mano derecha:
+
+Pulgar → dirección de →v
+
+Índice → dirección de →B
+
+Medio → dirección de →F_B (para carga positiva; se invierte para carga negativa)
+
+Si la velocidad es perpendicular al campo magnético, la carga realiza un movimiento circular uniforme con radio r, dado por:
+
+r = m·v / (|q|·B)
+
+y la frecuencia angular (ω) es:
+
+ω = |q|·B / m
+
+4. Fuerza magnética sobre conductores
+
+Un conductor con corriente I dentro de un campo magnético →B experimenta una fuerza →F:
+
+→F = I · (→L × →B)
+
+donde:
+
+→F = fuerza (N)
+
+I = corriente (A)
+
+→L = vector longitud del conductor (m)
+
+→B = campo magnético (T)
+
+Si el conductor es perpendicular al campo magnético:
+
+F = B · I · L
+
+5. Campo magnético creado por corrientes: Ley de Biot–Savart
+
+El campo magnético →B generado por una corriente eléctrica se determina mediante la Ley de Biot–Savart, expresada como:
+
+d→B = (μ₀ / 4π) · [ I · (d→l × →r̂) / r² ]
+
+donde:
+
+d→B = campo magnético elemental (T)
+
+μ₀ = 4π × 10⁻⁷ T·m/A (permeabilidad del vacío)
+
+I = corriente (A)
+
+d→l = elemento de longitud del conductor (m)
+
+→r̂ = vector unitario desde el elemento hasta el punto
+
+r = distancia entre el elemento y el punto (m)
+
+6. Campo magnético de una espira y de un solenoide
+a) Espira circular
+
+El campo magnético en el eje de una espira circular de radio R, con corriente I, a una distancia x del centro, se calcula como:
+
+B = (μ₀·I·R²) / [2·(R² + x²)^(3/2)]
+
+En el centro de la espira (x = 0):
+
+B = (μ₀·I) / (2·R)
+
+b) Solenoide
+
+Un solenoide es una bobina larga de N espiras distribuidas en una longitud L.
+En su interior, el campo magnético es prácticamente uniforme y se expresa como:
+
+B = μ₀·n·I
+
+donde:
+
+n = N / L
+
+→ n es el número de espiras por unidad de longitud.
+
+7. Aplicaciones prácticas del magnetismo y la fuerza de Lorentz
+
+El magnetismo y la fuerza de Lorentz tienen amplias aplicaciones en electrónica y electromecánica, entre las cuales destacan:
+
+Motores eléctricos: La fuerza magnética sobre los conductores hace girar el rotor, transformando energía eléctrica en mecánica.
+
+Parlantes o bocinas: Una bobina móvil dentro de un campo magnético se desplaza según la corriente aplicada, generando vibraciones sonoras.
+
+Aceleradores de partículas: Campos magnéticos controlan y guían partículas cargadas a altas velocidades mediante la fuerza de Lorentz.
+
+Generadores eléctricos: Aprovechan la inducción electromagnética al mover conductores dentro de campos magnéticos variables.`
+      },
+      calculadora: { component: MagnetismCalculator },
+      simulacion: { component: MagnetismSimulation }
+    },
+    induccion: {
+       historia: {
+        title: 'Historia de la Inducción Electromagnética: Faraday y Lenz',
+        content: `El fenómeno de la inducción electromagnética representa uno de los descubrimientos más trascendentes en la historia de la física. Su comprensión permitió establecer la relación directa entre la electricidad y el magnetismo, dando origen a la teoría del electromagnetismo clásico y a la mayoría de las aplicaciones eléctricas modernas.
+
+1. Antecedentes históricos
+
+Durante gran parte del siglo XVIII, la electricidad y el magnetismo eran considerados fenómenos independientes. Sin embargo, los trabajos experimentales de Hans Christian Ørsted en 1820 revelaron que una corriente eléctrica produce un campo magnético, evidenciando por primera vez un vínculo entre ambas fuerzas.
+
+Este descubrimiento inspiró a científicos europeos como André-Marie Ampère, quien formuló las leyes cuantitativas que describen la interacción entre corrientes, y a Jean-Baptiste Biot y Félix Savart, quienes establecieron la Ley de Biot–Savart para calcular el campo magnético generado por corrientes eléctricas.
+
+No obstante, la cuestión inversa —si un campo magnético podía generar una corriente eléctrica— permanecía sin respuesta hasta la década siguiente.
+
+2. Los experimentos de Michael Faraday
+
+En 1831, el físico y químico británico Michael Faraday (1791–1867) realizó una serie de experimentos decisivos que demostraron que una corriente eléctrica puede ser inducida por la variación de un campo magnético.
+
+Faraday construyó una bobina doble, en la que una de las espiras estaba conectada a una fuente de corriente continua y la otra a un galvanómetro. Al interrumpir o restablecer la corriente en la primera bobina, el galvanómetro de la segunda detectaba una corriente momentánea, aun sin contacto físico entre ambas.
+
+Faraday concluyó que la corriente inducida no dependía de la presencia del campo magnético constante, sino de su variación en el tiempo. A este fenómeno lo denominó inducción electromagnética.
+
+Su descubrimiento se sintetiza en la relación:
+
+ε = - dΦ / dt
+
+donde:
+
+ε = fuerza electromotriz inducida (V)
+
+Φ = flujo magnético (Wb)
+
+dΦ / dt = variación temporal del flujo
+
+El signo negativo expresa que la corriente inducida se opone a la causa que la origina, principio posteriormente formulado por Lenz.
+
+Los experimentos de Faraday establecieron los fundamentos experimentales del electromagnetismo, permitiendo la invención de dispositivos como el generador eléctrico y el transformador.
+
+3. La contribución de Heinrich Friedrich Lenz
+
+En 1834, el físico alemán Heinrich Friedrich Emil Lenz (1804–1865) complementó los hallazgos de Faraday al formular la Ley de Lenz, la cual determina el sentido de la corriente inducida.
+
+Lenz postuló que:
+
+“La corriente inducida tiene un sentido tal que el campo magnético que genera se opone a la variación del flujo magnético que la produce.”
+
+Este principio se representa mediante el signo negativo (–) en la ecuación de Faraday y constituye una manifestación directa del principio de conservación de la energía.
+
+De no existir esta oposición, la corriente inducida reforzaría la variación del flujo, generando energía de forma espontánea, lo cual es físicamente imposible.
+
+4. Desarrollo teórico posterior
+
+Tras los descubrimientos de Faraday y Lenz, el fenómeno de la inducción fue formalizado matemáticamente por James Clerk Maxwell (1831–1879), quien incluyó las ecuaciones de Faraday dentro de su teoría del campo electromagnético (1865).
+
+Maxwell estableció que la variación del campo magnético genera un campo eléctrico no conservativo, expresado en forma diferencial como:
+
+∇ × →E = - ∂→B / ∂t
+
+Esta ecuación representa la versión matemática moderna de la Ley de Faraday-Lenz, unificando los fenómenos eléctricos y magnéticos bajo un mismo marco teórico.
+
+Con el tiempo, esta formulación dio lugar a la comprensión de las ondas electromagnéticas, que se propagan a la velocidad de la luz y constituyen la base de la comunicación inalámbrica y la radiación electromagnética en general.
+
+5. Impacto tecnológico y aplicaciones
+
+El descubrimiento de la inducción electromagnética revolucionó la tecnología del siglo XIX y sentó las bases del desarrollo industrial moderno.
+Gracias a las leyes de Faraday y Lenz fue posible diseñar y construir:
+
+Generadores eléctricos, que convierten energía mecánica en eléctrica mediante la rotación de bobinas en campos magnéticos variables.
+
+Transformadores, que permiten transferir energía eléctrica entre circuitos ajustando los niveles de tensión y corriente.
+
+Motores eléctricos, que operan bajo los principios inversos de la inducción.
+
+Sistemas de freno y cocinas de inducción, basados en las corrientes de Foucault.
+
+Equipos de resonancia magnética, que utilizan campos variables para generar imágenes médicas.
+
+El fenómeno de inducción electromagnética, por tanto, constituye el principio de funcionamiento de casi toda la maquinaria eléctrica moderna.`
+      },
+      teoria: {
+        title: 'Teoria de Inducción Electromagnética: Ley de Faraday y Lenz',
+        content: `1. Concepto de flujo magnético
+
+El flujo magnético (Φ) representa la cantidad de líneas de campo magnético (B) que atraviesan una superficie determinada (A).
+Su valor depende de la intensidad del campo, del área y del ángulo entre el campo y la superficie.
+
+Se define matemáticamente como:
+
+Φ = B · A · cos(θ)
+
+donde:
+
+Φ = flujo magnético (en weber, Wb)
+
+B = intensidad del campo magnético (en tesla, T)
+
+A = área atravesada por el campo (en m²)
+
+θ = ángulo entre el vector campo magnético y el vector normal a la superficie
+
+El flujo magnético mide la “cantidad de magnetismo” que atraviesa una superficie; si el campo es variable o la superficie cambia de orientación, el flujo también varía.
+
+2. Ley de Faraday (Inducción Electromagnética)
+
+La Ley de Faraday establece que toda variación del flujo magnético (Φ) a través de un circuito induce una fuerza electromotriz (fem) en él.
+
+Es decir, cuando el campo magnético o la geometría del circuito cambian con el tiempo, se genera una corriente inducida.
+
+La expresión general es:
+
+ε = - dΦ / dt
+
+donde:
+
+ε = fuerza electromotriz inducida (en voltios, V)
+
+dΦ / dt = velocidad de variación del flujo magnético (Wb/s)
+
+El signo (–) indica el sentido de oposición descrito por la Ley de Lenz
+
+En un circuito con N espiras, la ecuación se amplía a:
+
+ε = - N · (dΦ / dt)
+
+La Ley de Faraday demuestra que la electricidad puede generarse a partir del magnetismo, fundamento del principio de inducción electromagnética.
+
+3. Ley de Lenz: sentido de la corriente inducida
+
+La Ley de Lenz complementa a la de Faraday y determina el sentido de la corriente inducida.
+Afirma que:
+
+La corriente inducida siempre se produce en un sentido tal que el campo magnético que genera se opone a la variación del flujo que la produce.
+
+Matemáticamente, este principio está representado por el signo negativo (–) en la ecuación de Faraday.
+
+De forma conceptual:
+
+Si el flujo aumenta, la corriente inducida crea un campo en sentido opuesto al campo original.
+
+Si el flujo disminuye, la corriente inducida genera un campo en el mismo sentido para compensar la pérdida.
+
+Este comportamiento obedece al principio de conservación de la energía, pues impide que la energía se cree de manera espontánea.
+
+4. Corrientes inducidas y su energía
+
+Cuando una variación del flujo magnético induce una corriente en un conductor (por ejemplo, una espira o una placa metálica), se generan las llamadas corrientes de Foucault o corrientes parásitas.
+
+Estas corrientes circulan dentro del material conductor y producen efectos térmicos debido a la resistencia eléctrica.
+
+La potencia disipada por una corriente inducida I en una resistencia R se calcula con:
+
+P = I² · R
+
+Las corrientes inducidas pueden ser útiles (como en frenos electromagnéticos o cocinas de inducción) o indeseadas (como pérdidas de energía en transformadores y motores).
+Por ello, se emplean núcleos laminados o ferríticos para reducir dichas pérdidas.
+
+La energía electromagnética inducida (W) en una espira durante un intervalo de tiempo t se calcula como:
+
+W = ε · I · t
+
+5. Aplicaciones prácticas: generadores y transformadores
+a) Generadores eléctricos
+
+Los generadores eléctricos se basan directamente en la Ley de Faraday.
+Cuando una bobina gira dentro de un campo magnético, el flujo magnético a través de ella cambia continuamente, produciendo una fuerza electromotriz alterna (fem).
+
+La expresión de la fem instantánea inducida en una espira giratoria es:
+
+ε = B · A · ω · sin(ωt)
+
+donde:
+
+B = campo magnético (T)
+
+A = área de la espira (m²)
+
+ω = velocidad angular (rad/s)
+
+t = tiempo (s)
+
+Este principio es la base del funcionamiento de los generadores de corriente alterna (CA) y de los alternadores utilizados en plantas eléctricas.
+
+b) Transformadores eléctricos
+
+Los transformadores aplican las Leyes de Faraday y Lenz para transferir energía eléctrica entre dos circuitos mediante inducción mutua.
+
+Cuando una corriente alterna circula por la bobina primaria, genera un campo magnético variable que induce una fem en la bobina secundaria.
+
+La relación entre las tensiones e intensidades de ambas bobinas es:
+
+V₁ / V₂ = N₁ / N₂
+
+y
+
+I₁ / I₂ = N₂ / N₁
+
+donde:
+
+V₁, V₂ = tensiones en el primario y secundario
+
+I₁, I₂ = corrientes en el primario y secundario
+
+N₁, N₂ = número de espiras en cada bobina
+
+Tipos de transformadores:
+
+Elevadores: aumentan la tensión (N₂ > N₁).
+
+Reductores: disminuyen la tensión (N₂ < N₁).
+
+Los transformadores son esenciales en la distribución de energía eléctrica, ya que permiten modificar los niveles de tensión con alta eficiencia.`
+      },
+      calculadora: { component: InductionCalculator },
+      simulacion: { component: InductionSimulation }
+    },
+    rlc: {
+       historia: {
+        title: 'Historia de la Autoinducción, Inductores y Circuitos RLC',
+        content: `1. Orígenes del concepto de autoinducción
+
+El fenómeno de la autoinducción tiene sus raíces en los descubrimientos realizados durante el siglo XIX, época en la que el estudio del electromagnetismo alcanzó su consolidación científica.
+Tras los experimentos de Michael Faraday (1831) sobre la inducción electromagnética, se comprendió que la variación de un campo magnético externo podía inducir una corriente eléctrica en un conductor.
+
+Sin embargo, poco después se descubrió que un circuito podía inducir una fuerza electromotriz en sí mismo debido a las variaciones de su propia corriente. Este fenómeno fue descrito por el físico estadounidense Joseph Henry (1797–1878) en forma casi simultánea a los estudios de Faraday en Inglaterra.
+
+Henry observó que al interrumpir una corriente en una bobina, se generaba una chispa eléctrica que evidenciaba la presencia de una fem opuesta, producida por el mismo campo magnético del circuito. A este fenómeno se le denominó autoinducción, y el parámetro que lo cuantifica se denominó inductancia (L) en honor a Henry.
+
+2. Desarrollo del concepto de inductancia
+
+El término inductancia fue introducido formalmente por el físico inglés Oliver Heaviside hacia finales del siglo XIX, quien lo incluyó en sus formulaciones del electromagnetismo vectorial.
+La inductancia (L) representa la capacidad de un circuito o bobina para oponerse a las variaciones de corriente y almacenar energía magnética en su campo.
+
+Posteriormente, el físico escocés James Clerk Maxwell (1831–1879) incorporó la noción de inductancia en sus célebres Ecuaciones de Maxwell, dando una interpretación unificada a los fenómenos eléctricos y magnéticos.
+En este marco teórico, Maxwell demostró que los campos eléctricos y magnéticos son interdependientes y se propagan como ondas electromagnéticas, con una velocidad equivalente a la de la luz.
+
+Así, la inductancia se consolidó como una propiedad fundamental de los circuitos eléctricos, con un papel análogo al de la capacitancia (C) en los fenómenos eléctricos.
+
+3. Desarrollo de los circuitos RLC
+
+La combinación de resistencia (R), inductancia (L) y capacitancia (C) dio origen a los circuitos RLC, que permitieron estudiar de manera integral el comportamiento transitorio y oscilatorio de los sistemas eléctricos.
+
+Durante la segunda mitad del siglo XIX, varios científicos contribuyeron a su análisis teórico:
+
+Hermann von Helmholtz y Lord Kelvin (William Thomson) investigaron los circuitos oscilatorios, demostrando que podían comportarse como sistemas análogos a un péndulo mecánico, con energía alternando entre formas eléctrica y magnética.
+
+Heinrich Hertz (1857–1894), basándose en las ecuaciones de Maxwell, empleó circuitos RLC en sus experimentos para producir y detectar ondas electromagnéticas (1887), confirmando experimentalmente la existencia de las ondas predichas por la teoría.
+
+En las décadas posteriores, Nikola Tesla (1856–1943) aplicó los principios de resonancia en sus bobinas de alta frecuencia, precursoras de los actuales sistemas de radiofrecuencia y transmisión inalámbrica de energía.
+
+Estos avances marcaron el nacimiento de la radio y de la electrónica de comunicación, al comprobar que un circuito RLC puede resonar y seleccionar frecuencias específicas según sus valores de inductancia y capacitancia.
+
+4. Aplicaciones tecnológicas y evolución
+
+A lo largo del siglo XX, los circuitos RLC y los inductores se convirtieron en elementos esenciales en múltiples aplicaciones tecnológicas:
+
+En radiocomunicaciones, los circuitos LC se usaron como sintonizadores de frecuencia en transmisores y receptores de radio, permitiendo aislar señales dentro de un espectro electromagnético amplio.
+
+En electrónica analógica, los filtros RLC se emplearon para eliminar ruido, estabilizar señales y crear osciladores de alta precisión.
+
+En sistemas eléctricos de potencia, las bobinas y reactancias se aplicaron para corrección del factor de potencia y limitación de corriente en redes de corriente alterna.
+
+En ingeniería moderna, los inductores son parte esencial de convertidores de energía, fuentes conmutadas, sistemas de carga inalámbrica y sensores de campo magnético.
+
+Con el desarrollo de los semiconductores y los circuitos integrados, la función de los inductores se ha optimizado mediante componentes miniaturizados, núcleos de ferrita y materiales de alta permeabilidad magnética, permitiendo operar en frecuencias elevadas con gran eficiencia.
+
+5. Relevancia científica y legado histórico
+
+El estudio de la autoinducción y los circuitos RLC constituye uno de los pilares del electromagnetismo aplicado y de la ingeniería eléctrica.
+Desde los trabajos pioneros de Henry, Maxwell, Hertz y Tesla, la comprensión de estos fenómenos ha permitido el desarrollo de tecnologías que sustentan la transmisión de energía, la comunicación inalámbrica y el procesamiento de señales.
+
+En términos científicos, la autoinducción ilustra de manera tangible los principios de conservación de la energía y la interacción dinámica entre campos eléctricos y magnéticos.
+En el plano tecnológico, los circuitos RLC continúan siendo modelos fundamentales para el análisis de resonancia, filtrado, estabilidad y oscilación en sistemas eléctricos y electrónicos modernos.`
+      },
+      teoria: {
+        title: 'Teoria de la Autoinducción, Inductores y Circuitos RLC',
+        content: `1. Concepto de autoinducción y coeficiente de inductancia (L)
+
+La autoinducción es el fenómeno electromagnético mediante el cual una corriente variable en un conductor o bobina induce una fuerza electromotriz (fem) en sí mismo.
+Este fenómeno se produce debido a la variación del flujo magnético (Φ) generado por la propia corriente eléctrica que circula por el circuito.
+
+Cuando la corriente aumenta o disminuye, el campo magnético asociado también varía, generando una fem inducida que se opone al cambio de corriente, de acuerdo con la Ley de Lenz.
+
+Matemáticamente, la fem autoinducida se expresa como:
+
+ε = - L · (dI / dt)
+
+donde:
+
+ε = fuerza electromotriz autoinducida (V)
+
+L = coeficiente de autoinducción o inductancia (H, henrio)
+
+dI / dt = variación temporal de la corriente (A/s)
+
+El signo negativo (–) indica que la fem inducida se opone a la variación de la corriente que la origina.
+
+El coeficiente de inductancia (L) depende de la geometría de la bobina (número de espiras, área, longitud) y de la permeabilidad magnética (μ) del material del núcleo.
+
+Para una bobina de N espiras, se define:
+
+L = (N · Φ) / I
+
+donde:
+
+N = número de espiras
+
+Φ = flujo magnético total (Wb)
+
+I = corriente eléctrica (A)
+
+La unidad del Sistema Internacional para la inductancia es el henrio (H), equivalente a 1 V·s / A.
+
+2. Energía almacenada en un inductor
+
+Un inductor no solo se opone a las variaciones de corriente, sino que también almacena energía en su campo magnético cuando por él circula una corriente eléctrica.
+
+La energía almacenada (W) en un inductor se calcula mediante la siguiente expresión:
+
+W = (1 / 2) · L · I²
+
+donde:
+
+W = energía magnética almacenada (J)
+
+L = inductancia (H)
+
+I = corriente instantánea (A)
+
+Esta energía puede liberarse cuando la corriente disminuye, lo que explica los picos de tensión observados al desconectar bobinas o relés.
+En dispositivos eléctricos, se emplean diodos de protección (diodos flyback) para disipar dicha energía de forma segura.
+
+3. Circuitos RL, RC y RLC
+
+Los circuitos eléctricos que combinan resistencias (R), inductores (L) y capacitores (C) presentan comportamientos transitorios y oscilatorios que describen la dinámica de la corriente y el voltaje en el tiempo.
+
+a) Circuito RL (resistor–inductor)
+
+En un circuito RL serie, al aplicar una tensión V, la corriente no alcanza instantáneamente su valor máximo debido a la autoinducción del inductor.
+
+La ecuación diferencial que describe el circuito es:
+
+V = R · I + L · (dI / dt)
+
+La solución para el régimen transitorio de crecimiento de la corriente es:
+
+I(t) = Iₘₐₓ · (1 - e^(-t / τ))
+
+donde:
+
+Iₘₐₓ = V / R
+
+τ = L / R = constante de tiempo del circuito
+
+En el proceso de desconexión, la corriente decrece exponencialmente como:
+
+I(t) = I₀ · e^(-t / τ)
+
+b) Circuito RC (resistor–capacitor)
+
+En un circuito RC serie, la corriente varía según la carga o descarga del capacitor.
+La ecuación general es:
+
+V = R · I + (1 / C) · ∫ I · dt
+
+Durante la carga del capacitor, la tensión en él evoluciona como:
+
+V_C(t) = V · (1 - e^(-t / (R·C)))
+
+y la corriente como:
+
+I(t) = (V / R) · e^(-t / (R·C))
+
+donde τ = R · C es la constante de tiempo del circuito.
+
+c) Circuito RLC (resistor–inductor–capacitor)
+
+El circuito RLC combina resistencia, inductancia y capacitancia, y puede comportarse como un sistema oscilatorio amortiguado.
+
+La ecuación diferencial que lo describe es:
+
+V = R · I + L · (dI / dt) + (1 / C) · ∫ I · dt
+
+o, derivando:
+
+L · (d²I / dt²) + R · (dI / dt) + (I / C) = 0
+
+Este circuito puede presentar tres comportamientos según la relación entre los parámetros R, L y C:
+
+Subamortiguado: Oscilaciones decrecientes con el tiempo.
+
+Críticamente amortiguado: Regreso rápido al equilibrio sin oscilación.
+
+Sobreamortiguado: Retorno lento al equilibrio sin oscilación.
+
+4. Oscilaciones eléctricas y resonancia
+
+Cuando un circuito RLC se conecta a una fuente de corriente alterna (CA), se establecen oscilaciones eléctricas que dependen de la frecuencia de la fuente.
+
+La frecuencia natural de oscilación (frecuencia de resonancia) está dada por:
+
+f₀ = 1 / (2·π·√(L·C))
+
+donde:
+
+f₀ = frecuencia de resonancia (Hz)
+
+L = inductancia (H)
+
+C = capacitancia (F)
+
+En la frecuencia de resonancia, las reactancias inductiva y capacitiva se anulan entre sí:
+
+X_L = X_C
+
+siendo:
+
+X_L = 2·π·f·L
+X_C = 1 / (2·π·f·C)
+
+En ese punto, la impedancia total del circuito es mínima (Z = R) y la corriente alcanza su valor máximo.
+
+Este fenómeno se denomina resonancia eléctrica y tiene gran relevancia en la sintonización de señales.
+
+5. Aplicaciones en radiofrecuencia y electrónica analógica
+
+Los inductores y circuitos RLC poseen múltiples aplicaciones en el campo de la radiofrecuencia (RF), la electrónica analógica y los sistemas de comunicación.
+
+Principales aplicaciones:
+
+Filtros resonantes: Seleccionan o eliminan señales según su frecuencia (filtros pasa-banda, pasa-bajo o pasa-alto).
+
+Sintonizadores de radio: Utilizan un circuito LC variable para ajustar la frecuencia de recepción.
+
+Osciladores electrónicos: Generan señales periódicas a partir de las oscilaciones naturales de un circuito RLC.
+
+Convertidores de potencia: Emplean inductores para almacenar energía y suavizar las corrientes (fuentes conmutadas).
+
+Sistemas de acoplamiento e impedancia: Adaptan señales en transmisores y antenas de radio.
+
+En todos estos casos, el control de la inductancia (L) y la capacitancia (C) permite manipular la respuesta en frecuencia del circuito y optimizar su comportamiento electromagnético.`
+      },
+      calculadora: { component: RLCCircuitCalculator },
+      simulacion: { component: CircuitosRLCSimulation }
+    },
+    maxwell: {
+       historia: {
+        title: 'Historia de las ondas electromagnéticas y las ecuaciones de Maxwell',
+        content: `1. Unificación del campo eléctrico y magnético
+
+Durante los siglos XVII y XVIII, la electricidad y el magnetismo se consideraban fenómenos completamente distintos. Sin embargo, a comienzos del siglo XIX, una serie de descubrimientos experimentales reveló que ambos estaban profundamente relacionados.
+
+En 1820, el físico danés Hans Christian Oersted demostró que una corriente eléctrica podía desviar la aguja de una brújula, evidenciando que la electricidad genera magnetismo.
+Poco después, André-Marie Ampère formuló matemáticamente la relación entre las corrientes y los campos magnéticos, estableciendo la Ley de Ampère.
+
+Más tarde, en 1831, Michael Faraday descubrió el fenómeno de la inducción electromagnética, mostrando que un campo magnético variable produce una corriente eléctrica.
+Estos hallazgos indicaron que la electricidad y el magnetismo no son entidades separadas, sino manifestaciones de una misma realidad física.
+
+Fue el físico escocés James Clerk Maxwell (1831–1879) quien, basándose en los trabajos de Faraday y otros científicos, desarrolló una teoría unificada que integraba los campos eléctricos y magnéticos dentro de un solo marco matemático: el electromagnetismo.
+
+2. Las Ecuaciones de Maxwell
+
+Entre 1861 y 1865, Maxwell formuló un conjunto de cuatro ecuaciones fundamentales que describen cómo los campos eléctricos (→E) y magnéticos (→B) se generan, se modifican y se propagan en el espacio.
+Estas ecuaciones consolidaron los experimentos previos en una teoría completa del campo electromagnético.
+
+a) Ley de Gauss para el campo eléctrico
+
+Esta ley establece que el flujo eléctrico total que atraviesa una superficie cerrada es proporcional a la carga eléctrica neta contenida en su interior.
+Fue desarrollada a partir de los estudios de Carl Friedrich Gauss sobre la electrostática (1835).
+
+
+∇⋅E=ρ/ε0
+	
+
+donde ρ es la densidad de carga y ε₀ la permitividad del vacío.
+Históricamente, esta ley permitió comprender cómo las cargas eléctricas originan campos eléctricos.
+
+b) Ley de Gauss para el magnetismo
+
+Gauss también aplicó su método al campo magnético y demostró que el flujo magnético total a través de una superficie cerrada es siempre cero, lo que implica que no existen monopolos magnéticos.
+
+
+∇⋅B=0
+
+Este principio histórico refleja que las líneas del campo magnético son continuas y cerradas, extendiéndose de un polo a otro.
+
+c) Ley de Faraday (inducción electromagnética)
+
+En 1831, Faraday descubrió que una variación en el flujo magnético a través de un circuito induce una fuerza electromotriz (fem).
+Maxwell formuló este fenómeno matemáticamente mediante la ecuación:
+
+
+∇×E=−∂B/∂t
+
+Esta ley fue crucial para el desarrollo de los generadores eléctricos y mostró que los campos eléctricos pueden generarse por campos magnéticos variables.
+
+d) Ley de Ampère-Maxwell
+
+Ampère había establecido en 1826 que las corrientes eléctricas producen campos magnéticos.
+No obstante, Maxwell descubrió que la ley de Ampère original era incompleta, pues no explicaba los campos variables en el tiempo.
+Por ello añadió el término de la corriente de desplazamiento (ε₀ · ∂\vec{E}/∂t), obteniendo la forma moderna:
+
+
+∇×B=μ0⋅(J+ε0⋅∂E/∂t)
+
+Esta corrección permitió explicar la propagación de los campos electromagnéticos, incluso en el vacío, sin necesidad de corrientes reales.
+
+3. Propagación de las ondas electromagnéticas
+
+De la combinación de las leyes de Faraday y Ampère-Maxwell, Maxwell dedujo que los campos eléctricos y magnéticos variables pueden propagarse en el espacio en forma de ondas.
+Matemáticamente, la ecuación de onda electromagnética se expresa como:
+
+
+∂2E/∂x2=μ0⋅ε0⋅∂2E/∂t^2
+
+De esta relación, se obtiene la velocidad de propagación (c):
+
+c=1/√(μ0⋅ε0)
+
+Al calcularla con valores experimentales, Maxwell obtuvo c ≈ 3 × 10⁸ m/s, exactamente la velocidad de la luz.
+Este resultado lo llevó a concluir que la luz es una onda electromagnética, uniendo así la electricidad, el magnetismo y la óptica en una sola teoría física.
+
+4. Confirmación experimental
+
+Aunque la teoría de Maxwell era matemáticamente sólida, fue el físico alemán Heinrich Hertz quien, en 1887, logró producir y detectar ondas electromagnéticas en el laboratorio.
+Sus experimentos confirmaron que estas ondas se reflejaban, refractaban e interferían igual que la luz visible, validando de forma concluyente la teoría de Maxwell.
+Más tarde, Guglielmo Marconi aplicó estos principios en 1901 para realizar la primera transmisión de radio transatlántica, dando inicio a las telecomunicaciones modernas.
+
+5. Espectro electromagnético
+
+El descubrimiento de que la luz era una onda electromagnética permitió reconocer que existe una amplia gama de radiaciones electromagnéticas, que difieren solo en su frecuencia (f) o longitud de onda (λ), relacionadas mediante:
+
+c=λ⋅f
+
+El espectro electromagnético abarca desde las ondas de radio (de baja frecuencia y gran longitud de onda) hasta los rayos gamma (de alta frecuencia y corta longitud de onda).
+Cada tipo de radiación posee aplicaciones específicas, desde las comunicaciones hasta la medicina y la astronomía.
+
+6. Aplicaciones: telecomunicaciones, radar y energía solar
+
+El conocimiento del comportamiento de las ondas electromagnéticas condujo a múltiples avances tecnológicos:
+
+Telecomunicaciones:
+El uso de ondas de radio, microondas y señales ópticas permitió el desarrollo de la radio, televisión, telefonía móvil, Wi-Fi y satélites.
+
+Radar:
+Basado en la reflexión de ondas electromagnéticas, el radar se utiliza para detectar y localizar objetos, siendo esencial en la aviación, meteorología y defensa.
+
+Energía solar:
+La radiación electromagnética del Sol, principalmente en forma de luz visible e infrarroja, es aprovechada por paneles fotovoltaicos para generar electricidad mediante el efecto fotoeléctrico.`
+      },
+      teoria: {
+        title: 'Teoria de las Ondas Electromagnéticas y Ecuaciones de Maxwell',
+        content: `1. Unificación del campo eléctrico y magnético
+
+Durante el siglo XIX, los fenómenos eléctricos y magnéticos se estudiaban de manera separada. Sin embargo, los experimentos de Oersted, Faraday y las formulaciones teóricas de James Clerk Maxwell (1831–1879) demostraron que la electricidad y el magnetismo son manifestaciones de un mismo fenómeno físico: el campo electromagnético.
+
+Maxwell formuló un conjunto de cuatro ecuaciones fundamentales que describen cómo los campos eléctricos (→E) y magnéticos (→B) interactúan y se propagan en el espacio.
+Estas ecuaciones no solo unificaron la teoría eléctrica y magnética, sino que también predijeron la existencia de ondas electromagnéticas, cuya velocidad de propagación resulta igual a la de la luz, estableciendo así la naturaleza electromagnética de la radiación luminosa.
+
+2. Ecuaciones de Maxwell
+
+Las Ecuaciones de Maxwell constituyen la base matemática del electromagnetismo clásico.
+Pueden expresarse en su forma diferencial, representando los fenómenos eléctricos y magnéticos en cualquier punto del espacio.
+
+a) Ley de Gauss para el campo eléctrico
+
+Establece que el flujo eléctrico total que atraviesa una superficie cerrada es proporcional a la carga eléctrica neta contenida dentro de ella.
+
+∇ · →E = ρ / ε₀
+
+donde:
+
+→E = campo eléctrico (V/m)
+
+ρ = densidad de carga eléctrica (C/m³)
+
+ε₀ = permitividad eléctrica del vacío (≈ 8.85 × 10⁻¹² C²/N·m²)
+
+Esta ley cuantifica la relación entre las cargas eléctricas y los campos eléctricos que generan.
+
+b) Ley de Gauss para el magnetismo
+
+Expresa que no existen monopolos magnéticos; es decir, el flujo magnético total a través de una superficie cerrada es siempre nulo.
+
+∇ · →B = 0
+
+donde:
+
+→B = campo magnético (T, tesla)
+
+Esto implica que las líneas del campo magnético son cerradas y continuas, siempre formando bucles sin principio ni fin.
+
+c) Ley de Faraday (Inducción Electromagnética)
+
+Describe que una variación temporal del flujo magnético induce un campo eléctrico.
+
+∇ × →E = - ∂→B / ∂t
+
+Esto significa que los campos eléctricos pueden generarse por campos magnéticos variables, lo que constituye la base del principio de inducción electromagnética descubierto por Faraday.
+
+d) Ley de Ampère-Maxwell
+
+Originalmente, Ampère formuló que los campos magnéticos eran generados por corrientes eléctricas.
+Maxwell amplió esta ley al incluir el campo de desplazamiento eléctrico, necesario para describir correctamente los fenómenos electromagnéticos variables.
+
+La forma completa es:
+
+∇ × →B = μ₀ · (→J + ε₀ · ∂→E / ∂t)
+
+donde:
+
+→J = densidad de corriente eléctrica (A/m²)
+
+μ₀ = permeabilidad magnética del vacío (≈ 4·π·10⁻⁷ H/m)
+
+ε₀ · ∂→E / ∂t = corriente de desplazamiento (componente teórica introducida por Maxwell)
+
+Esta ecuación muestra que un campo magnético puede originarse tanto por una corriente eléctrica real como por un campo eléctrico variable.
+
+3. Propagación de ondas electromagnéticas
+
+De la combinación de las leyes de Faraday y Ampère-Maxwell, se deduce que los campos eléctricos y magnéticos variables se propagan en el espacio en forma de ondas.
+
+La ecuación de onda electromagnética en el vacío se expresa como:
+
+∂²→E / ∂x² = μ₀·ε₀·∂²→E / ∂t²
+∂²→B / ∂x² = μ₀·ε₀·∂²→B / ∂t²
+
+De estas ecuaciones se obtiene la velocidad de propagación (c) de la onda electromagnética:
+
+c = 1 / √(μ₀ · ε₀)
+
+Al sustituir los valores conocidos:
+
+μ₀ = 4·π·10⁻⁷ H/m
+ε₀ = 8.85·10⁻¹² C²/N·m²
+
+Se obtiene:
+
+c ≈ 3 × 10⁸ m/s
+
+Esta velocidad corresponde a la velocidad de la luz en el vacío, lo que confirma que la luz es una onda electromagnética.
+
+En una onda electromagnética:
+
+Los vectores →E y →B son perpendiculares entre sí y a la dirección de propagación.
+
+La energía se transporta mediante el vector de Poynting (→S), definido como:
+
+→S = →E × →H
+
+donde →H = →B / μ₀, y →S indica la densidad de flujo de energía en W/m².
+
+4. Espectro electromagnético
+
+El espectro electromagnético comprende el conjunto de todas las ondas electromagnéticas ordenadas según su frecuencia (f) o longitud de onda (λ), relacionadas por la ecuación:
+
+c = λ · f
+
+Estas ondas se diferencian por su energía y aplicaciones, aunque todas se propagan a la misma velocidad en el vacío (c = 3 × 10⁸ m/s).
+5. Aplicaciones: telecomunicaciones, radar y energía solar
+
+Las ondas electromagnéticas son esenciales en la tecnología moderna. Su capacidad para propagarse sin un medio material permite la transmisión de información y energía a distancia.
+
+Principales aplicaciones:
+
+Telecomunicaciones:
+Utilizan ondas de radio y microondas para la transmisión inalámbrica de datos, en sistemas como radio, televisión, telefonía móvil, Wi-Fi y satélites.
+
+Radar (Radio Detection and Ranging):
+Emplea microondas para detectar objetos y medir distancias mediante la reflexión de las ondas electromagnéticas.
+Es fundamental en aeronáutica, meteorología y defensa.
+
+Energía solar:
+La radiación electromagnética del Sol, principalmente en el rango visible e infrarrojo, constituye una fuente natural de energía.
+Los paneles fotovoltaicos convierten esta energía en electricidad aprovechando el efecto fotoeléctrico.
+
+Además, las ondas electromagnéticas son utilizadas en medicina (rayos X, resonancia magnética), industria (calentamiento por microondas) y astronomía (radiotelescopios).`
+      },
+      calculadora: { component: OndasMaxwellCalculator },
+      simulacion: { component: SimulacionOndasMaxwell }
+    }
+
+  };
+
+  const renderContent = () => {
+    if (!selectedTopic) {
+      return (
+        <div className="flex flex-col items-center justify-center h-full text-center p-8">
+          <BookOpen className="w-24 h-24 text-blue-500 mb-6" />
+          <h2 className="text-3xl font-bold text-gray-800 mb-4">Aplicación de Fisica</h2>
+          <p className="text-gray-600 text-lg max-w-2xl">
+            Seleccione un tema del menú lateral para acceder a su contenido.
+          </p>
+        </div>
+      );
+    }
+
+    const topicContent = content[selectedTopic];
+    if (!topicContent || !topicContent[selectedSection]) {
+      return (
+        <div className="p-8">
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6">
+            <p className="text-yellow-800">Contenido en desarrollo.</p>
+          </div>
+        </div>
+      );
+    }
+
+    const sectionContent = topicContent[selectedSection];
+    
+    if (sectionContent.component) {
+      const Component = sectionContent.component;
+      return <Component />;
+    }
+
+    return (
+      <div className="p-8 max-w-4xl">
+        <h2 className="text-3xl font-bold text-gray-800 mb-6">{sectionContent.title}</h2>
+        <div className="prose prose-lg">
+          {sectionContent.content.split('\n\n').map((paragraph, idx) => (
+            <p key={idx} className="text-gray-700 mb-4 text-justify leading-relaxed">{paragraph}</p>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div className="flex h-screen bg-gray-50">
+      <div className="w-80 bg-gradient-to-b from-blue-900 to-blue-800 text-white overflow-y-auto">
+        <div className="p-6 border-b border-blue-700">
+          <h1 className="text-2xl font-bold mb-2">Fisica</h1>
+          <p className="text-blue-200 text-sm">Sistema de Aprendizaje Integral</p>
+        </div>
+        
+        <nav className="p-4">
+          {topics.map((topic) => (
+            <button
+              key={topic.id}
+              onClick={() => { setSelectedTopic(topic.id); setSelectedSection('historia'); }}
+              className={`w-full text-left p-4 rounded-lg mb-2 transition-all ${
+                selectedTopic === topic.id ? 'bg-blue-700 shadow-lg' : 'hover:bg-blue-800'
+              }`}
+            >
+              <div className="font-semibold">{topic.title}</div>
+              <div className="text-sm text-blue-200 mt-1">{topic.subtitle}</div>
+            </button>
+          ))}
+        </nav>
+      </div>
+
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {selectedTopic && (
+          <div className="bg-white border-b border-gray-200 px-8 py-4">
+            <div className="flex space-x-2">
+              {sections.map((section) => {
+                const Icon = section.icon;
+                return (
+                  <button
+                    key={section.id}
+                    onClick={() => setSelectedSection(section.id)}
+                    className={`flex items-center space-x-2 px-6 py-3 rounded-lg font-medium transition-all ${
+                      selectedSection === section.id
+                        ? 'bg-blue-600 text-white shadow-md'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    <Icon className="w-5 h-5" />
+                    <span>{section.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        <div className="flex-1 overflow-y-auto bg-white">{renderContent()}</div>
+      </div>
+    </div>
+  );
+};
+
+function CinematicaCalculator() {
+  const [calcType, setCalcType] = useState('mru');
+  const [inputs, setInputs] = useState({});
+  const [result, setResult] = useState(null);
+  const [findVariable, setFindVariable] = useState('x');
+
+  const calculateMRU = () => {
+    const { v0, t, x0, x } = inputs;
+    
+    if (findVariable === 'x') {
+      const xf = parseFloat(x0 || 0) + parseFloat(v0) * parseFloat(t);
+      setResult({ posicionFinal: xf.toFixed(3), velocidad: parseFloat(v0).toFixed(3) });
+    } else if (findVariable === 'v0') {
+      const v = (parseFloat(x) - parseFloat(x0 || 0)) / parseFloat(t);
+      setResult({ velocidad: v.toFixed(3), posicionFinal: parseFloat(x).toFixed(3) });
+    } else if (findVariable === 't') {
+      const time = (parseFloat(x) - parseFloat(x0 || 0)) / parseFloat(v0);
+      setResult({ tiempo: time.toFixed(3), velocidad: parseFloat(v0).toFixed(3) });
+    }
+  };
+
+  const calculateMRUA = () => {
+    const { v0, a, t, x0, vf } = inputs;
+    
+    if (findVariable === 'x') {
+      const xf = parseFloat(x0 || 0) + parseFloat(v0) * parseFloat(t) + 0.5 * parseFloat(a) * Math.pow(parseFloat(t), 2);
+      const v = parseFloat(v0) + parseFloat(a) * parseFloat(t);
+      setResult({ posicionFinal: xf.toFixed(3), velocidadFinal: v.toFixed(3) });
+    } else if (findVariable === 'vf') {
+      const v = parseFloat(v0) + parseFloat(a) * parseFloat(t);
+      setResult({ velocidadFinal: v.toFixed(3) });
+    } else if (findVariable === 'v0') {
+      const v = parseFloat(vf) - parseFloat(a) * parseFloat(t);
+      setResult({ velocidadInicial: v.toFixed(3) });
+    } else if (findVariable === 'a') {
+      const acc = (parseFloat(vf) - parseFloat(v0)) / parseFloat(t);
+      setResult({ aceleracion: acc.toFixed(3) });
+    } else if (findVariable === 't') {
+      const time = (parseFloat(vf) - parseFloat(v0)) / parseFloat(a);
+      setResult({ tiempo: time.toFixed(3) });
+    }
+  };
+
+  const calculateCircular = () => {
+    const { r, omega, v } = inputs;
+    
+    if (findVariable === 'v') {
+      const vel = parseFloat(r) * parseFloat(omega);
+      setResult({ velocidadTangencial: vel.toFixed(3) });
+    } else if (findVariable === 'omega') {
+      const w = parseFloat(v) / parseFloat(r);
+      setResult({ velocidadAngular: w.toFixed(3) });
+    } else if (findVariable === 'r') {
+      const radius = parseFloat(v) / parseFloat(omega);
+      setResult({ radio: radius.toFixed(3) });
+    }
+  };
+
+  const handleCalculate = () => {
+    if (calcType === 'mru') calculateMRU();
+    else if (calcType === 'mrua') calculateMRUA();
+    else if (calcType === 'circular') calculateCircular();
+  };
+
+  return (
+    <div className="p-8 max-w-4xl mx-auto">
+      <h2 className="text-3xl font-bold text-gray-800 mb-6">Calculadora de Cinemática</h2>
+
+      <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6">
+        <p className="text-sm text-gray-700">
+          Seleccione qué variable desea calcular y complete los demás campos.
+        </p>
+      </div>
+
+      <div className="mb-6">
+        <label className="block text-sm font-semibold text-gray-700 mb-2">Variable a encontrar</label>
+        <select
+          value={findVariable}
+          onChange={(e) => { setFindVariable(e.target.value); setInputs({}); setResult(null); }}
+          className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 mb-4"
+        >
+          {calcType === 'mru' && (
+            <>
+              <option value="x">Posición final (x)</option>
+              <option value="v0">Velocidad (v)</option>
+              <option value="t">Tiempo (t)</option>
+            </>
+          )}
+          {calcType === 'mrua' && (
+            <>
+              <option value="x">Posición final (x)</option>
+              <option value="vf">Velocidad final (vf)</option>
+              <option value="v0">Velocidad inicial (v₀)</option>
+              <option value="a">Aceleración (a)</option>
+              <option value="t">Tiempo (t)</option>
+            </>
+          )}
+          {calcType === 'circular' && (
+            <>
+              <option value="v">Velocidad tangencial (v)</option>
+              <option value="omega">Velocidad angular (ω)</option>
+              <option value="r">Radio (r)</option>
+            </>
+          )}
+        </select>
+        
+        <label className="block text-sm font-semibold text-gray-700 mb-2">Tipo de Movimiento</label>
+        <select
+          value={calcType}
+          onChange={(e) => { setCalcType(e.target.value); setInputs({}); setResult(null); }}
+          className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="mru">Movimiento Rectilíneo Uniforme (MRU)</option>
+          <option value="mrua">Movimiento Rectilíneo Uniformemente Acelerado (MRUA)</option>
+          <option value="circular">Movimiento Circular Uniforme</option>
+        </select>
+      </div>
+
+      <div className="bg-white border border-gray-200 rounded-lg p-6 mb-6">
+        {calcType === 'mru' && (
+          <div className="space-y-4">
+            {findVariable !== 'x' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Posición final x (m)</label>
+                <input type="number" step="any" value={inputs.x || ''} onChange={(e) => setInputs({...inputs, x: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+              </div>
+            )}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Posición inicial x₀ (m)</label>
+              <input type="number" step="any" value={inputs.x0 || ''} onChange={(e) => setInputs({...inputs, x0: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" placeholder="0" />
+            </div>
+            {findVariable !== 'v0' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Velocidad v (m/s)</label>
+                <input type="number" step="any" value={inputs.v0 || ''} onChange={(e) => setInputs({...inputs, v0: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+              </div>
+            )}
+            {findVariable !== 't' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Tiempo t (s)</label>
+                <input type="number" step="any" value={inputs.t || ''} onChange={(e) => setInputs({...inputs, t: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+              </div>
+            )}
+          </div>
+        )}
+
+        {calcType === 'mrua' && (
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Posición inicial x₀ (m)</label>
+              <input type="number" step="any" value={inputs.x0 || ''} onChange={(e) => setInputs({...inputs, x0: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" placeholder="0" />
+            </div>
+            {findVariable !== 'v0' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Velocidad inicial v₀ (m/s)</label>
+                <input type="number" step="any" value={inputs.v0 || ''} onChange={(e) => setInputs({...inputs, v0: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+              </div>
+            )}
+            {findVariable !== 'vf' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Velocidad final vf (m/s)</label>
+                <input type="number" step="any" value={inputs.vf || ''} onChange={(e) => setInputs({...inputs, vf: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+              </div>
+            )}
+            {findVariable !== 'a' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Aceleración a (m/s²)</label>
+                <input type="number" step="any" value={inputs.a || ''} onChange={(e) => setInputs({...inputs, a: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+              </div>
+            )}
+            {findVariable !== 't' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Tiempo t (s)</label>
+                <input type="number" step="any" value={inputs.t || ''} onChange={(e) => setInputs({...inputs, t: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+              </div>
+            )}
+          </div>
+        )}
+
+        {calcType === 'circular' && (
+          <div className="space-y-4">
+            {findVariable !== 'r' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Radio r (m)</label>
+                <input type="number" step="any" value={inputs.r || ''} onChange={(e) => setInputs({...inputs, r: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+              </div>
+            )}
+            {findVariable !== 'omega' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Velocidad angular ω (rad/s)</label>
+                <input type="number" step="any" value={inputs.omega || ''} onChange={(e) => setInputs({...inputs, omega: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+              </div>
+            )}
+            {findVariable !== 'v' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Velocidad tangencial v (m/s)</label>
+                <input type="number" step="any" value={inputs.v || ''} onChange={(e) => setInputs({...inputs, v: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+              </div>
+            )}
+          </div>
+        )}
+
+        <button onClick={handleCalculate} className="mt-6 w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors">
+          Calcular
+        </button>
+      </div>
+
+      {result && (
+        <div className="bg-green-50 border border-green-200 rounded-lg p-6">
+          <h3 className="text-xl font-bold text-gray-800 mb-4">Resultados</h3>
+          <div className="space-y-2">
+            {Object.entries(result).map(([key, value]) => (
+              <div key={key} className="flex justify-between items-center py-2 border-b border-green-100">
+                <span className="font-medium text-gray-700 capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}:</span>
+                <span className="text-lg font-semibold text-gray-900">{value}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CinematicaSimulation() {
+  const canvasRef = useRef(null);
+  const [isRunning, setIsRunning] = useState(false);
+  const [simType, setSimType] = useState('mru');
+  const [params, setParams] = useState({ v0: 20, angle: 45, a: 3, omega: 1 });
+  const animationRef = useRef(null);
+  const timeRef = useRef(0);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+
+    if (isRunning) {
+      timeRef.current = 0;
+      
+      const animate = () => {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        ctx.strokeStyle = '#374151';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(0, canvas.height - 50);
+        ctx.lineTo(canvas.width, canvas.height - 50);
+        ctx.stroke();
+
+        const t = timeRef.current;
+        let x = 0;
+        let y = 0;
+        let shouldContinue = true;
+
+        if (simType === 'mru') {
+          x = 50 + params.v0 * t * 8;
+          y = canvas.height - 70;
+          
+          ctx.strokeStyle = '#93c5fd';
+          ctx.lineWidth = 1;
+          ctx.setLineDash([5, 5]);
+          ctx.beginPath();
+          ctx.moveTo(0, y);
+          ctx.lineTo(canvas.width, y);
+          ctx.stroke();
+          ctx.setLineDash([]);
+          
+          if (x > canvas.width) shouldContinue = false;
+          
+        } else if (simType === 'mrua') {
+          x = 50 + params.v0 * t * 8 + 0.5 * params.a * t * t * 8;
+          y = canvas.height - 70;
+          
+          ctx.strokeStyle = '#93c5fd';
+          ctx.lineWidth = 1;
+          ctx.setLineDash([5, 5]);
+          ctx.beginPath();
+          ctx.moveTo(0, y);
+          ctx.lineTo(canvas.width, y);
+          ctx.stroke();
+          ctx.setLineDash([]);
+          
+          if (x > canvas.width) shouldContinue = false;
+          
+        } else if (simType === 'parabolico') {
+          const g = 9.81;
+          const angleRad = (params.angle * Math.PI) / 180;
+          const vx = params.v0 * Math.cos(angleRad);
+          const vy = params.v0 * Math.sin(angleRad);
+          
+          x = vx * t * 8 + 50;
+          y = canvas.height - 50 - (vy * t - 0.5 * g * t * t) * 8;
+          
+          ctx.strokeStyle = '#93c5fd';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          for (let i = 0; i < 200; i++) {
+            const ti = i * 0.05;
+            const xi = vx * ti * 8 + 50;
+            const yi = canvas.height - 50 - (vy * ti - 0.5 * g * ti * ti) * 8;
+            if (yi < canvas.height - 50 && xi < canvas.width) {
+              if (i === 0) ctx.moveTo(xi, yi);
+              else ctx.lineTo(xi, yi);
+            }
+          }
+          ctx.stroke();
+          
+          if (y >= canvas.height - 50 || x > canvas.width) shouldContinue = false;
+          
+        } else if (simType === 'circular') {
+          const centerX = canvas.width / 2;
+          const centerY = canvas.height / 2;
+          const radius = 120;
+          const theta = params.omega * t;
+          
+          x = centerX + radius * Math.cos(theta);
+          y = centerY + radius * Math.sin(theta);
+          
+          ctx.strokeStyle = '#93c5fd';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
+          ctx.stroke();
+          
+          ctx.strokeStyle = '#d1d5db';
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(centerX, centerY);
+          ctx.lineTo(x, y);
+          ctx.stroke();
+          
+          ctx.fillStyle = '#ef4444';
+          ctx.beginPath();
+          ctx.arc(centerX, centerY, 4, 0, 2 * Math.PI);
+          ctx.fill();
+          
+          if (t > 15) shouldContinue = false;
+        }
+
+        ctx.fillStyle = '#3b82f6';
+        ctx.shadowColor = '#3b82f6';
+        ctx.shadowBlur = 10;
+        ctx.beginPath();
+        ctx.arc(x, y, 10, 0, 2 * Math.PI);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        
+        ctx.fillStyle = '#1f2937';
+        ctx.font = '14px Arial';
+        ctx.fillText('Tiempo: ' + t.toFixed(2) + ' s', 10, 20);
+
+        timeRef.current += 0.05;
+
+        if (shouldContinue) {
+          animationRef.current = requestAnimationFrame(animate);
+        } else {
+          setIsRunning(false);
+        }
+      };
+
+      animate();
+    }
+
+    return () => {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
+    };
+  }, [isRunning, simType, params]);
+
+  return (
+    <div className="p-8 max-w-6xl mx-auto">
+      <h2 className="text-3xl font-bold text-gray-800 mb-6">Simulación de Cinemática</h2>
+
+      <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6">
+        <p className="text-sm text-gray-700">Visualiza diferentes tipos de movimiento ajustando los parámetros.</p>
+      </div>
+
+      <div className="mb-6">
+        <label className="block text-sm font-semibold text-gray-700 mb-2">Tipo de Simulación</label>
+        <select value={simType} onChange={(e) => { setSimType(e.target.value); setIsRunning(false); }} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+          <option value="mru">Movimiento Rectilíneo Uniforme (MRU)</option>
+          <option value="mrua">Movimiento Rectilíneo Uniformemente Acelerado (MRUA)</option>
+          <option value="parabolico">Movimiento Parabólico</option>
+          <option value="circular">Movimiento Circular Uniforme</option>
+        </select>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        {(simType === 'mru' || simType === 'mrua' || simType === 'parabolico') && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Velocidad inicial: {params.v0} m/s</label>
+            <input type="range" min="5" max="40" value={params.v0} onChange={(e) => setParams({...params, v0: Number(e.target.value)})} className="w-full" disabled={isRunning} />
+          </div>
+        )}
+        {simType === 'mrua' && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Aceleración: {params.a} m/s²</label>
+            <input type="range" min="1" max="10" value={params.a} onChange={(e) => setParams({...params, a: Number(e.target.value)})} className="w-full" disabled={isRunning} />
+          </div>
+        )}
+        {simType === 'parabolico' && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Ángulo: {params.angle}°</label>
+            <input type="range" min="15" max="75" value={params.angle} onChange={(e) => setParams({...params, angle: Number(e.target.value)})} className="w-full" disabled={isRunning} />
+          </div>
+        )}
+        {simType === 'circular' && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Velocidad angular: {params.omega} rad/s</label>
+            <input type="range" min="0.5" max="3" step="0.1" value={params.omega} onChange={(e) => setParams({...params, omega: Number(e.target.value)})} className="w-full" disabled={isRunning} />
+          </div>
+        )}
+        <div className="flex items-end">
+          <button onClick={() => setIsRunning(!isRunning)} className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors">
+            {isRunning ? 'Detener' : 'Iniciar'}
+          </button>
+        </div>
+      </div>
+
+      <div className="bg-white border-2 border-gray-300 rounded-lg overflow-hidden">
+        <canvas ref={canvasRef} width={800} height={400} className="w-full" />
+      </div>
+    </div>
+  );
+}
+
+function DinamicaCalculador() {
+  const [calcType, setCalcType] = useState('segunda_ley');
+  const [inputs, setInputs] = useState({});
+  const [result, setResult] = useState(null);
+  const [findVariable, setFindVariable] = useState('F');
+
+  const calculateSegundaLey = () => {
+    const { F, m, a } = inputs;
+    if (findVariable === 'F') {
+      const fuerza = parseFloat(m) * parseFloat(a);
+      setResult({ 
+        fuerza: fuerza.toFixed(3), 
+        unidad: 'N',
+        explicacion: 'Segunda Ley: F = m × a'
+      });
+    } else if (findVariable === 'm') {
+      const masa = parseFloat(F) / parseFloat(a);
+      setResult({ 
+        masa: masa.toFixed(3), 
+        unidad: 'kg',
+        explicacion: 'Despejando masa: m = F / a'
+      });
+    } else if (findVariable === 'a') {
+      const aceleracion = parseFloat(F) / parseFloat(m);
+      setResult({ 
+        aceleracion: aceleracion.toFixed(3), 
+        unidad: 'm/s²',
+        explicacion: 'Despejando aceleración: a = F / m'
+      });
+    }
+  };
+
+  const calculatePrimeraLey = () => {
+    const { F1, F2, F3, F4 } = inputs;
+    const fuerzas = [F1, F2, F3, F4].filter(f => f !== '' && f !== undefined);
+    const sumaFuerzas = fuerzas.reduce((sum, f) => sum + parseFloat(f), 0);
+    const enEquilibrio = Math.abs(sumaFuerzas) < 0.01;
+    
+    setResult({
+      sumaFuerzas: sumaFuerzas.toFixed(3),
+      estado: enEquilibrio ? 'EN EQUILIBRIO' : 'NO EN EQUILIBRIO',
+      descripcion: enEquilibrio 
+        ? 'El objeto está en reposo o MRU (velocidad constante)'
+        : 'El objeto experimentará aceleración',
+      primeraLey: 'Si ΣF = 0, entonces v = constante'
+    });
+  };
+
+  const calculateTerceraLey = () => {
+    const { F_accion, m1, m2, a } = inputs;
+    
+    if (findVariable === 'F_reaccion') {
+      const reaccion = -parseFloat(F_accion);
+      setResult({
+        fuerzaAccion: parseFloat(F_accion).toFixed(3),
+        fuerzaReaccion: reaccion.toFixed(3),
+        unidad: 'N',
+        explicacion: 'Tercera Ley: F_AB = -F_BA',
+        caracteristica: 'Misma magnitud, dirección opuesta'
+      });
+    } else if (findVariable === 'aceleraciones') {
+      const F = parseFloat(F_accion);
+      const a1 = F / parseFloat(m1);
+      const a2 = -F / parseFloat(m2);
+      setResult({
+        aceleracion1: a1.toFixed(3),
+        aceleracion2: a2.toFixed(3),
+        unidad: 'm/s²',
+        explicacion: 'Las aceleraciones son inversamente proporcionales a las masas',
+        relacion: `a1/a2 = ${(a1/Math.abs(a2)).toFixed(2)} = m2/m1`
+      });
+    }
+  };
+
+  const calculateFriccion = () => {
+    const { mu, N, f } = inputs;
+    if (findVariable === 'f') {
+      const friccion = parseFloat(mu) * parseFloat(N);
+      setResult({ 
+        fuerzaFriccion: friccion.toFixed(3), 
+        unidad: 'N',
+        tipo: parseFloat(mu) < 0.5 ? 'Fricción baja' : 'Fricción alta'
+      });
+    } else if (findVariable === 'mu') {
+      const coeficiente = parseFloat(f) / parseFloat(N);
+      setResult({ 
+        coeficienteFriccion: coeficiente.toFixed(3),
+        tipo: coeficiente < 0.5 ? 'Fricción baja' : 'Fricción alta'
+      });
+    } else if (findVariable === 'N') {
+      const normal = parseFloat(f) / parseFloat(mu);
+      setResult({ 
+        fuerzaNormal: normal.toFixed(3), 
+        unidad: 'N' 
+      });
+    }
+  };
+
+  const calculatePlanoInclinado = () => {
+    const { m, theta, mu } = inputs;
+    const g = 9.81;
+    const thetaRad = parseFloat(theta) * Math.PI / 180;
+    const W = parseFloat(m) * g;
+    const N = parseFloat(m) * g * Math.cos(thetaRad);
+    const Fp = parseFloat(m) * g * Math.sin(thetaRad);
+    const Fr = parseFloat(mu || 0) * N;
+    const Fneta = Fp - Fr;
+    const a = Fneta / parseFloat(m);
+    
+    setResult({
+      peso: W.toFixed(3),
+      fuerzaNormal: N.toFixed(3),
+      fuerzaParalela: Fp.toFixed(3),
+      fuerzaFriccion: Fr.toFixed(3),
+      fuerzaNeta: Fneta.toFixed(3),
+      aceleracion: a.toFixed(3),
+      estado: Fneta > 0 ? 'SE MUEVE' : 'ESTÁTICO'
+    });
+  };
+
+  const calculateFuerzaCentripeta = () => {
+    const { m, v, r, Fc } = inputs;
+    if (findVariable === 'Fc') {
+      const fuerza = parseFloat(m) * Math.pow(parseFloat(v), 2) / parseFloat(r);
+      setResult({ 
+        fuerzaCentripeta: fuerza.toFixed(3),
+        unidad: 'N',
+        formula: 'Fc = m·v²/r'
+      });
+    } else if (findVariable === 'v') {
+      const velocidad = Math.sqrt(parseFloat(Fc) * parseFloat(r) / parseFloat(m));
+      setResult({ 
+        velocidad: velocidad.toFixed(3),
+        unidad: 'm/s',
+        formula: 'v = √(Fc·r/m)'
+      });
+    } else if (findVariable === 'r') {
+      const radio = parseFloat(m) * Math.pow(parseFloat(v), 2) / parseFloat(Fc);
+      setResult({ 
+        radio: radio.toFixed(3),
+        unidad: 'm',
+        formula: 'r = m·v²/Fc'
+      });
+    }
+  };
+
+  const handleCalculate = () => {
+    if (calcType === 'primera_ley') calculatePrimeraLey();
+    else if (calcType === 'segunda_ley') calculateSegundaLey();
+    else if (calcType === 'tercera_ley') calculateTerceraLey();
+    else if (calcType === 'friccion') calculateFriccion();
+    else if (calcType === 'plano_inclinado') calculatePlanoInclinado();
+    else if (calcType === 'centripeta') calculateFuerzaCentripeta();
+  };
+
+  return (
+    <div className="p-8 max-w-4xl mx-auto">
+      <h2 className="text-3xl font-bold text-gray-800 mb-6">Calculadora de Dinámica</h2>
+
+      <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6">
+        <p className="text-sm text-gray-700">
+          Resuelve problemas usando las Leyes de Newton y aplicaciones de la dinámica.
+        </p>
+      </div>
+
+      <div className="mb-6">
+        <label className="block text-sm font-semibold text-gray-700 mb-2">Tipo de Problema</label>
+        <select
+          value={calcType}
+          onChange={(e) => { setCalcType(e.target.value); setInputs({}); setResult(null); }}
+          className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="primera_ley">Primera Ley de Newton (Inercia)</option>
+          <option value="segunda_ley">Segunda Ley de Newton (F = ma)</option>
+          <option value="tercera_ley">Tercera Ley de Newton (Acción-Reacción)</option>
+          <option value="friccion">Fuerza de Fricción</option>
+          <option value="plano_inclinado">Plano Inclinado</option>
+          <option value="centripeta">Fuerza Centrípeta</option>
+        </select>
+      </div>
+
+      {(calcType === 'segunda_ley' || calcType === 'friccion' || calcType === 'centripeta' || calcType === 'tercera_ley') && (
+        <div className="mb-6">
+          <label className="block text-sm font-semibold text-gray-700 mb-2">Variable a encontrar</label>
+          <select
+            value={findVariable}
+            onChange={(e) => { setFindVariable(e.target.value); setInputs({}); setResult(null); }}
+            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+          >
+            {calcType === 'segunda_ley' && (
+              <>
+                <option value="F">Fuerza (F)</option>
+                <option value="m">Masa (m)</option>
+                <option value="a">Aceleración (a)</option>
+              </>
+            )}
+            {calcType === 'tercera_ley' && (
+              <>
+                <option value="F_reaccion">Fuerza de Reacción</option>
+                <option value="aceleraciones">Aceleraciones de ambos cuerpos</option>
+              </>
+            )}
+            {calcType === 'friccion' && (
+              <>
+                <option value="f">Fuerza de fricción (f)</option>
+                <option value="mu">Coeficiente (μ)</option>
+                <option value="N">Fuerza normal (N)</option>
+              </>
+            )}
+            {calcType === 'centripeta' && (
+              <>
+                <option value="Fc">Fuerza centrípeta (Fc)</option>
+                <option value="v">Velocidad (v)</option>
+                <option value="r">Radio (r)</option>
+              </>
+            )}
+          </select>
+        </div>
+      )}
+
+      <div className="bg-white border border-gray-200 rounded-lg p-6 mb-6">
+        {calcType === 'primera_ley' && (
+          <div className="space-y-4">
+            <div className="bg-gray-50 p-3 rounded">
+              <p className="text-sm font-semibold text-gray-700">Primera Ley de Newton (Ley de Inercia)</p>
+              <p className="text-xs text-gray-600 mt-1">Si ΣF = 0, entonces v = constante</p>
+            </div>
+            <p className="text-sm text-gray-600">Ingrese las fuerzas que actúan sobre el objeto (use valores negativos para fuerzas opuestas):</p>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Fuerza 1 (N)</label>
+              <input type="number" step="any" value={inputs.F1 || ''} onChange={(e) => setInputs({...inputs, F1: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" placeholder="Ej: 50" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Fuerza 2 (N)</label>
+              <input type="number" step="any" value={inputs.F2 || ''} onChange={(e) => setInputs({...inputs, F2: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" placeholder="Ej: -30" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Fuerza 3 (N) - Opcional</label>
+              <input type="number" step="any" value={inputs.F3 || ''} onChange={(e) => setInputs({...inputs, F3: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" placeholder="Ej: -20" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Fuerza 4 (N) - Opcional</label>
+              <input type="number" step="any" value={inputs.F4 || ''} onChange={(e) => setInputs({...inputs, F4: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+            </div>
+          </div>
+        )}
+
+        {calcType === 'segunda_ley' && (
+          <div className="space-y-4">
+            <div className="bg-gray-50 p-3 rounded">
+              <p className="text-sm font-semibold text-gray-700">Segunda Ley de Newton</p>
+              <p className="text-xs text-gray-600 mt-1">F = m × a</p>
+            </div>
+            {findVariable !== 'F' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Fuerza F (N)</label>
+                <input type="number" step="any" value={inputs.F || ''} onChange={(e) => setInputs({...inputs, F: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" placeholder="Ej: 100" />
+              </div>
+            )}
+            {findVariable !== 'm' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Masa m (kg)</label>
+                <input type="number" step="any" value={inputs.m || ''} onChange={(e) => setInputs({...inputs, m: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" placeholder="Ej: 10" />
+              </div>
+            )}
+            {findVariable !== 'a' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Aceleración a (m/s²)</label>
+                <input type="number" step="any" value={inputs.a || ''} onChange={(e) => setInputs({...inputs, a: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" placeholder="Ej: 5" />
+              </div>
+            )}
+          </div>
+        )}
+
+        {calcType === 'tercera_ley' && (
+          <div className="space-y-4">
+            <div className="bg-gray-50 p-3 rounded">
+              <p className="text-sm font-semibold text-gray-700">Tercera Ley de Newton (Acción y Reacción)</p>
+              <p className="text-xs text-gray-600 mt-1">F_AB = -F_BA (Misma magnitud, sentidos opuestos)</p>
+            </div>
+            {findVariable === 'F_reaccion' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Fuerza de Acción (N)</label>
+                <input type="number" step="any" value={inputs.F_accion || ''} onChange={(e) => setInputs({...inputs, F_accion: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" placeholder="Ej: 50" />
+              </div>
+            )}
+            {findVariable === 'aceleraciones' && (
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Fuerza de interacción (N)</label>
+                  <input type="number" step="any" value={inputs.F_accion || ''} onChange={(e) => setInputs({...inputs, F_accion: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" placeholder="Ej: 100" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Masa del objeto 1 (kg)</label>
+                  <input type="number" step="any" value={inputs.m1 || ''} onChange={(e) => setInputs({...inputs, m1: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" placeholder="Ej: 5" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Masa del objeto 2 (kg)</label>
+                  <input type="number" step="any" value={inputs.m2 || ''} onChange={(e) => setInputs({...inputs, m2: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" placeholder="Ej: 10" />
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {calcType === 'friccion' && (
+          <div className="space-y-4">
+            <div className="bg-gray-50 p-3 rounded">
+              <p className="text-sm font-semibold text-gray-700">Fuerza de Fricción</p>
+              <p className="text-xs text-gray-600 mt-1">f = μ × N</p>
+            </div>
+            {findVariable !== 'f' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Fuerza de fricción f (N)</label>
+                <input type="number" step="any" value={inputs.f || ''} onChange={(e) => setInputs({...inputs, f: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+              </div>
+            )}
+            {findVariable !== 'mu' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Coeficiente de fricción μ</label>
+                <input type="number" step="any" value={inputs.mu || ''} onChange={(e) => setInputs({...inputs, mu: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" placeholder="Ej: 0.3" />
+              </div>
+            )}
+            {findVariable !== 'N' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Fuerza normal N (N)</label>
+                <input type="number" step="any" value={inputs.N || ''} onChange={(e) => setInputs({...inputs, N: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+              </div>
+            )}
+          </div>
+        )}
+
+        {calcType === 'plano_inclinado' && (
+          <div className="space-y-4">
+            <div className="bg-gray-50 p-3 rounded">
+              <p className="text-sm font-semibold text-gray-700">Análisis de Plano Inclinado</p>
+              <p className="text-xs text-gray-600 mt-1">Calcula todas las fuerzas y la aceleración</p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Masa m (kg)</label>
+              <input type="number" step="any" value={inputs.m || ''} onChange={(e) => setInputs({...inputs, m: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" placeholder="Ej: 5" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Ángulo θ (grados)</label>
+              <input type="number" step="any" value={inputs.theta || ''} onChange={(e) => setInputs({...inputs, theta: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" placeholder="Ej: 30" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Coeficiente de fricción μ (opcional)</label>
+              <input type="number" step="any" value={inputs.mu || ''} onChange={(e) => setInputs({...inputs, mu: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" placeholder="0" />
+            </div>
+          </div>
+        )}
+
+        {calcType === 'centripeta' && (
+          <div className="space-y-4">
+            <div className="bg-gray-50 p-3 rounded">
+              <p className="text-sm font-semibold text-gray-700">Fuerza Centrípeta</p>
+              <p className="text-xs text-gray-600 mt-1">Fc = m × v² / r</p>
+            </div>
+            {findVariable !== 'Fc' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Fuerza centrípeta Fc (N)</label>
+                <input type="number" step="any" value={inputs.Fc || ''} onChange={(e) => setInputs({...inputs, Fc: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+              </div>
+            )}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Masa m (kg)</label>
+              <input type="number" step="any" value={inputs.m || ''} onChange={(e) => setInputs({...inputs, m: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+            </div>
+            {findVariable !== 'v' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Velocidad v (m/s)</label>
+                <input type="number" step="any" value={inputs.v || ''} onChange={(e) => setInputs({...inputs, v: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+              </div>
+            )}
+            {findVariable !== 'r' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Radio r (m)</label>
+                <input type="number" step="any" value={inputs.r || ''} onChange={(e) => setInputs({...inputs, r: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+              </div>
+            )}
+          </div>
+        )}
+
+        <button onClick={handleCalculate} className="mt-6 w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors">
+          Calcular
+        </button>
+      </div>
+
+      {result && (
+        <div className="bg-green-50 border border-green-200 rounded-lg p-6">
+          <h3 className="text-xl font-bold text-gray-800 mb-4">Resultados</h3>
+          <div className="space-y-2">
+            {Object.entries(result).map(([key, value]) => (
+              <div key={key} className="flex justify-between items-center py-2 border-b border-green-100">
+                <span className="font-medium text-gray-700 capitalize">
+                  {key.replace(/([A-Z])/g, ' $1').replace(/_/g, ' ').trim()}:
+                </span>
+                <span className="text-lg font-semibold text-gray-900">{value}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+function DinamicaSimulacion() {
+  return (
+    <div className="p-8">
+      <h2 className="text-3xl font-bold text-gray-800 mb-6">Simulación de Dinámica</h2>
+      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6">
+        <p className="text-yellow-800">Simulación en desarrollo</p>
+      </div>
+    </div>
+  );
+}
+
+function TrabajoCalculator() {
+  const [calcType, setCalcType] = useState('trabajo');
+  const [inputs, setInputs] = useState({});
+  const [result, setResult] = useState(null);
+  const [findVariable, setFindVariable] = useState('W');
+
+  const calculateTrabajo = () => {
+    const { F, d, theta, W } = inputs;
+    
+    if (findVariable === 'W') {
+      const thetaRad = parseFloat(theta) * Math.PI / 180;
+      const trabajo = parseFloat(F) * parseFloat(d) * Math.cos(thetaRad);
+      setResult({ trabajo: trabajo.toFixed(3) });
+    } else if (findVariable === 'F') {
+      const thetaRad = parseFloat(theta) * Math.PI / 180;
+      const fuerza = parseFloat(W) / (parseFloat(d) * Math.cos(thetaRad));
+      setResult({ fuerza: fuerza.toFixed(3) });
+    } else if (findVariable === 'd') {
+      const thetaRad = parseFloat(theta) * Math.PI / 180;
+      const distancia = parseFloat(W) / (parseFloat(F) * Math.cos(thetaRad));
+      setResult({ distancia: distancia.toFixed(3) });
+    }
+  };
+
+  const calculateEnergia = () => {
+    const { m, v, h, K, U } = inputs;
+    const g = 9.81;
+    
+    if (findVariable === 'K') {
+      const cinetica = 0.5 * parseFloat(m) * Math.pow(parseFloat(v), 2);
+      setResult({ energiaCinetica: cinetica.toFixed(3) });
+    } else if (findVariable === 'U') {
+      const potencial = parseFloat(m) * g * parseFloat(h);
+      setResult({ energiaPotencial: potencial.toFixed(3) });
+    } else if (findVariable === 'v') {
+      const velocidad = Math.sqrt(2 * parseFloat(K) / parseFloat(m));
+      setResult({ velocidad: velocidad.toFixed(3) });
+    } else if (findVariable === 'h') {
+      const altura = parseFloat(U) / (parseFloat(m) * g);
+      setResult({ altura: altura.toFixed(3) });
+    }
+  };
+
+  const calculatePotencia = () => {
+    const { P, W, t, F, v } = inputs;
+    
+    if (findVariable === 'P') {
+      if (W && t) {
+        const potencia = parseFloat(W) / parseFloat(t);
+        setResult({ potencia: potencia.toFixed(3) });
+      } else if (F && v) {
+        const potencia = parseFloat(F) * parseFloat(v);
+        setResult({ potencia: potencia.toFixed(3) });
+      }
+    } else if (findVariable === 'W') {
+      const trabajo = parseFloat(P) * parseFloat(t);
+      setResult({ trabajo: trabajo.toFixed(3) });
+    } else if (findVariable === 't') {
+      const tiempo = parseFloat(W) / parseFloat(P);
+      setResult({ tiempo: tiempo.toFixed(3) });
+    }
+  };
+
+  const handleCalculate = () => {
+    if (calcType === 'trabajo') calculateTrabajo();
+    else if (calcType === 'energia') calculateEnergia();
+    else if (calcType === 'potencia') calculatePotencia();
+  };
+
+  return (
+    <div className="p-8 max-w-4xl mx-auto">
+      <h2 className="text-3xl font-bold text-gray-800 mb-6">Calculadora de Trabajo y Energía</h2>
+
+      <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6">
+        <p className="text-sm text-gray-700">Calcula trabajo, energía cinética, potencial y potencia.</p>
+      </div>
+
+      <div className="mb-6">
+        <label className="block text-sm font-semibold text-gray-700 mb-2">Tipo de Cálculo</label>
+        <select value={calcType} onChange={(e) => { setCalcType(e.target.value); setInputs({}); setResult(null); }} className="w-full p-3 border border-gray-300 rounded-lg">
+          <option value="trabajo">Trabajo Mecánico</option>
+          <option value="energia">Energía Cinética y Potencial</option>
+          <option value="potencia">Potencia</option>
+        </select>
+      </div>
+
+      <div className="mb-6">
+        <label className="block text-sm font-semibold text-gray-700 mb-2">Variable a encontrar</label>
+        <select value={findVariable} onChange={(e) => { setFindVariable(e.target.value); setInputs({}); setResult(null); }} className="w-full p-3 border border-gray-300 rounded-lg">
+          {calcType === 'trabajo' && (
+            <>
+              <option value="W">Trabajo (W)</option>
+              <option value="F">Fuerza (F)</option>
+              <option value="d">Distancia (d)</option>
+            </>
+          )}
+          {calcType === 'energia' && (
+            <>
+              <option value="K">Energía Cinética (K)</option>
+              <option value="U">Energía Potencial (U)</option>
+              <option value="v">Velocidad (v)</option>
+              <option value="h">Altura (h)</option>
+            </>
+          )}
+          {calcType === 'potencia' && (
+            <>
+              <option value="P">Potencia (P)</option>
+              <option value="W">Trabajo (W)</option>
+              <option value="t">Tiempo (t)</option>
+            </>
+          )}
+        </select>
+      </div>
+
+      <div className="bg-white border border-gray-200 rounded-lg p-6 mb-6">
+        {calcType === 'trabajo' && (
+          <div className="space-y-4">
+            {findVariable !== 'W' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Trabajo W (J)</label>
+                <input type="number" step="any" value={inputs.W || ''} onChange={(e) => setInputs({...inputs, W: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+              </div>
+            )}
+            {findVariable !== 'F' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Fuerza F (N)</label>
+                <input type="number" step="any" value={inputs.F || ''} onChange={(e) => setInputs({...inputs, F: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+              </div>
+            )}
+            {findVariable !== 'd' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Distancia d (m)</label>
+                <input type="number" step="any" value={inputs.d || ''} onChange={(e) => setInputs({...inputs, d: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+              </div>
+            )}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Ángulo θ (grados)</label>
+              <input type="number" step="any" value={inputs.theta || ''} onChange={(e) => setInputs({...inputs, theta: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" placeholder="0" />
+            </div>
+          </div>
+        )}
+
+        {calcType === 'energia' && (
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Masa m (kg)</label>
+              <input type="number" step="any" value={inputs.m || ''} onChange={(e) => setInputs({...inputs, m: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+            </div>
+            {findVariable === 'K' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Velocidad v (m/s)</label>
+                <input type="number" step="any" value={inputs.v || ''} onChange={(e) => setInputs({...inputs, v: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+              </div>
+            )}
+            {findVariable === 'U' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Altura h (m)</label>
+                <input type="number" step="any" value={inputs.h || ''} onChange={(e) => setInputs({...inputs, h: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+              </div>
+            )}
+            {findVariable === 'v' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Energía Cinética K (J)</label>
+                <input type="number" step="any" value={inputs.K || ''} onChange={(e) => setInputs({...inputs, K: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+              </div>
+            )}
+            {findVariable === 'h' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Energía Potencial U (J)</label>
+                <input type="number" step="any" value={inputs.U || ''} onChange={(e) => setInputs({...inputs, U: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+              </div>
+            )}
+          </div>
+        )}
+
+        {calcType === 'potencia' && (
+          <div className="space-y-4">
+            {findVariable !== 'P' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Potencia P (W)</label>
+                <input type="number" step="any" value={inputs.P || ''} onChange={(e) => setInputs({...inputs, P: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+              </div>
+            )}
+            {findVariable !== 'W' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Trabajo W (J)</label>
+                <input type="number" step="any" value={inputs.W || ''} onChange={(e) => setInputs({...inputs, W: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+              </div>
+            )}
+            {findVariable !== 't' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Tiempo t (s)</label>
+                <input type="number" step="any" value={inputs.t || ''} onChange={(e) => setInputs({...inputs, t: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+              </div>
+            )}
+            {findVariable === 'P' && (
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Fuerza F (N) - Opcional</label>
+                  <input type="number" step="any" value={inputs.F || ''} onChange={(e) => setInputs({...inputs, F: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Velocidad v (m/s) - Opcional</label>
+                  <input type="number" step="any" value={inputs.v || ''} onChange={(e) => setInputs({...inputs, v: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        <button onClick={handleCalculate} className="mt-6 w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors">
+          Calcular
+        </button>
+      </div>
+
+      {result && (
+        <div className="bg-green-50 border border-green-200 rounded-lg p-6">
+          <h3 className="text-xl font-bold text-gray-800 mb-4">Resultados</h3>
+          <div className="space-y-2">
+            {Object.entries(result).map(([key, value]) => (
+              <div key={key} className="flex justify-between items-center py-2 border-b border-green-100">
+                <span className="font-medium text-gray-700 capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}:</span>
+                <span className="text-lg font-semibold text-gray-900">{value}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TrabajoSimulacion() {
+  return (
+    <div className="p-8">
+      <h2 className="text-3xl font-bold text-gray-800 mb-6">Simulación de Trabajo y Energía</h2>
+      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6">
+        <p className="text-yellow-800">Simulación en desarrollo</p>
+      </div>
+    </div>
+  );
+}
+function TemperaturaCalculator() {
+  const [inputValue, setInputValue] = useState('');
+  const [fromScale, setFromScale] = useState('C');
+  const [result, setResult] = useState(null);
+
+  const handleConvert = () => {
+    const value = parseFloat(inputValue);
+    if (isNaN(value)) {
+      setResult(null);
+      return;
+    }
+
+    let C, F, K;
+
+    switch (fromScale) {
+      case 'C':
+        C = value;
+        F = (C * 9/5) + 32;
+        K = C + 273.15;
+        break;
+      case 'F':
+        F = value;
+        C = (F - 32) * 5/9;
+        K = C + 273.15;
+        break;
+      case 'K':
+        K = value;
+        C = K - 273.15;
+        F = (C * 9/5) + 32;
+        break;
+      default:
+        return;
+    }
+
+    setResult({
+      'Celsius (°C)': C.toFixed(2),
+      'Fahrenheit (°F)': F.toFixed(2),
+      'Kelvin (K)': K.toFixed(2)
+    });
+  };
+
+  const handleInputChange = (e) => {
+    setInputValue(e.target.value);
+    setResult(null); // Limpia el resultado anterior al cambiar el valor
+  };
+
+  const handleScaleChange = (e) => {
+    setFromScale(e.target.value);
+    setInputValue(''); // Resetea el input al cambiar la escala
+    setResult(null);
+  };
+
+  return (
+    <div className="p-8 max-w-2xl mx-auto">
+      <h2 className="text-3xl font-bold text-gray-800 mb-6">Calculadora de Temperatura</h2>
+
+      <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6">
+        <p className="text-sm text-gray-700">
+          Convierte fácilmente temperaturas entre las escalas Celsius (°C), Fahrenheit (°F) y Kelvin (K).
+        </p>
+      </div>
+
+      <div className="bg-white border border-gray-200 rounded-lg p-6 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Valor a Convertir</label>
+            <input 
+              type="number" 
+              step="any" 
+              value={inputValue} 
+              onChange={handleInputChange}
+              className="w-full p-3 border border-gray-300 rounded-lg" 
+              placeholder="Ej: 100"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Escala de Origen</label>
+            <select 
+              value={fromScale} 
+              onChange={handleScaleChange} 
+              className="w-full p-3 border border-gray-300 rounded-lg"
+            >
+              <option value="C">Celsius (°C)</option>
+              <option value="F">Fahrenheit (°F)</option>
+              <option value="K">Kelvin (K)</option>
+            </select>
+          </div>
+        </div>
+
+        <button 
+          onClick={handleConvert} 
+          className="mt-6 w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
+        >
+          Convertir
+        </button>
+      </div>
+
+      {result && (
+        <div className="bg-green-50 border border-green-200 rounded-lg p-6">
+          <h3 className="text-xl font-bold text-gray-800 mb-4">Resultados</h3>
+          <div className="space-y-2">
+            {Object.entries(result).map(([scale, value]) => (
+              <div key={scale} className="flex justify-between items-center py-2 border-b border-green-100 last:border-b-0">
+                <span className="font-medium text-gray-700">{scale}:</span>
+                <span className="text-lg font-semibold text-gray-900">{value}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      
+    </div>
+  );
+}
+function TemperaturaSimulation() {
+  // Usamos Kelvin como la unidad base para la temperatura por ser una escala absoluta
+  const [tempK, setTempK] = useState(293.15); // Temperatura ambiente (20°C)
+  const canvasRef = useRef(null);
+
+  // --- Lógica de la simulación de partículas ---
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    const particleCount = 100;
+    // Usamos 'let' porque las partículas se reinician si el canvas cambia de tamaño
+    let particles = [];
+
+    // Función para crear las partículas iniciales
+    const initParticles = () => {
+      particles = [];
+      for (let i = 0; i < particleCount; i++) {
+        particles.push({
+          x: Math.random() * canvas.width,
+          y: Math.random() * canvas.height,
+          vx: (Math.random() - 0.5) * 2, // Velocidad en x (-1 a 1)
+          vy: (Math.random() - 0.5) * 2, // Velocidad en y (-1 a 1)
+          radius: 3,
+          color: `hsl(${Math.random() * 360}, 90%, 60%)`,
+        });
+      }
+    };
+
+    initParticles();
+
+    // --- El bucle de animación ---
+    let animationFrameId;
+    const animate = () => {
+      // El factor de velocidad es proporcional a la raíz cuadrada de la temperatura en Kelvin
+      // Esto es una simplificación de la relación real (E_cinética ∝ T)
+      const speedFactor = Math.sqrt(tempK) * 0.1;
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height); // Limpia el canvas
+
+      particles.forEach(p => {
+        // Mueve la partícula
+        p.x += p.vx * speedFactor;
+        p.y += p.vy * speedFactor;
+
+        // Rebote en las paredes
+        if (p.x < p.radius || p.x > canvas.width - p.radius) p.vx *= -1;
+        if (p.y < p.radius || p.y > canvas.height - p.radius) p.vy *= -1;
+
+        // Dibuja la partícula
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+        ctx.fillStyle = p.color;
+        ctx.fill();
+      });
+
+      animationFrameId = requestAnimationFrame(animate);
+    };
+
+    animate();
+
+    return () => {
+      cancelAnimationFrame(animationFrameId); // Limpia la animación al desmontar el componente
+    };
+  }, [tempK]); // Se re-ejecuta si tempK cambia para ajustar la velocidad
+
+  // --- Funciones de conversión ---
+  const kelvinToCelsius = (k) => k - 273.15;
+  const celsiusToFahrenheit = (c) => (c * 9/5) + 32;
+
+  const tempC = kelvinToCelsius(tempK);
+  const tempF = celsiusToFahrenheit(tempC);
+
+  // --- Manejador del cambio del slider ---
+  const handleTempChange = (e) => {
+    setTempK(parseFloat(e.target.value));
+  };
+
+  return (
+    <div className="p-8 max-w-4xl mx-auto">
+      <h2 className="text-3xl font-bold text-gray-800 mb-6">Simulación de Temperatura y Energía Cinética</h2>
+
+      <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6">
+        <p className="text-sm text-gray-700">
+          Observa cómo la temperatura afecta directamente el movimiento de las partículas.
+        </p>
+      </div>
+
+      {/* --- Visualizador de la Simulación --- */}
+      <div className="bg-gray-900 border-4 border-gray-700 rounded-lg p-2 mb-6">
+        <canvas ref={canvasRef} width="600" height="300" className="w-full h-auto rounded"></canvas>
+      </div>
+
+      {/* --- Controles y Lecturas de Temperatura --- */}
+      <div className="bg-white border border-gray-200 rounded-lg p-6 mb-6">
+        <label className="block text-sm font-semibold text-gray-700 mb-3">
+          Controlar Temperatura (0 K a 600 K)
+        </label>
+        <input 
+          type="range" 
+          min="0" 
+          max="600" 
+          step="0.1" 
+          value={tempK} 
+          onChange={handleTempChange}
+          className="w-full h-3 bg-gray-200 rounded-lg appearance-none cursor-pointer range-lg"
+        />
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6 text-center">
+          <div className="bg-blue-100 p-4 rounded-lg">
+            <p className="text-sm font-medium text-blue-800">Kelvin (K)</p>
+            <p className="text-2xl font-bold text-blue-900">{tempK.toFixed(2)}</p>
+          </div>
+          <div className="bg-green-100 p-4 rounded-lg">
+            <p className="text-sm font-medium text-green-800">Celsius (°C)</p>
+            <p className="text-2xl font-bold text-green-900">{tempC.toFixed(2)}</p>
+          </div>
+          <div className="bg-red-100 p-4 rounded-lg">
+            <p className="text-sm font-medium text-red-800">Fahrenheit (°F)</p>
+            <p className="text-2xl font-bold text-red-900">{tempF.toFixed(2)}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+function ThermodynamicsCalculator() {
+  const [calcType, setCalcType] = useState('heatTransfer');
+  const [inputs, setInputs] = useState({});
+  const [result, setResult] = useState(null);
+  const [findVariable, setFindVariable] = useState('q');
+
+  // Reinicia la variable a encontrar cuando cambia el tipo de cálculo
+  useEffect(() => {
+    if (calcType === 'heatTransfer') setFindVariable('q');
+    else if (calcType === 'work') setFindVariable('w');
+    else if (calcType === 'internalEnergy') setFindVariable('deltaU');
+    else if (calcType === 'latentHeat') setFindVariable('q');
+    setInputs({});
+    setResult(null);
+  }, [calcType]);
+
+  const calculateHeatTransfer = () => {
+    const { m, c, tInitial, tFinal, q } = inputs;
+    
+    if (findVariable === 'q') {
+      const heat = parseFloat(m) * parseFloat(c) * (parseFloat(tFinal) - parseFloat(tInitial));
+      setResult({ calorTransferido: heat.toFixed(3) + " J" });
+    } else if (findVariable === 'm') {
+      const mass = parseFloat(q) / (parseFloat(c) * (parseFloat(tFinal) - parseFloat(tInitial)));
+      setResult({ masa: mass.toFixed(3) + " kg" });
+    } else if (findVariable === 'c') {
+      const specificHeat = parseFloat(q) / (parseFloat(m) * (parseFloat(tFinal) - parseFloat(tInitial)));
+      setResult({ calorEspecifico: specificHeat.toFixed(3) + " J/kg°C" });
+    } else if (findVariable === 'tFinal') {
+      const finalTemp = (parseFloat(q) / (parseFloat(m) * parseFloat(c))) + parseFloat(tInitial);
+      setResult({ temperaturaFinal: finalTemp.toFixed(3) + " °C" });
+    }
+  };
+
+  const calculateWork = () => {
+    const { p, vInitial, vFinal, w } = inputs;
+
+    if (findVariable === 'w') {
+      const work = -parseFloat(p) * (parseFloat(vFinal) - parseFloat(vInitial));
+      setResult({ trabajoRealizado: work.toFixed(3) + " J" });
+    } else if (findVariable === 'p') {
+      const pressure = -parseFloat(w) / (parseFloat(vFinal) - parseFloat(vInitial));
+      setResult({ presion: pressure.toFixed(3) + " Pa" });
+    } else if (findVariable === 'vFinal') {
+      const finalVolume = (-parseFloat(w) / parseFloat(p)) + parseFloat(vInitial);
+      setResult({ volumenFinal: finalVolume.toFixed(3) + " m³" });
+    }
+  };
+  
+  const calculateInternalEnergy = () => {
+    const { q, w, deltaU } = inputs;
+    
+    if (findVariable === 'deltaU') {
+      const internalEnergy = parseFloat(q) + parseFloat(w);
+      setResult({ variacionEnergiaInterna: internalEnergy.toFixed(3) + " J" });
+    } else if (findVariable === 'q') {
+      const heat = parseFloat(deltaU) - parseFloat(w);
+      setResult({ calor: heat.toFixed(3) + " J" });
+    } else if (findVariable === 'w') {
+      const work = parseFloat(deltaU) - parseFloat(q);
+      setResult({ trabajo: work.toFixed(3) + " J" });
+    }
+  };
+
+  const calculateLatentHeat = () => {
+    const { m, l, q } = inputs;
+    
+    if (findVariable === 'q') {
+      const heat = parseFloat(m) * parseFloat(l);
+      setResult({ calorLatente: heat.toFixed(3) + " J" });
+    } else if (findVariable === 'm') {
+      const mass = parseFloat(q) / parseFloat(l);
+      setResult({ masa: mass.toFixed(3) + " kg" });
+    } else if (findVariable === 'l') {
+      const latent = parseFloat(q) / parseFloat(m);
+      setResult({ calorLatenteEspecifico: latent.toFixed(3) + " J/kg" });
+    }
+  };
+
+  const handleCalculate = () => {
+    if (calcType === 'heatTransfer') calculateHeatTransfer();
+    else if (calcType === 'work') calculateWork();
+    else if (calcType === 'internalEnergy') calculateInternalEnergy();
+    else if (calcType === 'latentHeat') calculateLatentHeat();
+  };
+
+  return (
+    <div className="p-8 max-w-4xl mx-auto">
+      <h2 className="text-3xl font-bold text-gray-800 mb-6">Calculadora de Termodinámica</h2>
+
+      <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6">
+        <p className="text-sm text-gray-700">
+          Seleccione el tipo de cálculo y la variable que desea encontrar, luego complete los demás campos.
+        </p>
+      </div>
+      
+      <div className="mb-6">
+        <label className="block text-sm font-semibold text-gray-700 mb-2">Tipo de Cálculo</label>
+        <select
+          value={calcType}
+          onChange={(e) => setCalcType(e.target.value)}
+          className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="heatTransfer">Transferencia de Calor (Q = mcΔT)</option>
+          <option value="work">Trabajo Termodinámico (W = -PΔV)</option>
+          <option value="internalEnergy">Energía Interna (ΔU = Q + W)</option>
+          <option value="latentHeat">Calor Latente (Q = mL)</option>
+        </select>
+      </div>
+
+      <div className="mb-6">
+        <label className="block text-sm font-semibold text-gray-700 mb-2">Variable a Encontrar</label>
+        <select
+          value={findVariable}
+          onChange={(e) => { setFindVariable(e.target.value); setInputs({}); setResult(null); }}
+          className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 mb-4"
+        >
+          {calcType === 'heatTransfer' && (
+            <>
+              <option value="q">Calor Transferido (Q)</option>
+              <option value="m">Masa (m)</option>
+              <option value="c">Calor Específico (c)</option>
+              <option value="tFinal">Temperatura Final (Tf)</option>
+            </>
+          )}
+          {calcType === 'work' && (
+            <>
+              <option value="w">Trabajo (W)</option>
+              <option value="p">Presión (P)</option>
+              <option value="vFinal">Volumen Final (Vf)</option>
+            </>
+          )}
+           {calcType === 'internalEnergy' && (
+            <>
+              <option value="deltaU">Variación de Energía Interna (ΔU)</option>
+              <option value="q">Calor (Q)</option>
+              <option value="w">Trabajo (W)</option>
+            </>
+          )}
+          {calcType === 'latentHeat' && (
+            <>
+              <option value="q">Calor Latente (Q)</option>
+              <option value="m">Masa (m)</option>
+              <option value="l">Calor Latente Específico (L)</option>
+            </>
+          )}
+        </select>
+      </div>
+
+      <div className="bg-white border border-gray-200 rounded-lg p-6 mb-6">
+        {/* --- Inputs para Transferencia de Calor --- */}
+        {calcType === 'heatTransfer' && (
+          <div className="space-y-4">
+            {findVariable !== 'q' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Calor Transferido Q (J)</label>
+                <input type="number" step="any" value={inputs.q || ''} onChange={(e) => setInputs({...inputs, q: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+              </div>
+            )}
+            {findVariable !== 'm' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Masa m (kg)</label>
+                <input type="number" step="any" value={inputs.m || ''} onChange={(e) => setInputs({...inputs, m: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+              </div>
+            )}
+            {findVariable !== 'c' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Calor Específico c (J/kg°C)</label>
+                <input type="number" step="any" value={inputs.c || ''} onChange={(e) => setInputs({...inputs, c: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+              </div>
+            )}
+            {findVariable !== 'tFinal' && (
+               <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Temperatura Final Tf (°C)</label>
+                <input type="number" step="any" value={inputs.tFinal || ''} onChange={(e) => setInputs({...inputs, tFinal: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+              </div>
+            )}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Temperatura Inicial Ti (°C)</label>
+              <input type="number" step="any" value={inputs.tInitial || ''} onChange={(e) => setInputs({...inputs, tInitial: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+            </div>
+          </div>
+        )}
+
+        {/* --- Inputs para Trabajo Termodinámico --- */}
+        {calcType === 'work' && (
+          <div className="space-y-4">
+            {findVariable !== 'w' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Trabajo W (J)</label>
+                <input type="number" step="any" value={inputs.w || ''} onChange={(e) => setInputs({...inputs, w: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+              </div>
+            )}
+            {findVariable !== 'p' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Presión Constante P (Pa)</label>
+                <input type="number" step="any" value={inputs.p || ''} onChange={(e) => setInputs({...inputs, p: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+              </div>
+            )}
+             {findVariable !== 'vFinal' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Volumen Final Vf (m³)</label>
+                <input type="number" step="any" value={inputs.vFinal || ''} onChange={(e) => setInputs({...inputs, vFinal: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+              </div>
+            )}
+             <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Volumen Inicial Vi (m³)</label>
+              <input type="number" step="any" value={inputs.vInitial || ''} onChange={(e) => setInputs({...inputs, vInitial: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+            </div>
+          </div>
+        )}
+        
+        {/* --- Inputs para Energía Interna --- */}
+        {calcType === 'internalEnergy' && (
+          <div className="space-y-4">
+            {findVariable !== 'deltaU' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Variación de Energía Interna ΔU (J)</label>
+                <input type="number" step="any" value={inputs.deltaU || ''} onChange={(e) => setInputs({...inputs, deltaU: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+              </div>
+            )}
+            {findVariable !== 'q' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Calor añadido al sistema Q (J)</label>
+                <input type="number" step="any" value={inputs.q || ''} onChange={(e) => setInputs({...inputs, q: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+              </div>
+            )}
+            {findVariable !== 'w' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Trabajo realizado sobre el sistema W (J)</label>
+                <input type="number" step="any" value={inputs.w || ''} onChange={(e) => setInputs({...inputs, w: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+              </div>
+            )}
+          </div>
+        )}
+        
+        {/* --- Inputs para Calor Latente --- */}
+        {calcType === 'latentHeat' && (
+          <div className="space-y-4">
+            {findVariable !== 'q' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Calor Q (J)</label>
+                <input type="number" step="any" value={inputs.q || ''} onChange={(e) => setInputs({...inputs, q: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+              </div>
+            )}
+            {findVariable !== 'm' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Masa m (kg)</label>
+                <input type="number" step="any" value={inputs.m || ''} onChange={(e) => setInputs({...inputs, m: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+              </div>
+            )}
+            {findVariable !== 'l' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Calor Latente Específico L (J/kg)</label>
+                <input type="number" step="any" value={inputs.l || ''} onChange={(e) => setInputs({...inputs, l: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+              </div>
+            )}
+          </div>
+        )}
+
+        <button onClick={handleCalculate} className="mt-6 w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors">
+          Calcular
+        </button>
+      </div>
+
+      {result && (
+        <div className="bg-green-50 border border-green-200 rounded-lg p-6">
+          <h3 className="text-xl font-bold text-gray-800 mb-4">Resultados</h3>
+          <div className="space-y-2">
+            {Object.entries(result).map(([key, value]) => (
+              <div key={key} className="flex justify-between items-center py-2 border-b border-green-100">
+                <span className="font-medium text-gray-700 capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}:</span>
+                <span className="text-lg font-semibold text-gray-900">{value}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+const Slider = ({ label, unit, value, onChange, min, max, step }) => (
+  <div>
+    <label className="block text-sm font-medium text-gray-700 mb-2">
+      {label} ({unit}): <span className="font-bold text-blue-600">{value}</span>
+    </label>
+    <input
+      type="range"
+      min={min}
+      max={max}
+      step={step}
+      value={value}
+      onChange={onChange}
+      className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+    />
+  </div>
+);
+function ThermodynamicsSimulator() {
+  const [simType, setSimType] = useState('heatTransfer');
+
+  // Estados para cada simulación
+  const [heatState, setHeatState] = useState({ m: 1, c: 4186, deltaT: 20 });
+  const [workState, setWorkState] = useState({ p: 101325, vInitial: 1, vFinal: 2 });
+  const [energyState, setEnergyState] = useState({ q: 1000, w: -500 });
+  const [latentState, setLatentState] = useState({ m: 1, l: 334000 });
+  
+  const heatResult = heatState.m * heatState.c * heatState.deltaT;
+  const workResult = -workState.p * (workState.vFinal - workState.vInitial);
+  const energyResult = energyState.q + energyState.w;
+  const latentResult = latentState.m * latentState.l;
+
+  const handleHeatChange = (param, value) => {
+    setHeatState(prev => ({ ...prev, [param]: parseFloat(value) }));
+  };
+  const handleWorkChange = (param, value) => {
+    setWorkState(prev => ({ ...prev, [param]: parseFloat(value) }));
+  };
+  const handleEnergyChange = (param, value) => {
+    setEnergyState(prev => ({ ...prev, [param]: parseFloat(value) }));
+  };
+  const handleLatentChange = (param, value) => {
+    setLatentState(prev => ({ ...prev, [param]: parseFloat(value) }));
+  };
+
+  const renderSimulation = () => {
+    switch (simType) {
+      case 'heatTransfer':
+        const temperatureHeight = Math.min(100, heatState.deltaT); // Limitar al 100%
+        return (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+            <div className="space-y-4">
+              <h3 className="text-xl font-semibold text-gray-800">Parámetros de Calor Específico</h3>
+              <Slider label="Masa" unit="kg" value={heatState.m} onChange={(e) => handleHeatChange('m', e.target.value)} min="0.1" max="10" step="0.1" />
+              <Slider label="Calor Específico" unit="J/kg°C" value={heatState.c} onChange={(e) => handleHeatChange('c', e.target.value)} min="100" max="5000" step="10" />
+              <Slider label="Cambio de Temperatura (ΔT)" unit="°C" value={heatState.deltaT} onChange={(e) => handleHeatChange('deltaT', e.target.value)} min="0" max="200" step="1" />
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4 mt-4">
+                 <h4 className="font-bold">Calor Transferido (Q): {heatResult.toLocaleString('en-US')} J</h4>
+              </div>
+            </div>
+            <div className="flex flex-col items-center justify-center bg-gray-50 p-6 rounded-lg h-80">
+                <p className="font-medium">Visualización de Temperatura</p>
+                <div className="w-16 h-64 bg-gray-200 rounded-full flex items-end">
+                    <div className="w-full bg-red-500 rounded-full transition-all duration-300" style={{ height: `${temperatureHeight}%` }}></div>
+                </div>
+                <p className="mt-2 text-lg font-bold">{heatState.deltaT}°C</p>
+            </div>
+          </div>
+        );
+      
+      case 'work':
+        const volumeChangePercentage = ((workState.vFinal - workState.vInitial) / workState.vInitial) * 50;
+        const pistonPosition = Math.max(0, Math.min(100, 50 + volumeChangePercentage));
+        return (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+              <div className="space-y-4">
+                <h3 className="text-xl font-semibold text-gray-800">Parámetros de Trabajo Termodinámico</h3>
+                <Slider label="Presión" unit="Pa" value={workState.p} onChange={(e) => handleWorkChange('p', e.target.value)} min="10000" max="300000" step="1000" />
+                <Slider label="Volumen Inicial" unit="m³" value={workState.vInitial} onChange={(e) => handleWorkChange('vInitial', e.target.value)} min="0.1" max="5" step="0.1" />
+                <Slider label="Volumen Final" unit="m³" value={workState.vFinal} onChange={(e) => handleWorkChange('vFinal', e.target.value)} min="0.1" max="5" step="0.1" />
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4 mt-4">
+                   <h4 className="font-bold">Trabajo (W): {workResult.toLocaleString('en-US')} J</h4>
+                   <p className="text-sm">{workResult > 0 ? 'Trabajo realizado POR el sistema (expansión).' : 'Trabajo realizado SOBRE el sistema (compresión).'}</p>
+                </div>
+              </div>
+              <div className="flex items-center justify-center bg-gray-50 p-6 rounded-lg h-80">
+                <div className="w-40 h-64 bg-gray-300 relative border-2 border-gray-500">
+                    <div className="bg-blue-400 absolute bottom-0 w-full" style={{height: '100%'}}></div>
+                    <div className="absolute top-0 w-full h-8 bg-gray-700 transition-all duration-300" style={{ top: `${100 - pistonPosition}%` }}></div>
+                </div>
+              </div>
+            </div>
+        );
+        
+      case 'internalEnergy':
+        const energyColor = energyResult > 0 ? 'bg-green-400' : 'bg-red-400';
+        const energySize = Math.min(100, Math.abs(energyResult) / 20); 
+        return (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+              <div className="space-y-4">
+                <h3 className="text-xl font-semibold text-gray-800">Primera Ley de la Termodinámica</h3>
+                <Slider label="Calor añadido al sistema" unit="J" value={energyState.q} onChange={(e) => handleEnergyChange('q', e.target.value)} min="-2000" max="2000" step="50" />
+                <Slider label="Trabajo sobre el sistema" unit="J" value={energyState.w} onChange={(e) => handleEnergyChange('w', e.target.value)} min="-2000" max="2000" step="50" />
+                 <div className="bg-green-50 border border-green-200 rounded-lg p-4 mt-4">
+                   <h4 className="font-bold">Cambio en Energía Interna (ΔU): {energyResult.toLocaleString('en-US')} J</h4>
+                   <p className="text-sm">{energyResult > 0 ? 'La energía interna del sistema aumenta.' : 'La energía interna del sistema disminuye.'}</p>
+                </div>
+              </div>
+               <div className="flex flex-col items-center justify-center bg-gray-50 p-6 rounded-lg h-80">
+                 <p className="font-medium mb-4">Energía Interna del Sistema</p>
+                 <div className={`rounded-full transition-all duration-300 ${energyColor}`} style={{ width: `${10 + energySize}px`, height: `${10 + energySize}px` }}></div>
+               </div>
+            </div>
+        );
+
+      case 'latentHeat':
+        const meltPercentage = Math.min(100, (latentResult / (latentState.l * latentState.m)) * 100);
+        return (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+              <div className="space-y-4">
+                <h3 className="text-xl font-semibold text-gray-800">Parámetros de Calor Latente</h3>
+                <Slider label="Masa" unit="kg" value={latentState.m} onChange={(e) => handleLatentChange('m', e.target.value)} min="0.1" max="5" step="0.1" />
+                <Slider label="Calor Latente Específico" unit="J/kg" value={latentState.l} onChange={(e) => handleLatentChange('l', e.target.value)} min="100000" max="2.5e6" step="10000" />
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4 mt-4">
+                   <h4 className="font-bold">Calor Necesario para el Cambio (Q): {latentResult.toLocaleString('en-US')} J</h4>
+                </div>
+              </div>
+              <div className="flex flex-col items-center justify-center bg-gray-50 p-6 rounded-lg h-80">
+                  <p className="font-medium mb-4">Simulación de Fusión</p>
+                  <div className="w-40 h-40 bg-blue-200 rounded-lg relative overflow-hidden">
+                      {/* Agua */}
+                      <div className="absolute bottom-0 w-full bg-blue-500 transition-all duration-300" style={{ height: `${meltPercentage}%` }}></div>
+                      {/* Hielo */}
+                       <div className="absolute top-0 w-full bg-cyan-200 transition-all duration-300" style={{ height: `${100 - meltPercentage}%` }}></div>
+                  </div>
+                   <p className="mt-2 text-lg font-bold">{meltPercentage.toFixed(1)}% Derretido</p>
+              </div>
+            </div>
+        );
+
+      default: return null;
+    }
+  };
+
+  return (
+    <div className="p-8 max-w-4xl mx-auto">
+      <h2 className="text-3xl font-bold text-gray-800 mb-6">Simulador Interactivo de Termodinámica</h2>
+
+      <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6">
+        <p className="text-sm text-gray-700">
+          Selecciona un concepto y ajusta los deslizadores para ver cómo las variables interactúan en tiempo real.
+        </p>
+      </div>
+      
+      <div className="mb-6">
+        <label className="block text-sm font-semibold text-gray-700 mb-2">Concepto a Simular</label>
+        <select
+          value={simType}
+          onChange={(e) => setSimType(e.target.value)}
+          className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="heatTransfer">Transferencia de Calor (Q = mcΔT)</option>
+          <option value="work">Trabajo Termodinámico (W = -PΔV)</option>
+          <option value="internalEnergy">Energía Interna (ΔU = Q + W)</option>
+          <option value="latentHeat">Calor Latente (Q = mL)</option>
+        </select>
+      </div>
+
+      <div className="bg-white border border-gray-200 rounded-lg p-6 mb-6">
+        {renderSimulation()}
+      </div>
+    </div>
+  );
+}
+function ThermodynamicProcessesCalculator() {
+  const [calcType, setCalcType] = useState('isobaric');
+  const [inputs, setInputs] = useState({});
+  const [result, setResult] = useState(null);
+  const [findVariable, setFindVariable] = useState('work');
+
+  // Ajusta la variable a buscar por defecto cuando cambia el tipo de proceso
+  useEffect(() => {
+    setInputs({});
+    setResult(null);
+    switch (calcType) {
+      case 'isothermal':
+      case 'isobaric':
+      case 'adiabatic':
+        setFindVariable('work');
+        break;
+      case 'isochoric':
+        setFindVariable('p2'); // El trabajo es siempre 0, así que calculamos P₂ por defecto
+        break;
+      default:
+        setFindVariable('work');
+    }
+  }, [calcType]);
+
+  const calculateIsobaric = () => {
+    // Proceso a Presión Constante: W = -P * (V₂ - V₁)
+    const { p, v1, v2, work } = inputs;
+    if (findVariable === 'work') {
+      const w = -parseFloat(p) * (parseFloat(v2) - parseFloat(v1));
+      setResult({ trabajoRealizado: `${w.toFixed(3)} J` });
+    } else if (findVariable === 'v2') {
+      const finalVolume = (-parseFloat(work) / parseFloat(p)) + parseFloat(v1);
+      setResult({ volumenFinal: `${finalVolume.toFixed(3)} m³` });
+    }
+  };
+
+  const calculateIsochoric = () => {
+    // Proceso a Volumen Constante: W = 0; P₁/T₁ = P₂/T₂
+    const { p1, t1, p2, t2 } = inputs;
+    if (findVariable === 'p2') {
+      const finalPressure = parseFloat(p1) * (parseFloat(t2) / parseFloat(t1));
+      setResult({ presionFinal: `${finalPressure.toFixed(3)} Pa`, trabajoRealizado: '0 J' });
+    } else if (findVariable === 't2') {
+      const finalTemperature = parseFloat(t1) * (parseFloat(p2) / parseFloat(p1));
+      setResult({ temperaturaFinal: `${finalTemperature.toFixed(3)} K`, trabajoRealizado: '0 J' });
+    }
+  };
+
+  const calculateIsothermal = () => {
+    // Proceso a Temperatura Constante: W = -P₁V₁ * ln(V₂/V₁)
+    const { p1, v1, v2, p2, work } = inputs;
+    if (findVariable === 'work') {
+      const w = -parseFloat(p1) * parseFloat(v1) * Math.log(parseFloat(v2) / parseFloat(v1));
+      setResult({ trabajoRealizado: `${w.toFixed(3)} J`, cambioEnergiaInterna: '0 J (gas ideal)' });
+    } else if (findVariable === 'p2') {
+      const finalPressure = (parseFloat(p1) * parseFloat(v1)) / parseFloat(v2);
+      setResult({ presionFinal: `${finalPressure.toFixed(3)} Pa` });
+    } else if (findVariable === 'v2') {
+      const finalVolume = (parseFloat(p1) * parseFloat(v1)) / parseFloat(p2);
+      setResult({ volumenFinal: `${finalVolume.toFixed(3)} m³` });
+    }
+  };
+
+  const calculateAdiabatic = () => {
+    // Proceso sin transferencia de calor: P₁V₁^γ = P₂V₂^γ
+    const { p1, v1, v2, p2, gamma, work } = inputs;
+    const g = parseFloat(gamma);
+
+    if (findVariable === 'work') {
+      const finalPressure = parseFloat(p1) * Math.pow(parseFloat(v1) / parseFloat(v2), g);
+      const w = (finalPressure * parseFloat(v2) - parseFloat(p1) * parseFloat(v1)) / (1 - g);
+      setResult({ trabajoRealizado: `${w.toFixed(3)} J`, calorTransferido: '0 J' });
+    } else if (findVariable === 'p2') {
+      const finalPressure = parseFloat(p1) * Math.pow(parseFloat(v1) / parseFloat(v2), g);
+      setResult({ presionFinal: `${finalPressure.toFixed(3)} Pa` });
+    } else if (findVariable === 'v2') {
+      const finalVolume = parseFloat(v1) * Math.pow(parseFloat(p1) / parseFloat(p2), 1 / g);
+      setResult({ volumenFinal: `${finalVolume.toFixed(3)} m³` });
+    }
+  };
+
+
+  const handleCalculate = () => {
+    switch (calcType) {
+      case 'isobaric': calculateIsobaric(); break;
+      case 'isochoric': calculateIsochoric(); break;
+      case 'isothermal': calculateIsothermal(); break;
+      case 'adiabatic': calculateAdiabatic(); break;
+      default: break;
+    }
+  };
+
+  const renderInputs = () => {
+    switch (calcType) {
+      case 'isobaric':
+        return (
+          <div className="space-y-4">
+            {findVariable !== 'work' && <div><label>Trabajo (W) [J]</label><input type="number" step="any" value={inputs.work || ''} onChange={(e) => setInputs({...inputs, work: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" /></div>}
+            <div><label>Presión constante (P) [Pa]</label><input type="number" step="any" value={inputs.p || ''} onChange={(e) => setInputs({...inputs, p: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" /></div>
+            <div><label>Volumen inicial (V₁) [m³]</label><input type="number" step="any" value={inputs.v1 || ''} onChange={(e) => setInputs({...inputs, v1: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" /></div>
+            {findVariable !== 'v2' && <div><label>Volumen final (V₂) [m³]</label><input type="number" step="any" value={inputs.v2 || ''} onChange={(e) => setInputs({...inputs, v2: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" /></div>}
+          </div>
+        );
+      case 'isochoric':
+        return (
+          <div className="space-y-4">
+             <div className="bg-yellow-50 p-3 rounded-md text-center"><p className="text-sm text-yellow-800">En un proceso isocórico, el trabajo realizado (W) es siempre 0.</p></div>
+            {findVariable !== 'p2' && <div><label>Presión final (P₂) [Pa]</label><input type="number" step="any" value={inputs.p2 || ''} onChange={(e) => setInputs({...inputs, p2: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" /></div>}
+            <div><label>Presión inicial (P₁) [Pa]</label><input type="number" step="any" value={inputs.p1 || ''} onChange={(e) => setInputs({...inputs, p1: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" /></div>
+            <div><label>Temperatura inicial (T₁) [K]</label><input type="number" step="any" value={inputs.t1 || ''} onChange={(e) => setInputs({...inputs, t1: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" /></div>
+            {findVariable !== 't2' && <div><label>Temperatura final (T₂) [K]</label><input type="number" step="any" value={inputs.t2 || ''} onChange={(e) => setInputs({...inputs, t2: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" /></div>}
+          </div>
+        );
+      case 'isothermal':
+        return (
+          <div className="space-y-4">
+            {findVariable !== 'work' && <div><label>Trabajo (W) [J]</label><input type="number" step="any" value={inputs.work || ''} onChange={(e) => setInputs({...inputs, work: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" /></div>}
+            {findVariable !== 'p2' && findVariable !== 'v2' && <div><label>Presión inicial (P₁) [Pa]</label><input type="number" step="any" value={inputs.p1 || ''} onChange={(e) => setInputs({...inputs, p1: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" /></div>}
+            {findVariable === 'v2' && <div><label>Presión final (P₂) [Pa]</label><input type="number" step="any" value={inputs.p2 || ''} onChange={(e) => setInputs({...inputs, p2: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" /></div>}
+            <div><label>Volumen inicial (V₁) [m³]</label><input type="number" step="any" value={inputs.v1 || ''} onChange={(e) => setInputs({...inputs, v1: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" /></div>
+            {findVariable !== 'v2' && <div><label>Volumen final (V₂) [m³]</label><input type="number" step="any" value={inputs.v2 || ''} onChange={(e) => setInputs({...inputs, v2: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" /></div>}
+          </div>
+        );
+      case 'adiabatic':
+        return (
+          <div className="space-y-4">
+            <div><label>Índice adiabático (γ)</label><input type="number" step="any" value={inputs.gamma || ''} onChange={(e) => setInputs({...inputs, gamma: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" placeholder="Ej: 1.4 para aire"/></div>
+            <div><label>Presión inicial (P₁) [Pa]</label><input type="number" step="any" value={inputs.p1 || ''} onChange={(e) => setInputs({...inputs, p1: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" /></div>
+            {findVariable === 'v2' && <div><label>Presión final (P₂) [Pa]</label><input type="number" step="any" value={inputs.p2 || ''} onChange={(e) => setInputs({...inputs, p2: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" /></div>}
+            <div><label>Volumen inicial (V₁) [m³]</label><input type="number" step="any" value={inputs.v1 || ''} onChange={(e) => setInputs({...inputs, v1: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" /></div>
+            {findVariable !== 'v2' && <div><label>Volumen final (V₂) [m³]</label><input type="number" step="any" value={inputs.v2 || ''} onChange={(e) => setInputs({...inputs, v2: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" /></div>}
+          </div>
+        );
+      default: return null;
+    }
+  };
+  
+  return (
+    <div className="p-8 max-w-4xl mx-auto">
+      <h2 className="text-3xl font-bold text-gray-800 mb-6">Calculadora de Procesos Termodinámicos</h2>
+
+      <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6">
+        <p className="text-sm text-gray-700">
+          Seleccione el proceso termodinámico y la variable a encontrar. Complete los campos con los datos conocidos.
+        </p>
+      </div>
+      
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+        <div>
+          <label className="block text-sm font-semibold text-gray-700 mb-2">Tipo de Proceso</label>
+          <select
+            value={calcType}
+            onChange={(e) => setCalcType(e.target.value)}
+            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="isobaric">Proceso Isobárico (P constante)</option>
+            <option value="isochoric">Proceso Isocórico (V constante)</option>
+            <option value="isothermal">Proceso Isotérmico (T constante)</option>
+            <option value="adiabatic">Proceso Adiabático (Q = 0)</option>
+          </select>
+        </div>
+        <div>
+          <label className="block text-sm font-semibold text-gray-700 mb-2">Variable a Encontrar</label>
+          <select
+            value={findVariable}
+            onChange={(e) => { setFindVariable(e.target.value); setInputs({}); setResult(null); }}
+            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+          >
+            {calcType === 'isobaric' && <>
+              <option value="work">Trabajo (W)</option>
+              <option value="v2">Volumen final (V₂)</option>
+            </>}
+            {calcType === 'isochoric' && <>
+              <option value="p2">Presión final (P₂)</option>
+              <option value="t2">Temperatura final (T₂)</option>
+            </>}
+            {calcType === 'isothermal' && <>
+              <option value="work">Trabajo (W)</option>
+              <option value="p2">Presión final (P₂)</option>
+              <option value="v2">Volumen final (V₂)</option>
+            </>}
+            {calcType === 'adiabatic' && <>
+              <option value="work">Trabajo (W)</option>
+              <option value="p2">Presión final (P₂)</option>
+              <option value="v2">Volumen final (V₂)</option>
+            </>}
+          </select>
+        </div>
+      </div>
+
+      <div className="bg-white border border-gray-200 rounded-lg p-6 mb-6">
+        {renderInputs()}
+        <button onClick={handleCalculate} className="mt-6 w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors">
+          Calcular
+        </button>
+      </div>
+
+      {result && (
+        <div className="bg-green-50 border border-green-200 rounded-lg p-6">
+          <h3 className="text-xl font-bold text-gray-800 mb-4">Resultados</h3>
+          <div className="space-y-2">
+            {Object.entries(result).map(([key, value]) => (
+              <div key={key} className="flex justify-between items-center py-2 border-b border-green-100">
+                <span className="font-medium text-gray-700 capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}:</span>
+                <span className="text-lg font-semibold text-gray-900">{value}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+function TermodinamicaSimulation() {
+  const canvasRef = useRef(null);
+  const [isRunning, setIsRunning] = useState(false);
+  const [processType, setProcessType] = useState('isotermico');
+  const [params, setParams] = useState({ 
+    P0: 2, 
+    V0: 3, 
+    T0: 300, 
+    Vf: 6,
+    Pf: 4,
+    gamma: 1.4 
+  });
+  const animationRef = useRef(null);
+  const progressRef = useRef(0);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+
+    const drawAxes = () => {
+      const marginLeft = 60;
+      const marginBottom = 60;
+      const marginTop = 40;
+      const marginRight = 40;
+
+      ctx.strokeStyle = '#1f2937';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(marginLeft, canvas.height - marginBottom);
+      ctx.lineTo(canvas.width - marginRight, canvas.height - marginBottom);
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.moveTo(marginLeft, canvas.height - marginBottom);
+      ctx.lineTo(marginLeft, marginTop);
+      ctx.stroke();
+
+      ctx.fillStyle = '#1f2937';
+      ctx.font = 'bold 16px Arial';
+      ctx.fillText('V (L)', canvas.width - 70, canvas.height - 30);
+      ctx.save();
+      ctx.translate(25, canvas.height / 2);
+      ctx.rotate(-Math.PI / 2);
+      ctx.fillText('P (atm)', 0, 0);
+      ctx.restore();
+
+      ctx.font = '12px Arial';
+      ctx.fillStyle = '#6b7280';
+      for (let i = 0; i <= 5; i++) {
+        const x = marginLeft + (i * (canvas.width - marginLeft - marginRight) / 5);
+        ctx.fillText((i * 2).toString(), x - 8, canvas.height - marginBottom + 20);
+      }
+      for (let i = 0; i <= 5; i++) {
+        const y = canvas.height - marginBottom - (i * (canvas.height - marginBottom - marginTop) / 5);
+        ctx.fillText((i * 2).toString(), marginLeft - 30, y + 5);
+      }
+    };
+
+    const scaleX = (v) => {
+      const marginLeft = 60;
+      const marginRight = 40;
+      const maxV = 10;
+      return marginLeft + ((v / maxV) * (canvas.width - marginLeft - marginRight));
+    };
+
+    const scaleY = (p) => {
+      const marginBottom = 60;
+      const marginTop = 40;
+      const maxP = 10;
+      return canvas.height - marginBottom - ((p / maxP) * (canvas.height - marginBottom - marginTop));
+    };
+
+    if (isRunning) {
+      progressRef.current = 0;
+      
+      const animate = () => {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        drawAxes();
+
+        const t = progressRef.current;
+        let currentV, currentP, pathPoints = [];
+        const steps = 100;
+
+        if (processType === 'isotermico') {
+          const P0 = params.P0;
+          const V0 = params.V0;
+          const Vf = params.Vf;
+          const PV = P0 * V0;
+
+          for (let i = 0; i <= steps; i++) {
+            const v = V0 + (Vf - V0) * (i / steps);
+            const p = PV / v;
+            pathPoints.push({ v, p });
+          }
+
+          currentV = V0 + (Vf - V0) * t;
+          currentP = PV / currentV;
+
+          ctx.fillStyle = '#dbeafe';
+          ctx.globalAlpha = 0.3;
+          ctx.beginPath();
+          ctx.moveTo(scaleX(V0), scaleY(0));
+          for (const pt of pathPoints.slice(0, Math.floor(t * steps))) {
+            ctx.lineTo(scaleX(pt.v), scaleY(pt.p));
+          }
+          ctx.lineTo(scaleX(currentV), scaleY(0));
+          ctx.closePath();
+          ctx.fill();
+          ctx.globalAlpha = 1;
+
+        } else if (processType === 'isobarico') {
+          const P0 = params.P0;
+          const V0 = params.V0;
+          const Vf = params.Vf;
+
+          for (let i = 0; i <= steps; i++) {
+            const v = V0 + (Vf - V0) * (i / steps);
+            pathPoints.push({ v, p: P0 });
+          }
+
+          currentV = V0 + (Vf - V0) * t;
+          currentP = P0;
+
+          ctx.fillStyle = '#fef3c7';
+          ctx.globalAlpha = 0.3;
+          ctx.beginPath();
+          ctx.moveTo(scaleX(V0), scaleY(0));
+          ctx.lineTo(scaleX(V0), scaleY(P0));
+          ctx.lineTo(scaleX(currentV), scaleY(P0));
+          ctx.lineTo(scaleX(currentV), scaleY(0));
+          ctx.closePath();
+          ctx.fill();
+          ctx.globalAlpha = 1;
+
+        } else if (processType === 'isocorico') {
+          const P0 = params.P0;
+          const V0 = params.V0;
+          const Pf = params.Pf;
+
+          for (let i = 0; i <= steps; i++) {
+            const p = P0 + (Pf - P0) * (i / steps);
+            pathPoints.push({ v: V0, p });
+          }
+
+          currentV = V0;
+          currentP = P0 + (Pf - P0) * t;
+
+        } else if (processType === 'adiabatico') {
+          const P0 = params.P0;
+          const V0 = params.V0;
+          const Vf = params.Vf;
+          const gamma = params.gamma;
+          const K = P0 * Math.pow(V0, gamma);
+
+          for (let i = 0; i <= steps; i++) {
+            const v = V0 + (Vf - V0) * (i / steps);
+            const p = K / Math.pow(v, gamma);
+            pathPoints.push({ v, p });
+          }
+
+          currentV = V0 + (Vf - V0) * t;
+          currentP = K / Math.pow(currentV, gamma);
+
+          ctx.fillStyle = '#fce7f3';
+          ctx.globalAlpha = 0.3;
+          ctx.beginPath();
+          ctx.moveTo(scaleX(V0), scaleY(0));
+          for (const pt of pathPoints.slice(0, Math.floor(t * steps))) {
+            ctx.lineTo(scaleX(pt.v), scaleY(pt.p));
+          }
+          ctx.lineTo(scaleX(currentV), scaleY(0));
+          ctx.closePath();
+          ctx.fill();
+          ctx.globalAlpha = 1;
+        }
+
+        ctx.strokeStyle = processType === 'isotermico' ? '#3b82f6' : 
+                          processType === 'isobarico' ? '#f59e0b' :
+                          processType === 'isocorico' ? '#10b981' : '#ec4899';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        pathPoints.forEach((pt, i) => {
+          if (i === 0) ctx.moveTo(scaleX(pt.v), scaleY(pt.p));
+          else ctx.lineTo(scaleX(pt.v), scaleY(pt.p));
+        });
+        ctx.stroke();
+
+        const progressIdx = Math.floor(t * steps);
+        if (progressIdx < pathPoints.length) {
+          ctx.strokeStyle = processType === 'isotermico' ? '#1e40af' : 
+                            processType === 'isobarico' ? '#d97706' :
+                            processType === 'isocorico' ? '#059669' : '#be185d';
+          ctx.lineWidth = 4;
+          ctx.beginPath();
+          pathPoints.slice(0, progressIdx + 1).forEach((pt, i) => {
+            if (i === 0) ctx.moveTo(scaleX(pt.v), scaleY(pt.p));
+            else ctx.lineTo(scaleX(pt.v), scaleY(pt.p));
+          });
+          ctx.stroke();
+        }
+
+        ctx.fillStyle = processType === 'isotermico' ? '#3b82f6' : 
+                        processType === 'isobarico' ? '#f59e0b' :
+                        processType === 'isocorico' ? '#10b981' : '#ec4899';
+        ctx.shadowColor = ctx.fillStyle;
+        ctx.shadowBlur = 15;
+        ctx.beginPath();
+        ctx.arc(scaleX(currentV), scaleY(currentP), 8, 0, 2 * Math.PI);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+
+        ctx.fillStyle = '#1f2937';
+        ctx.font = 'bold 14px Arial';
+        ctx.fillText(`V = ${currentV.toFixed(2)} L`, 10, 25);
+        ctx.fillText(`P = ${currentP.toFixed(2)} atm`, 10, 45);
+        
+        if (processType === 'isotermico') {
+          ctx.fillText(`T = ${params.T0} K (constante)`, 10, 65);
+        } else if (processType === 'isobarico') {
+          const T = (params.T0 * currentV) / params.V0;
+          ctx.fillText(`T = ${T.toFixed(1)} K`, 10, 65);
+        } else if (processType === 'isocorico') {
+          const T = (params.T0 * currentP) / params.P0;
+          ctx.fillText(`T = ${T.toFixed(1)} K`, 10, 65);
+        } else if (processType === 'adiabatico') {
+          const T = params.T0 * Math.pow(currentV / params.V0, 1 - params.gamma);
+          ctx.fillText(`T = ${T.toFixed(1)} K`, 10, 65);
+        }
+
+        progressRef.current += 0.01;
+
+        if (progressRef.current <= 1) {
+          animationRef.current = requestAnimationFrame(animate);
+        } else {
+          setIsRunning(false);
+        }
+      };
+
+      animate();
+    } else {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      drawAxes();
+    }
+
+    return () => {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
+    };
+  }, [isRunning, processType, params]);
+
+  const processInfo = {
+    isotermico: {
+      title: 'Proceso Isotérmico',
+      desc: 'Temperatura constante. PV = constante',
+      color: 'blue'
+    },
+    isobarico: {
+      title: 'Proceso Isobárico',
+      desc: 'Presión constante. V/T = constante',
+      color: 'yellow'
+    },
+    isocorico: {
+      title: 'Proceso Isocórico',
+      desc: 'Volumen constante. P/T = constante',
+      color: 'green'
+    },
+    adiabatico: {
+      title: 'Proceso Adiabático',
+      desc: 'Sin intercambio de calor. PVᵞ = constante',
+      color: 'pink'
+    }
+  };
+
+  const info = processInfo[processType];
+  const bgColor = info.color === 'blue' ? 'bg-blue-50 border-blue-500' :
+                  info.color === 'yellow' ? 'bg-yellow-50 border-yellow-500' :
+                  info.color === 'green' ? 'bg-green-50 border-green-500' : 'bg-pink-50 border-pink-500';
+
+  return (
+    <div className="p-8 max-w-6xl mx-auto">
+      <h2 className="text-3xl font-bold text-gray-800 mb-6">Simulación de Procesos Termodinámicos</h2>
+
+      <div className={`${bgColor} border-l-4 p-4 mb-6`}>
+        <h3 className="font-bold text-gray-800 mb-1">{info.title}</h3>
+        <p className="text-sm text-gray-700">{info.desc}</p>
+      </div>
+
+      <div className="mb-6">
+        <label className="block text-sm font-semibold text-gray-700 mb-2">Tipo de Proceso</label>
+        <select 
+          value={processType} 
+          onChange={(e) => { setProcessType(e.target.value); setIsRunning(false); }} 
+          className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="isotermico">Isotérmico (T constante)</option>
+          <option value="isobarico">Isobárico (P constante)</option>
+          <option value="isocorico">Isocórico (V constante)</option>
+          <option value="adiabatico">Adiabático (Q = 0)</option>
+        </select>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        {(processType === 'isotermico' || processType === 'isobarico' || processType === 'adiabatico') && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Volumen inicial: {params.V0} L</label>
+            <input 
+              type="range" 
+              min="1" 
+              max="5" 
+              step="0.5"
+              value={params.V0} 
+              onChange={(e) => setParams({...params, V0: Number(e.target.value)})} 
+              className="w-full" 
+              disabled={isRunning} 
+            />
+          </div>
+        )}
+        {(processType === 'isotermico' || processType === 'isobarico' || processType === 'adiabatico') && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Volumen final: {params.Vf} L</label>
+            <input 
+              type="range" 
+              min="3" 
+              max="9" 
+              step="0.5"
+              value={params.Vf} 
+              onChange={(e) => setParams({...params, Vf: Number(e.target.value)})} 
+              className="w-full" 
+              disabled={isRunning} 
+            />
+          </div>
+        )}
+        {(processType === 'isotermico' || processType === 'isocorico' || processType === 'adiabatico') && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Presión inicial: {params.P0} atm</label>
+            <input 
+              type="range" 
+              min="1" 
+              max="5" 
+              step="0.5"
+              value={params.P0} 
+              onChange={(e) => setParams({...params, P0: Number(e.target.value)})} 
+              className="w-full" 
+              disabled={isRunning} 
+            />
+          </div>
+        )}
+        {processType === 'isocorico' && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Presión final: {params.Pf} atm</label>
+            <input 
+              type="range" 
+              min="1" 
+              max="8" 
+              step="0.5"
+              value={params.Pf} 
+              onChange={(e) => setParams({...params, Pf: Number(e.target.value)})} 
+              className="w-full" 
+              disabled={isRunning} 
+            />
+          </div>
+        )}
+        {processType === 'adiabatico' && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">γ (gamma): {params.gamma}</label>
+            <input 
+              type="range" 
+              min="1.1" 
+              max="1.7" 
+              step="0.1"
+              value={params.gamma} 
+              onChange={(e) => setParams({...params, gamma: Number(e.target.value)})} 
+              className="w-full" 
+              disabled={isRunning} 
+            />
+          </div>
+        )}
+        <div className="flex items-end">
+          <button 
+            onClick={() => setIsRunning(!isRunning)} 
+            className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
+          >
+            {isRunning ? 'Detener' : 'Iniciar'}
+          </button>
+        </div>
+      </div>
+
+      <div className="bg-white border-2 border-gray-300 rounded-lg overflow-hidden mb-6">
+        <canvas ref={canvasRef} width={800} height={500} className="w-full" />
+      </div>
+
+      <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+        <h3 className="font-bold text-gray-800 mb-3">Información sobre los Procesos</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm text-gray-700">
+          <div className="bg-blue-100 p-3 rounded">
+            <strong className="text-blue-800">Isotérmico:</strong> La temperatura permanece constante. El trabajo realizado es el área bajo la curva en el diagrama P-V.
+          </div>
+          <div className="bg-yellow-100 p-3 rounded">
+            <strong className="text-yellow-800">Isobárico:</strong> La presión permanece constante. El trabajo es W = P(Vf - V0).
+          </div>
+          <div className="bg-green-100 p-3 rounded">
+            <strong className="text-green-800">Isocórico:</strong> El volumen permanece constante. No se realiza trabajo (W = 0).
+          </div>
+          <div className="bg-pink-100 p-3 rounded">
+            <strong className="text-pink-800">Adiabático:</strong> No hay intercambio de calor con el entorno (Q = 0). La curva es más pronunciada que la isotérmica.
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+function TermodinamicaCalculator() {
+  const [calcType, setCalcType] = useState('primer-principio');
+  const [inputs, setInputs] = useState({});
+  const [result, setResult] = useState(null);
+  const [findVariable, setFindVariable] = useState('deltaU');
+
+  const calculatePrimerPrincipio = () => {
+    const { Q, W, deltaU } = inputs;
+    
+    if (findVariable === 'deltaU') {
+      // ΔU = Q - W
+      const energiaInterna = parseFloat(Q) - parseFloat(W);
+      setResult({ 
+        energiaInterna: energiaInterna.toFixed(3),
+        calor: parseFloat(Q).toFixed(3),
+        trabajo: parseFloat(W).toFixed(3)
+      });
+    } else if (findVariable === 'Q') {
+      // Q = ΔU + W
+      const calor = parseFloat(deltaU) + parseFloat(W);
+      setResult({ 
+        calor: calor.toFixed(3),
+        energiaInterna: parseFloat(deltaU).toFixed(3),
+        trabajo: parseFloat(W).toFixed(3)
+      });
+    } else if (findVariable === 'W') {
+      // W = Q - ΔU
+      const trabajo = parseFloat(Q) - parseFloat(deltaU);
+      setResult({ 
+        trabajo: trabajo.toFixed(3),
+        calor: parseFloat(Q).toFixed(3),
+        energiaInterna: parseFloat(deltaU).toFixed(3)
+      });
+    }
+  };
+
+  const calculateGasIdeal = () => {
+    const { n, Cv, deltaT } = inputs;
+    
+    if (findVariable === 'deltaU-gas') {
+      // ΔU = n * Cv * ΔT
+      const energiaInterna = parseFloat(n) * parseFloat(Cv) * parseFloat(deltaT);
+      setResult({ 
+        energiaInterna: energiaInterna.toFixed(3),
+        moles: parseFloat(n).toFixed(3),
+        capacidadCalorica: parseFloat(Cv).toFixed(3),
+        cambioTemperatura: parseFloat(deltaT).toFixed(3)
+      });
+    } else if (findVariable === 'deltaT') {
+      // ΔT = ΔU / (n * Cv)
+      const cambioTemp = parseFloat(inputs.deltaU) / (parseFloat(n) * parseFloat(Cv));
+      setResult({ 
+        cambioTemperatura: cambioTemp.toFixed(3),
+        energiaInterna: parseFloat(inputs.deltaU).toFixed(3)
+      });
+    } else if (findVariable === 'n') {
+      // n = ΔU / (Cv * ΔT)
+      const moles = parseFloat(inputs.deltaU) / (parseFloat(Cv) * parseFloat(deltaT));
+      setResult({ 
+        moles: moles.toFixed(3),
+        energiaInterna: parseFloat(inputs.deltaU).toFixed(3)
+      });
+    }
+  };
+
+  const calculateProcesos = () => {
+    const { P, V, deltaV, n, R, T, gamma } = inputs;
+    
+    if (findVariable === 'W-isobarico') {
+      // W = P * ΔV (proceso isobárico)
+      const trabajo = parseFloat(P) * parseFloat(deltaV);
+      setResult({ 
+        trabajo: trabajo.toFixed(3),
+        presion: parseFloat(P).toFixed(3),
+        cambioVolumen: parseFloat(deltaV).toFixed(3),
+        tipoProceso: 'Isobárico (P constante)'
+      });
+    } else if (findVariable === 'W-isotermico') {
+      // W = n * R * T * ln(Vf/Vi) (proceso isotérmico)
+      const Vi = parseFloat(inputs.Vi);
+      const Vf = parseFloat(inputs.Vf);
+      const trabajo = parseFloat(n) * parseFloat(R) * parseFloat(T) * Math.log(Vf/Vi);
+      setResult({ 
+        trabajo: trabajo.toFixed(3),
+        moles: parseFloat(n).toFixed(3),
+        temperatura: parseFloat(T).toFixed(3),
+        tipoProceso: 'Isotérmico (T constante)',
+        volumenInicial: Vi.toFixed(3),
+        volumenFinal: Vf.toFixed(3)
+      });
+    } else if (findVariable === 'W-adiabatico') {
+      // W = (P1*V1 - P2*V2) / (γ-1) (proceso adiabático)
+      const P1 = parseFloat(inputs.P1);
+      const V1 = parseFloat(inputs.V1);
+      const P2 = parseFloat(inputs.P2);
+      const V2 = parseFloat(inputs.V2);
+      const trabajo = (P1*V1 - P2*V2) / (parseFloat(gamma) - 1);
+      setResult({ 
+        trabajo: trabajo.toFixed(3),
+        presionInicial: P1.toFixed(3),
+        presionFinal: P2.toFixed(3),
+        tipoProceso: 'Adiabático (Q = 0)',
+        nota: 'ΔU = -W en proceso adiabático'
+      });
+    } else if (findVariable === 'Q-isocoro') {
+      // Q = n * Cv * ΔT (proceso isócoro, W=0)
+      const calor = parseFloat(n) * parseFloat(inputs.Cv) * parseFloat(inputs.deltaT);
+      setResult({ 
+        calor: calor.toFixed(3),
+        trabajo: '0.000',
+        tipoProceso: 'Isócoro (V constante)',
+        nota: 'W = 0, todo el calor cambia ΔU'
+      });
+    }
+  };
+
+  const handleCalculate = () => {
+    if (calcType === 'primer-principio') calculatePrimerPrincipio();
+    else if (calcType === 'gas-ideal') calculateGasIdeal();
+    else if (calcType === 'procesos') calculateProcesos();
+  };
+
+  return (
+    <div className="p-8 max-w-4xl mx-auto">
+      <h2 className="text-3xl font-bold text-gray-800 mb-6">Calculadora de Termodinámica</h2>
+
+      <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6">
+        <p className="text-sm text-gray-700">
+          <strong>Primer Principio de la Termodinámica:</strong> La energía no se crea ni se destruye, solo se transforma.
+          <br />
+          <strong>Ecuación fundamental:</strong> ΔU = Q - W
+        </p>
+      </div>
+
+      <div className="mb-6">
+        <label className="block text-sm font-semibold text-gray-700 mb-2">Variable a encontrar</label>
+        <select
+          value={findVariable}
+          onChange={(e) => { setFindVariable(e.target.value); setInputs({}); setResult(null); }}
+          className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 mb-4"
+        >
+          {calcType === 'primer-principio' && (
+            <>
+              <option value="deltaU">Cambio de energía interna (ΔU)</option>
+              <option value="Q">Calor transferido (Q)</option>
+              <option value="W">Trabajo realizado (W)</option>
+            </>
+          )}
+          {calcType === 'gas-ideal' && (
+            <>
+              <option value="deltaU-gas">Energía interna gas ideal (ΔU)</option>
+              <option value="deltaT">Cambio de temperatura (ΔT)</option>
+              <option value="n">Número de moles (n)</option>
+            </>
+          )}
+          {calcType === 'procesos' && (
+            <>
+              <option value="W-isobarico">Trabajo en proceso isobárico</option>
+              <option value="W-isotermico">Trabajo en proceso isotérmico</option>
+              <option value="W-adiabatico">Trabajo en proceso adiabático</option>
+              <option value="Q-isocoro">Calor en proceso isócoro</option>
+            </>
+          )}
+        </select>
+        
+        <label className="block text-sm font-semibold text-gray-700 mb-2">Tipo de Cálculo</label>
+        <select
+          value={calcType}
+          onChange={(e) => { setCalcType(e.target.value); setInputs({}); setResult(null); setFindVariable(e.target.value === 'primer-principio' ? 'deltaU' : e.target.value === 'gas-ideal' ? 'deltaU-gas' : 'W-isobarico'); }}
+          className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="primer-principio">Primer Principio (ΔU = Q - W)</option>
+          <option value="gas-ideal">Energía Interna de Gas Ideal</option>
+          <option value="procesos">Procesos Termodinámicos</option>
+        </select>
+      </div>
+
+      <div className="bg-white border border-gray-200 rounded-lg p-6 mb-6">
+        {calcType === 'primer-principio' && (
+          <div className="space-y-4">
+            {findVariable !== 'Q' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Calor transferido Q (J)</label>
+                <input type="number" step="any" value={inputs.Q || ''} onChange={(e) => setInputs({...inputs, Q: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" placeholder="Positivo si entra al sistema" />
+              </div>
+            )}
+            {findVariable !== 'W' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Trabajo realizado W (J)</label>
+                <input type="number" step="any" value={inputs.W || ''} onChange={(e) => setInputs({...inputs, W: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" placeholder="Positivo si el sistema lo realiza" />
+              </div>
+            )}
+            {findVariable !== 'deltaU' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Cambio de energía interna ΔU (J)</label>
+                <input type="number" step="any" value={inputs.deltaU || ''} onChange={(e) => setInputs({...inputs, deltaU: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+              </div>
+            )}
+            <div className="bg-yellow-50 border border-yellow-200 rounded p-3 text-sm text-gray-700">
+              <strong>Convención de signos:</strong><br />
+              Q &gt; 0: calor entra al sistema<br />
+              W &gt; 0: sistema realiza trabajo (expansión)<br />
+              ΔU &gt; 0: aumenta energía interna
+            </div>
+          </div>
+        )}
+
+        {calcType === 'gas-ideal' && (
+          <div className="space-y-4">
+            {findVariable !== 'n' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Número de moles n (mol)</label>
+                <input type="number" step="any" value={inputs.n || ''} onChange={(e) => setInputs({...inputs, n: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+              </div>
+            )}
+            {findVariable !== 'Cv' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Capacidad calorífica a volumen constante Cv (J/mol·K)</label>
+                <input type="number" step="any" value={inputs.Cv || ''} onChange={(e) => setInputs({...inputs, Cv: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" placeholder="Monoatómico: 12.5, Diatómico: 20.8" />
+              </div>
+            )}
+            {findVariable !== 'deltaT' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Cambio de temperatura ΔT (K)</label>
+                <input type="number" step="any" value={inputs.deltaT || ''} onChange={(e) => setInputs({...inputs, deltaT: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+              </div>
+            )}
+            {findVariable === 'deltaT' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Cambio de energía interna ΔU (J)</label>
+                <input type="number" step="any" value={inputs.deltaU || ''} onChange={(e) => setInputs({...inputs, deltaU: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+              </div>
+            )}
+            {findVariable === 'n' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Cambio de energía interna ΔU (J)</label>
+                <input type="number" step="any" value={inputs.deltaU || ''} onChange={(e) => setInputs({...inputs, deltaU: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+              </div>
+            )}
+            <div className="bg-green-50 border border-green-200 rounded p-3 text-sm text-gray-700">
+              <strong>Para gas ideal:</strong> ΔU = n · Cv · ΔT<br />
+              La energía interna solo depende de la temperatura
+            </div>
+          </div>
+        )}
+
+        {calcType === 'procesos' && (
+          <div className="space-y-4">
+            {findVariable === 'W-isobarico' && (
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Presión constante P (Pa)</label>
+                  <input type="number" step="any" value={inputs.P || ''} onChange={(e) => setInputs({...inputs, P: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Cambio de volumen ΔV (m³)</label>
+                  <input type="number" step="any" value={inputs.deltaV || ''} onChange={(e) => setInputs({...inputs, deltaV: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" placeholder="Vf - Vi" />
+                </div>
+              </>
+            )}
+
+            {findVariable === 'W-isotermico' && (
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Número de moles n (mol)</label>
+                  <input type="number" step="any" value={inputs.n || ''} onChange={(e) => setInputs({...inputs, n: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Constante de gas R (J/mol·K)</label>
+                  <input type="number" step="any" value={inputs.R || ''} onChange={(e) => setInputs({...inputs, R: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" placeholder="8.314" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Temperatura T (K)</label>
+                  <input type="number" step="any" value={inputs.T || ''} onChange={(e) => setInputs({...inputs, T: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Volumen inicial Vi (m³)</label>
+                  <input type="number" step="any" value={inputs.Vi || ''} onChange={(e) => setInputs({...inputs, Vi: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Volumen final Vf (m³)</label>
+                  <input type="number" step="any" value={inputs.Vf || ''} onChange={(e) => setInputs({...inputs, Vf: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+                </div>
+              </>
+            )}
+
+            {findVariable === 'W-adiabatico' && (
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Presión inicial P₁ (Pa)</label>
+                  <input type="number" step="any" value={inputs.P1 || ''} onChange={(e) => setInputs({...inputs, P1: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Volumen inicial V₁ (m³)</label>
+                  <input type="number" step="any" value={inputs.V1 || ''} onChange={(e) => setInputs({...inputs, V1: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Presión final P₂ (Pa)</label>
+                  <input type="number" step="any" value={inputs.P2 || ''} onChange={(e) => setInputs({...inputs, P2: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Volumen final V₂ (m³)</label>
+                  <input type="number" step="any" value={inputs.V2 || ''} onChange={(e) => setInputs({...inputs, V2: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Coeficiente adiabático γ (Cp/Cv)</label>
+                  <input type="number" step="any" value={inputs.gamma || ''} onChange={(e) => setInputs({...inputs, gamma: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" placeholder="Monoatómico: 1.67, Diatómico: 1.4" />
+                </div>
+              </>
+            )}
+
+            {findVariable === 'Q-isocoro' && (
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Número de moles n (mol)</label>
+                  <input type="number" step="any" value={inputs.n || ''} onChange={(e) => setInputs({...inputs, n: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Capacidad calorífica Cv (J/mol·K)</label>
+                  <input type="number" step="any" value={inputs.Cv || ''} onChange={(e) => setInputs({...inputs, Cv: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Cambio de temperatura ΔT (K)</label>
+                  <input type="number" step="any" value={inputs.deltaT || ''} onChange={(e) => setInputs({...inputs, deltaT: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+                </div>
+              </>
+            )}
+
+            <div className="bg-purple-50 border border-purple-200 rounded p-3 text-sm text-gray-700">
+              <strong>Tipos de procesos:</strong><br />
+              • Isobárico (P constante): W = P·ΔV<br />
+              • Isotérmico (T constante): W = nRT·ln(Vf/Vi), ΔU = 0<br />
+              • Adiabático (Q = 0): W = -ΔU<br />
+              • Isócoro (V constante): W = 0, Q = ΔU
+            </div>
+          </div>
+        )}
+
+        <button onClick={handleCalculate} className="mt-6 w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors">
+          Calcular
+        </button>
+      </div>
+
+      {result && (
+        <div className="bg-green-50 border border-green-200 rounded-lg p-6">
+          <h3 className="text-xl font-bold text-gray-800 mb-4">Resultados</h3>
+          <div className="space-y-2">
+            {Object.entries(result).map(([key, value]) => (
+              <div key={key} className="flex justify-between items-center py-2 border-b border-green-100">
+                <span className="font-medium text-gray-700 capitalize">
+                  {key === 'energiaInterna' ? 'Cambio de Energía Interna (ΔU)' :
+                   key === 'calor' ? 'Calor Transferido (Q)' :
+                   key === 'trabajo' ? 'Trabajo Realizado (W)' :
+                   key === 'moles' ? 'Moles (n)' :
+                   key === 'capacidadCalorica' ? 'Capacidad Calorífica (Cv)' :
+                   key === 'cambioTemperatura' ? 'Cambio de Temperatura (ΔT)' :
+                   key === 'presion' ? 'Presión (P)' :
+                   key === 'cambioVolumen' ? 'Cambio de Volumen (ΔV)' :
+                   key === 'temperatura' ? 'Temperatura (T)' :
+                   key === 'volumenInicial' ? 'Volumen Inicial (Vi)' :
+                   key === 'volumenFinal' ? 'Volumen Final (Vf)' :
+                   key === 'presionInicial' ? 'Presión Inicial (P₁)' :
+                   key === 'presionFinal' ? 'Presión Final (P₂)' :
+                   key === 'tipoProceso' ? 'Tipo de Proceso' :
+                   key === 'nota' ? 'Nota' :
+                   key.replace(/([A-Z])/g, ' $1').trim()}:
+                </span>
+                <span className="text-lg font-semibold text-gray-900">
+                  {key === 'energiaInterna' || key === 'calor' || key === 'trabajo' ? `${value} J` :
+                   key === 'cambioTemperatura' || key === 'temperatura' ? `${value} K` :
+                   key === 'moles' ? `${value} mol` :
+                   key === 'capacidadCalorica' ? `${value} J/mol·K` :
+                   key === 'presion' || key === 'presionInicial' || key === 'presionFinal' ? `${value} Pa` :
+                   key === 'cambioVolumen' || key === 'volumenInicial' || key === 'volumenFinal' ? `${value} m³` :
+                   value}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+function TermodinamicaSimulacion() {
+  const [proceso, setProceso] = useState('isobarico');
+  const [parametros, setParametros] = useState({
+    presion: 100000,
+    volumenInicial: 0.5,
+    volumenFinal: 1.5,
+    temperatura: 300,
+    moles: 1,
+    gamma: 1.4
+  });
+  const [simulando, setSimulando] = useState(false);
+  const [progreso, setProgreso] = useState(0);
+  const [resultados, setResultados] = useState(null);
+
+  useEffect(() => {
+    if (simulando && progreso < 100) {
+      const timer = setTimeout(() => {
+        setProgreso(prev => Math.min(prev + 2, 100));
+      }, 50);
+      return () => clearTimeout(timer);
+    } else if (progreso >= 100) {
+      setSimulando(false);
+      calcularResultados();
+    }
+  }, [simulando, progreso]);
+
+  const calcularResultados = () => {
+    const R = 8.314;
+    const { presion, volumenInicial, volumenFinal, temperatura, moles, gamma } = parametros;
+    let Q, W, deltaU, descripcion;
+
+    if (proceso === 'isobarico') {
+      // Proceso Isobárico (P constante)
+      W = presion * (volumenFinal - volumenInicial);
+      const Cp = (gamma * R) / (gamma - 1);
+      const deltaT = (presion * (volumenFinal - volumenInicial)) / (moles * R);
+      Q = moles * Cp * deltaT;
+      deltaU = Q - W;
+      descripcion = 'El gas se expande a presión constante. El sistema realiza trabajo sobre el entorno mientras absorbe calor.';
+    } else if (proceso === 'isotermico') {
+      // Proceso Isotérmico (T constante)
+      W = moles * R * temperatura * Math.log(volumenFinal / volumenInicial);
+      Q = W;
+      deltaU = 0;
+      descripcion = 'El gas se expande a temperatura constante. Todo el calor absorbido se convierte en trabajo. La energía interna no cambia.';
+    } else if (proceso === 'adiabatico') {
+      // Proceso Adiabático (Q = 0)
+      const P1 = presion;
+      const V1 = volumenInicial;
+      const P2 = P1 * Math.pow(V1 / volumenFinal, gamma);
+      W = (P1 * V1 - P2 * volumenFinal) / (gamma - 1);
+      Q = 0;
+      deltaU = -W;
+      descripcion = 'El gas se expande sin intercambio de calor con el entorno. La energía interna disminuye y la temperatura baja.';
+    } else if (proceso === 'isocoro') {
+      // Proceso Isócoro (V constante)
+      W = 0;
+      const Cv = R / (gamma - 1);
+      const deltaT = 100; // Cambio de temperatura fijo para la simulación
+      Q = moles * Cv * deltaT;
+      deltaU = Q;
+      descripcion = 'El gas se calienta a volumen constante. No se realiza trabajo y todo el calor aumenta la energía interna.';
+    }
+
+    setResultados({
+      Q: Q.toFixed(2),
+      W: W.toFixed(2),
+      deltaU: deltaU.toFixed(2),
+      descripcion,
+      volumenActual: volumenFinal.toFixed(3),
+      presionFinal: proceso === 'adiabatico' 
+        ? (presion * Math.pow(volumenInicial / volumenFinal, gamma)).toFixed(0)
+        : presion.toFixed(0)
+    });
+  };
+
+  const iniciarSimulacion = () => {
+    setSimulando(true);
+    setProgreso(0);
+    setResultados(null);
+  };
+
+  const resetSimulacion = () => {
+    setSimulando(false);
+    setProgreso(0);
+    setResultados(null);
+  };
+
+  const volumenActual = simulando 
+    ? parametros.volumenInicial + (parametros.volumenFinal - parametros.volumenInicial) * (progreso / 100)
+    : parametros.volumenInicial;
+
+  const alturaInicial = 200;
+  const alturaPiston = alturaInicial * (parametros.volumenInicial / volumenActual);
+
+  return (
+    <div className="p-8 max-w-6xl mx-auto">
+      <h2 className="text-3xl font-bold text-gray-800 mb-6">Simulación del Primer Principio de la Termodinámica</h2>
+
+      <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6">
+        <p className="text-sm text-gray-700">
+          <strong>ΔU = Q - W</strong> donde ΔU es el cambio de energía interna, Q es el calor transferido y W es el trabajo realizado.
+          <br />
+          Observe cómo varía la energía del sistema en diferentes procesos termodinámicos.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        {/* Panel de Control */}
+        <div className="bg-white border border-gray-200 rounded-lg p-6">
+          <h3 className="text-xl font-bold text-gray-800 mb-4">Panel de Control</h3>
+          
+          <div className="mb-4">
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Tipo de Proceso</label>
+            <select
+              value={proceso}
+              onChange={(e) => { setProceso(e.target.value); resetSimulacion(); }}
+              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              disabled={simulando}
+            >
+              <option value="isobarico">Isobárico (Presión constante)</option>
+              <option value="isotermico">Isotérmico (Temperatura constante)</option>
+              <option value="adiabatico">Adiabático (Sin intercambio de calor)</option>
+              <option value="isocoro">Isócoro (Volumen constante)</option>
+            </select>
+          </div>
+
+          {proceso !== 'isocoro' && (
+            <>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Volumen Inicial: {parametros.volumenInicial.toFixed(2)} m³
+                </label>
+                <input
+                  type="range"
+                  min="0.1"
+                  max="2"
+                  step="0.1"
+                  value={parametros.volumenInicial}
+                  onChange={(e) => setParametros({...parametros, volumenInicial: parseFloat(e.target.value)})}
+                  className="w-full"
+                  disabled={simulando}
+                />
+              </div>
+
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Volumen Final: {parametros.volumenFinal.toFixed(2)} m³
+                </label>
+                <input
+                  type="range"
+                  min="0.1"
+                  max="2"
+                  step="0.1"
+                  value={parametros.volumenFinal}
+                  onChange={(e) => setParametros({...parametros, volumenFinal: parseFloat(e.target.value)})}
+                  className="w-full"
+                  disabled={simulando}
+                />
+              </div>
+            </>
+          )}
+
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Presión: {(parametros.presion / 1000).toFixed(0)} kPa
+            </label>
+            <input
+              type="range"
+              min="50000"
+              max="300000"
+              step="10000"
+              value={parametros.presion}
+              onChange={(e) => setParametros({...parametros, presion: parseFloat(e.target.value)})}
+              className="w-full"
+              disabled={simulando}
+            />
+          </div>
+
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Temperatura: {parametros.temperatura} K
+            </label>
+            <input
+              type="range"
+              min="200"
+              max="500"
+              step="10"
+              value={parametros.temperatura}
+              onChange={(e) => setParametros({...parametros, temperatura: parseFloat(e.target.value)})}
+              className="w-full"
+              disabled={simulando}
+            />
+          </div>
+
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Moles de gas: {parametros.moles} mol
+            </label>
+            <input
+              type="range"
+              min="0.5"
+              max="3"
+              step="0.5"
+              value={parametros.moles}
+              onChange={(e) => setParametros({...parametros, moles: parseFloat(e.target.value)})}
+              className="w-full"
+              disabled={simulando}
+            />
+          </div>
+
+          <button
+            onClick={iniciarSimulacion}
+            disabled={simulando}
+            className={`w-full py-3 rounded-lg font-semibold transition-colors ${
+              simulando 
+                ? 'bg-gray-400 text-gray-200 cursor-not-allowed' 
+                : 'bg-blue-600 text-white hover:bg-blue-700'
+            }`}
+          >
+            {simulando ? 'Simulando...' : 'Iniciar Simulación'}
+          </button>
+
+          {!simulando && progreso === 100 && (
+            <button
+              onClick={resetSimulacion}
+              className="w-full mt-3 py-3 bg-gray-600 text-white rounded-lg font-semibold hover:bg-gray-700 transition-colors"
+            >
+              Reiniciar
+            </button>
+          )}
+        </div>
+
+        {/* Visualización del Sistema */}
+        <div className="bg-white border border-gray-200 rounded-lg p-6">
+          <h3 className="text-xl font-bold text-gray-800 mb-4">Sistema Termodinámico</h3>
+          
+          <div className="flex justify-center items-end h-96 bg-gradient-to-b from-blue-50 to-blue-100 rounded-lg p-4 relative">
+            {/* Cilindro */}
+            <div className="relative" style={{ width: '150px' }}>
+              {/* Base del cilindro */}
+              <div className="absolute bottom-0 w-full h-8 bg-gray-700 rounded-b-lg"></div>
+              
+              {/* Gas (área que cambia) */}
+              <div 
+                className="absolute bottom-8 w-full bg-gradient-to-t from-orange-300 to-yellow-200 transition-all duration-100 flex items-center justify-center"
+                style={{ height: `${alturaPiston}px` }}
+              >
+                <div className="text-center">
+                  <div className="text-xs font-bold text-gray-700">GAS</div>
+                  <div className="text-xs text-gray-600">{volumenActual.toFixed(2)} m³</div>
+                </div>
+              </div>
+
+              {/* Pistón */}
+              <div 
+                className="absolute w-full h-6 bg-gray-600 border-2 border-gray-800 rounded transition-all duration-100 flex items-center justify-center"
+                style={{ bottom: `${alturaPiston + 32}px` }}
+              >
+                <div className="w-2 h-4 bg-gray-400 rounded"></div>
+              </div>
+
+              {/* Paredes del cilindro */}
+              <div className="absolute bottom-8 left-0 w-2 bg-gray-500" style={{ height: `${300}px` }}></div>
+              <div className="absolute bottom-8 right-0 w-2 bg-gray-500" style={{ height: `${300}px` }}></div>
+            </div>
+
+            {/* Indicadores de calor */}
+            {proceso !== 'adiabatico' && simulando && (
+              <div className="absolute top-4 right-4">
+                <div className="flex items-center gap-2 bg-red-100 px-3 py-2 rounded-lg border border-red-300">
+                  <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
+                  <span className="text-sm font-semibold text-red-700">Calor</span>
+                </div>
+              </div>
+            )}
+
+            {proceso === 'adiabatico' && simulando && (
+              <div className="absolute top-4 right-4">
+                <div className="flex items-center gap-2 bg-blue-100 px-3 py-2 rounded-lg border border-blue-300">
+                  <span className="text-sm font-semibold text-blue-700">Sin intercambio de calor</span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Barra de progreso */}
+          {simulando && (
+            <div className="mt-4">
+              <div className="w-full bg-gray-200 rounded-full h-4">
+                <div 
+                  className="bg-blue-600 h-4 rounded-full transition-all duration-100"
+                  style={{ width: `${progreso}%` }}
+                ></div>
+              </div>
+              <p className="text-center text-sm text-gray-600 mt-2">Progreso: {progreso}%</p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Resultados */}
+      {resultados && (
+        <div className="bg-green-50 border border-green-200 rounded-lg p-6">
+          <h3 className="text-xl font-bold text-gray-800 mb-4">Resultados de la Simulación</h3>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+            <div className="bg-white p-4 rounded-lg border border-green-200">
+              <div className="text-sm text-gray-600 mb-1">Calor Transferido (Q)</div>
+              <div className="text-2xl font-bold text-blue-600">{resultados.Q} J</div>
+            </div>
+            <div className="bg-white p-4 rounded-lg border border-green-200">
+              <div className="text-sm text-gray-600 mb-1">Trabajo Realizado (W)</div>
+              <div className="text-2xl font-bold text-purple-600">{resultados.W} J</div>
+            </div>
+            <div className="bg-white p-4 rounded-lg border border-green-200">
+              <div className="text-sm text-gray-600 mb-1">Cambio Energía Interna (ΔU)</div>
+              <div className="text-2xl font-bold text-red-600">{resultados.deltaU} J</div>
+            </div>
+          </div>
+
+          <div className="bg-white p-4 rounded-lg border border-green-200 mb-4">
+            <div className="text-sm font-semibold text-gray-700 mb-2">Descripción del Proceso:</div>
+            <p className="text-gray-600">{resultados.descripcion}</p>
+          </div>
+
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+            <div className="text-sm font-semibold text-gray-800 mb-2">Verificación del Primer Principio:</div>
+            <div className="text-center text-lg font-mono">
+              <span className="text-red-600">ΔU</span> = 
+              <span className="text-blue-600"> Q</span> - 
+              <span className="text-purple-600"> W</span>
+            </div>
+            <div className="text-center text-lg font-mono mt-2">
+              <span className="text-red-600">{resultados.deltaU}</span> = 
+              <span className="text-blue-600"> {resultados.Q}</span> - 
+              <span className="text-purple-600"> {resultados.W}</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Información adicional */}
+      <div className="mt-6 bg-gray-50 border border-gray-200 rounded-lg p-6">
+        <h3 className="text-lg font-bold text-gray-800 mb-3">Información sobre los Procesos</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-700">
+          <div>
+            <strong className="text-blue-600">Isobárico:</strong> P = constante. El gas absorbe calor y se expande realizando trabajo.
+          </div>
+          <div>
+            <strong className="text-green-600">Isotérmico:</strong> T = constante. ΔU = 0, todo el calor se convierte en trabajo.
+          </div>
+          <div>
+            <strong className="text-red-600">Adiabático:</strong> Q = 0. No hay intercambio de calor, la energía interna cambia por trabajo.
+          </div>
+          <div>
+            <strong className="text-purple-600">Isócoro:</strong> V = constante. W = 0, todo el calor cambia la energía interna.
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+function SegundoPrincipioCalculator() {
+  const [calcType, setCalcType] = useState('maquina-termica');
+  const [inputs, setInputs] = useState({});
+  const [result, setResult] = useState(null);
+  const [findVariable, setFindVariable] = useState('eficiencia');
+
+  const calculateMaquinaTermica = () => {
+    const { Qh, Qc, W } = inputs;
+    
+    if (findVariable === 'eficiencia') {
+      // η = W/Qh = 1 - Qc/Qh
+      let eficiencia;
+      if (W && Qh) {
+        eficiencia = (parseFloat(W) / parseFloat(Qh)) * 100;
+      } else if (Qc && Qh) {
+        eficiencia = (1 - parseFloat(Qc) / parseFloat(Qh)) * 100;
+      }
+      setResult({ 
+        eficiencia: eficiencia.toFixed(2) + '%',
+        calorAbsorbido: parseFloat(Qh).toFixed(2),
+        nota: 'Una máquina real siempre tiene eficiencia < 100%'
+      });
+    } else if (findVariable === 'W') {
+      // W = Qh - Qc
+      const trabajo = parseFloat(Qh) - parseFloat(Qc);
+      const eficiencia = (trabajo / parseFloat(Qh)) * 100;
+      setResult({ 
+        trabajo: trabajo.toFixed(2),
+        eficiencia: eficiencia.toFixed(2) + '%',
+        calorAbsorbido: parseFloat(Qh).toFixed(2),
+        calorExpulsado: parseFloat(Qc).toFixed(2)
+      });
+    } else if (findVariable === 'Qh') {
+      // Qh = W + Qc
+      const calorAbsorbido = parseFloat(W) + parseFloat(Qc);
+      const eficiencia = (parseFloat(W) / calorAbsorbido) * 100;
+      setResult({ 
+        calorAbsorbido: calorAbsorbido.toFixed(2),
+        eficiencia: eficiencia.toFixed(2) + '%',
+        trabajo: parseFloat(W).toFixed(2)
+      });
+    } else if (findVariable === 'Qc') {
+      // Qc = Qh - W
+      const calorExpulsado = parseFloat(Qh) - parseFloat(W);
+      const eficiencia = (parseFloat(W) / parseFloat(Qh)) * 100;
+      setResult({ 
+        calorExpulsado: calorExpulsado.toFixed(2),
+        eficiencia: eficiencia.toFixed(2) + '%',
+        trabajo: parseFloat(W).toFixed(2)
+      });
+    }
+  };
+
+  const calculateRefrigerador = () => {
+    const { Qc, W, Qh } = inputs;
+    
+    if (findVariable === 'COP') {
+      // COP = Qc/W
+      const cop = parseFloat(Qc) / parseFloat(W);
+      setResult({ 
+        coeficienteRendimiento: cop.toFixed(2),
+        calorExtraido: parseFloat(Qc).toFixed(2),
+        trabajoRequerido: parseFloat(W).toFixed(2),
+        nota: 'COP > 1 es típico en refrigeradores reales'
+      });
+    } else if (findVariable === 'Qc-ref') {
+      // Qc = COP * W
+      const calorExtraido = parseFloat(inputs.COP) * parseFloat(W);
+      setResult({ 
+        calorExtraido: calorExtraido.toFixed(2),
+        trabajoRequerido: parseFloat(W).toFixed(2),
+        coeficienteRendimiento: parseFloat(inputs.COP).toFixed(2)
+      });
+    } else if (findVariable === 'W-ref') {
+      // W = Qc / COP
+      const trabajoRequerido = parseFloat(Qc) / parseFloat(inputs.COP);
+      setResult({ 
+        trabajoRequerido: trabajoRequerido.toFixed(2),
+        calorExtraido: parseFloat(Qc).toFixed(2),
+        coeficienteRendimiento: parseFloat(inputs.COP).toFixed(2)
+      });
+    } else if (findVariable === 'Qh-ref') {
+      // Qh = Qc + W
+      const calorExpulsado = parseFloat(Qc) + parseFloat(W);
+      const cop = parseFloat(Qc) / parseFloat(W);
+      setResult({ 
+        calorExpulsado: calorExpulsado.toFixed(2),
+        coeficienteRendimiento: cop.toFixed(2),
+        calorExtraido: parseFloat(Qc).toFixed(2)
+      });
+    }
+  };
+
+  const calculateCarnot = () => {
+    const { Th, Tc } = inputs;
+    
+    if (findVariable === 'eficiencia-carnot') {
+      // η_carnot = 1 - Tc/Th
+      const eficiencia = (1 - parseFloat(Tc) / parseFloat(Th)) * 100;
+      setResult({ 
+        eficienciaMaxima: eficiencia.toFixed(2) + '%',
+        temperaturaCaliente: parseFloat(Th).toFixed(2),
+        temperaturaFria: parseFloat(Tc).toFixed(2),
+        nota: 'Esta es la eficiencia máxima teórica posible',
+        advertencia: 'Ninguna máquina real puede alcanzar esta eficiencia'
+      });
+    } else if (findVariable === 'COP-carnot-ref') {
+      // COP_carnot = Tc / (Th - Tc)
+      const cop = parseFloat(Tc) / (parseFloat(Th) - parseFloat(Tc));
+      setResult({ 
+        copMaximo: cop.toFixed(2),
+        temperaturaCaliente: parseFloat(Th).toFixed(2),
+        temperaturaFria: parseFloat(Tc).toFixed(2),
+        nota: 'Este es el COP máximo teórico para un refrigerador'
+      });
+    } else if (findVariable === 'COP-carnot-bomb') {
+      // COP_carnot = Th / (Th - Tc)
+      const cop = parseFloat(Th) / (parseFloat(Th) - parseFloat(Tc));
+      setResult({ 
+        copMaximo: cop.toFixed(2),
+        temperaturaCaliente: parseFloat(Th).toFixed(2),
+        temperaturaFria: parseFloat(Tc).toFixed(2),
+        nota: 'Este es el COP máximo teórico para una bomba de calor'
+      });
+    } else if (findVariable === 'Tc-carnot') {
+      // Tc = Th * (1 - η)
+      const eficienciaDecimal = parseFloat(inputs.eficiencia) / 100;
+      const temperaturaFria = parseFloat(Th) * (1 - eficienciaDecimal);
+      setResult({ 
+        temperaturaFria: temperaturaFria.toFixed(2),
+        temperaturaCaliente: parseFloat(Th).toFixed(2),
+        eficiencia: parseFloat(inputs.eficiencia).toFixed(2) + '%'
+      });
+    } else if (findVariable === 'Th-carnot') {
+      // Th = Tc / (1 - η)
+      const eficienciaDecimal = parseFloat(inputs.eficiencia) / 100;
+      const temperaturaCaliente = parseFloat(Tc) / (1 - eficienciaDecimal);
+      setResult({ 
+        temperaturaCaliente: temperaturaCaliente.toFixed(2),
+        temperaturaFria: parseFloat(Tc).toFixed(2),
+        eficiencia: parseFloat(inputs.eficiencia).toFixed(2) + '%'
+      });
+    }
+  };
+
+  const calculateComparacion = () => {
+    const { Th, Tc, eficienciaReal } = inputs;
+    
+    const eficienciaCarnot = (1 - parseFloat(Tc) / parseFloat(Th)) * 100;
+    const eficienciaRealNum = parseFloat(eficienciaReal);
+    const diferencia = eficienciaCarnot - eficienciaRealNum;
+    const porcentajeIdeal = (eficienciaRealNum / eficienciaCarnot) * 100;
+    
+    let evaluacion;
+    if (eficienciaRealNum >= eficienciaCarnot) {
+      evaluacion = '¡IMPOSIBLE! Viola el segundo principio de la termodinámica';
+    } else if (porcentajeIdeal >= 80) {
+      evaluacion = 'Excelente: muy cercana al límite teórico';
+    } else if (porcentajeIdeal >= 60) {
+      evaluacion = 'Buena: eficiencia aceptable';
+    } else if (porcentajeIdeal >= 40) {
+      evaluacion = 'Regular: hay margen de mejora';
+    } else {
+      evaluacion = 'Baja: muy por debajo del ideal';
+    }
+
+    setResult({
+      eficienciaCarnot: eficienciaCarnot.toFixed(2) + '%',
+      eficienciaReal: eficienciaRealNum.toFixed(2) + '%',
+      diferencia: diferencia.toFixed(2) + '%',
+      porcentajeIdeal: porcentajeIdeal.toFixed(2) + '%',
+      evaluacion: evaluacion
+    });
+  };
+
+  const handleCalculate = () => {
+    if (calcType === 'maquina-termica') calculateMaquinaTermica();
+    else if (calcType === 'refrigerador') calculateRefrigerador();
+    else if (calcType === 'carnot') calculateCarnot();
+    else if (calcType === 'comparacion') calculateComparacion();
+  };
+
+  return (
+    <div className="p-8 max-w-4xl mx-auto">
+      <h2 className="text-3xl font-bold text-gray-800 mb-6">Calculadora - Segundo Principio de Termodinámica</h2>
+
+      <div className="bg-purple-50 border-l-4 border-purple-500 p-4 mb-6">
+        <p className="text-sm text-gray-700">
+          <strong>Segundo Principio:</strong> El calor fluye naturalmente de mayor a menor temperatura.
+          <br />
+          <strong>Enunciado de Kelvin-Planck:</strong> Es imposible construir una máquina térmica 100% eficiente.
+          <br />
+          <strong>Enunciado de Clausius:</strong> Es imposible transferir calor de un cuerpo frío a uno caliente sin trabajo externo.
+        </p>
+      </div>
+
+      <div className="mb-6">
+        <label className="block text-sm font-semibold text-gray-700 mb-2">Variable a encontrar</label>
+        <select
+          value={findVariable}
+          onChange={(e) => { setFindVariable(e.target.value); setInputs({}); setResult(null); }}
+          className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 mb-4"
+        >
+          {calcType === 'maquina-termica' && (
+            <>
+              <option value="eficiencia">Eficiencia (η)</option>
+              <option value="W">Trabajo neto (W)</option>
+              <option value="Qh">Calor absorbido (Qh)</option>
+              <option value="Qc">Calor expulsado (Qc)</option>
+            </>
+          )}
+          {calcType === 'refrigerador' && (
+            <>
+              <option value="COP">Coeficiente de rendimiento (COP)</option>
+              <option value="Qc-ref">Calor extraído (Qc)</option>
+              <option value="W-ref">Trabajo requerido (W)</option>
+              <option value="Qh-ref">Calor expulsado (Qh)</option>
+            </>
+          )}
+          {calcType === 'carnot' && (
+            <>
+              <option value="eficiencia-carnot">Eficiencia máxima de Carnot</option>
+              <option value="COP-carnot-ref">COP máximo (Refrigerador)</option>
+              <option value="COP-carnot-bomb">COP máximo (Bomba de calor)</option>
+              <option value="Tc-carnot">Temperatura fría (Tc)</option>
+              <option value="Th-carnot">Temperatura caliente (Th)</option>
+            </>
+          )}
+        </select>
+        
+        <label className="block text-sm font-semibold text-gray-700 mb-2">Tipo de Cálculo</label>
+        <select
+          value={calcType}
+          onChange={(e) => { 
+            setCalcType(e.target.value); 
+            setInputs({}); 
+            setResult(null); 
+            setFindVariable(
+              e.target.value === 'maquina-termica' ? 'eficiencia' : 
+              e.target.value === 'refrigerador' ? 'COP' : 
+              e.target.value === 'carnot' ? 'eficiencia-carnot' : 'comparacion'
+            ); 
+          }}
+          className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+        >
+          <option value="maquina-termica">Máquina Térmica</option>
+          <option value="refrigerador">Refrigerador / Bomba de Calor</option>
+          <option value="carnot">Ciclo de Carnot (Ideal)</option>
+          <option value="comparacion">Comparar con Carnot</option>
+        </select>
+      </div>
+
+      <div className="bg-white border border-gray-200 rounded-lg p-6 mb-6">
+        {calcType === 'maquina-termica' && (
+          <div className="space-y-4">
+            {findVariable !== 'Qh' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Calor absorbido de fuente caliente Qh (J)</label>
+                <input type="number" step="any" value={inputs.Qh || ''} onChange={(e) => setInputs({...inputs, Qh: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" placeholder="Calor de la fuente caliente" />
+              </div>
+            )}
+            {findVariable !== 'Qc' && findVariable !== 'eficiencia' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Calor expulsado a fuente fría Qc (J)</label>
+                <input type="number" step="any" value={inputs.Qc || ''} onChange={(e) => setInputs({...inputs, Qc: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" placeholder="Calor hacia la fuente fría" />
+              </div>
+            )}
+            {findVariable !== 'W' && findVariable === 'eficiencia' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Trabajo neto producido W (J)</label>
+                <input type="number" step="any" value={inputs.W || ''} onChange={(e) => setInputs({...inputs, W: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" placeholder="Trabajo útil" />
+              </div>
+            )}
+            {findVariable !== 'W' && findVariable !== 'eficiencia' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Trabajo neto producido W (J)</label>
+                <input type="number" step="any" value={inputs.W || ''} onChange={(e) => setInputs({...inputs, W: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" placeholder="Trabajo útil" />
+              </div>
+            )}
+            <div className="bg-blue-50 border border-blue-200 rounded p-3 text-sm text-gray-700">
+              <strong>Ecuaciones:</strong><br />
+              η = W/Qh = 1 - Qc/Qh<br />
+              W = Qh - Qc<br />
+              <strong>Nota:</strong> η siempre &lt; 100% en máquinas reales
+            </div>
+          </div>
+        )}
+
+        {calcType === 'refrigerador' && (
+          <div className="space-y-4">
+            {findVariable !== 'Qc-ref' && findVariable !== 'COP' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Calor extraído del espacio frío Qc (J)</label>
+                <input type="number" step="any" value={inputs.Qc || ''} onChange={(e) => setInputs({...inputs, Qc: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+              </div>
+            )}
+            {findVariable !== 'W-ref' && findVariable !== 'COP' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Trabajo suministrado W (J)</label>
+                <input type="number" step="any" value={inputs.W || ''} onChange={(e) => setInputs({...inputs, W: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+              </div>
+            )}
+            {findVariable === 'COP' && (
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Calor extraído Qc (J)</label>
+                  <input type="number" step="any" value={inputs.Qc || ''} onChange={(e) => setInputs({...inputs, Qc: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Trabajo suministrado W (J)</label>
+                  <input type="number" step="any" value={inputs.W || ''} onChange={(e) => setInputs({...inputs, W: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+                </div>
+              </>
+            )}
+            {(findVariable === 'Qc-ref' || findVariable === 'W-ref') && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Coeficiente de rendimiento COP</label>
+                <input type="number" step="any" value={inputs.COP || ''} onChange={(e) => setInputs({...inputs, COP: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" placeholder="Típicamente 2-6" />
+              </div>
+            )}
+            <div className="bg-green-50 border border-green-200 rounded p-3 text-sm text-gray-700">
+              <strong>Refrigerador:</strong> COP = Qc/W<br />
+              <strong>Bomba de calor:</strong> COP = Qh/W<br />
+              <strong>Nota:</strong> COP puede ser mayor que 1
+            </div>
+          </div>
+        )}
+
+        {calcType === 'carnot' && (
+          <div className="space-y-4">
+            {findVariable !== 'Th-carnot' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Temperatura de fuente caliente Th (K)</label>
+                <input type="number" step="any" value={inputs.Th || ''} onChange={(e) => setInputs({...inputs, Th: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" placeholder="En Kelvin" />
+              </div>
+            )}
+            {findVariable !== 'Tc-carnot' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Temperatura de fuente fría Tc (K)</label>
+                <input type="number" step="any" value={inputs.Tc || ''} onChange={(e) => setInputs({...inputs, Tc: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" placeholder="En Kelvin" />
+              </div>
+            )}
+            {(findVariable === 'Tc-carnot' || findVariable === 'Th-carnot') && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Eficiencia deseada (%)</label>
+                <input type="number" step="any" value={inputs.eficiencia || ''} onChange={(e) => setInputs({...inputs, eficiencia: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" placeholder="Entre 0 y 100" />
+              </div>
+            )}
+            <div className="bg-yellow-50 border border-yellow-200 rounded p-3 text-sm text-gray-700">
+              <strong>Ciclo de Carnot:</strong> Máximo rendimiento teórico<br />
+              η_carnot = 1 - Tc/Th<br />
+              <strong>Importante:</strong> Ninguna máquina real puede alcanzar esta eficiencia
+            </div>
+          </div>
+        )}
+
+        {calcType === 'comparacion' && (
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Temperatura fuente caliente Th (K)</label>
+              <input type="number" step="any" value={inputs.Th || ''} onChange={(e) => setInputs({...inputs, Th: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Temperatura fuente fría Tc (K)</label>
+              <input type="number" step="any" value={inputs.Tc || ''} onChange={(e) => setInputs({...inputs, Tc: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Eficiencia real de la máquina (%)</label>
+              <input type="number" step="any" value={inputs.eficienciaReal || ''} onChange={(e) => setInputs({...inputs, eficienciaReal: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" placeholder="Eficiencia medida" />
+            </div>
+            <div className="bg-red-50 border border-red-200 rounded p-3 text-sm text-gray-700">
+              <strong>Validación:</strong> Compara la eficiencia real con el límite de Carnot<br />
+              Si eficiencia real ≥ eficiencia de Carnot → IMPOSIBLE
+            </div>
+          </div>
+        )}
+
+        <button onClick={handleCalculate} className="mt-6 w-full bg-purple-600 text-white py-3 rounded-lg font-semibold hover:bg-purple-700 transition-colors">
+          Calcular
+        </button>
+      </div>
+
+      {result && (
+        <div className="bg-green-50 border border-green-200 rounded-lg p-6">
+          <h3 className="text-xl font-bold text-gray-800 mb-4">Resultados</h3>
+          <div className="space-y-2">
+            {Object.entries(result).map(([key, value]) => (
+              <div key={key} className={`flex justify-between items-center py-2 border-b border-green-100 ${key === 'evaluacion' && value.includes('IMPOSIBLE') ? 'bg-red-100' : ''}`}>
+                <span className="font-medium text-gray-700 capitalize">
+                  {key === 'eficiencia' ? 'Eficiencia (η)' :
+                   key === 'trabajo' ? 'Trabajo Neto (W)' :
+                   key === 'calorAbsorbido' ? 'Calor Absorbido (Qh)' :
+                   key === 'calorExpulsado' ? 'Calor Expulsado (Qc)' :
+                   key === 'calorExtraido' ? 'Calor Extraído (Qc)' :
+                   key === 'trabajoRequerido' ? 'Trabajo Requerido (W)' :
+                   key === 'coeficienteRendimiento' ? 'Coeficiente de Rendimiento (COP)' :
+                   key === 'eficienciaMaxima' ? 'Eficiencia Máxima (Carnot)' :
+                   key === 'copMaximo' ? 'COP Máximo (Carnot)' :
+                   key === 'temperaturaCaliente' ? 'Temperatura Caliente (Th)' :
+                   key === 'temperaturaFria' ? 'Temperatura Fría (Tc)' :
+                   key === 'eficienciaCarnot' ? 'Eficiencia de Carnot' :
+                   key === 'eficienciaReal' ? 'Eficiencia Real' :
+                   key === 'diferencia' ? 'Diferencia' :
+                   key === 'porcentajeIdeal' ? '% del Ideal de Carnot' :
+                   key === 'evaluacion' ? 'Evaluación' :
+                   key === 'nota' ? 'Nota' :
+                   key === 'advertencia' ? 'Advertencia' :
+                   key.replace(/([A-Z])/g, ' $1').trim()}:
+                </span>
+                <span className={`text-lg font-semibold ${key === 'evaluacion' && value.includes('IMPOSIBLE') ? 'text-red-600' : 'text-gray-900'}`}>
+                  {key === 'trabajo' || key === 'calorAbsorbido' || key === 'calorExpulsado' || key === 'calorExtraido' || key === 'trabajoRequerido' ? `${value} J` :
+                   key === 'temperaturaCaliente' || key === 'temperaturaFria' ? `${value} K` :
+                   value}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="mt-6 bg-gray-50 border border-gray-200 rounded-lg p-6">
+        <h3 className="text-lg font-bold text-gray-800 mb-3">Conceptos Clave</h3>
+        <div className="space-y-2 text-sm text-gray-700">
+          <p><strong>• Máquina Térmica:</strong> Convierte calor en trabajo. η = W/Qh. Siempre η &lt; 100%.</p>
+          <p><strong>• Refrigerador:</strong> Extrae calor del espacio frío. COP = Qc/W. Puede ser &gt; 1.</p>
+          <p><strong>• Ciclo de Carnot:</strong> Máximo rendimiento teórico. η_carnot = 1 - Tc/Th.</p>
+          <p><strong>• Kelvin-Planck:</strong> Imposible convertir todo el calor en trabajo (η = 100%).</p>
+          <p><strong>• Clausius:</strong> El calor no fluye espontáneamente de frío a caliente.</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+function SegundoPrincipioSimulacion() {
+  const [tipoMaquina, setTipoMaquina] = useState('termica');
+  const [parametros, setParametros] = useState({
+    Th: 500,
+    Tc: 300,
+    velocidad: 50
+  });
+  const [simulando, setSimulando] = useState(false);
+  const [cicloActual, setCicloActual] = useState(0);
+  const [etapaCiclo, setEtapaCiclo] = useState(0);
+  const [estadisticas, setEstadisticas] = useState({
+    totalCalorAbsorbido: 0,
+    totalTrabajo: 0,
+    totalCalorExpulsado: 0,
+    ciclosCompletados: 0
+  });
+
+  useEffect(() => {
+    if (simulando) {
+      const velocidadTimer = 2000 / parametros.velocidad;
+      const timer = setTimeout(() => {
+        setEtapaCiclo(prev => {
+          if (prev >= 3) {
+            setCicloActual(c => c + 1);
+            actualizarEstadisticas();
+            return 0;
+          }
+          return prev + 1;
+        });
+      }, velocidadTimer);
+      return () => clearTimeout(timer);
+    }
+  }, [simulando, etapaCiclo, parametros.velocidad]);
+
+  const actualizarEstadisticas = () => {
+    const eficienciaCarnot = 1 - parametros.Tc / parametros.Th;
+    const eficienciaReal = eficienciaCarnot * 0.7; // 70% de la eficiencia ideal
+    
+    if (tipoMaquina === 'termica') {
+      const Qh = 1000;
+      const W = Qh * eficienciaReal;
+      const Qc = Qh - W;
+      
+      setEstadisticas(prev => ({
+        totalCalorAbsorbido: prev.totalCalorAbsorbido + Qh,
+        totalTrabajo: prev.totalTrabajo + W,
+        totalCalorExpulsado: prev.totalCalorExpulsado + Qc,
+        ciclosCompletados: prev.ciclosCompletados + 1
+      }));
+    } else {
+      const W = 1000;
+      const COP = (parametros.Tc / (parametros.Th - parametros.Tc)) * 0.6;
+      const Qc = W * COP;
+      const Qh = W + Qc;
+      
+      setEstadisticas(prev => ({
+        totalCalorAbsorbido: prev.totalCalorAbsorbido + Qc,
+        totalTrabajo: prev.totalTrabajo + W,
+        totalCalorExpulsado: prev.totalCalorExpulsado + Qh,
+        ciclosCompletados: prev.ciclosCompletados + 1
+      }));
+    }
+  };
+
+  const iniciarSimulacion = () => {
+    setSimulando(true);
+    setEtapaCiclo(0);
+    setCicloActual(0);
+  };
+
+  const pausarSimulacion = () => {
+    setSimulando(false);
+  };
+
+  const resetSimulacion = () => {
+    setSimulando(false);
+    setEtapaCiclo(0);
+    setCicloActual(0);
+    setEstadisticas({
+      totalCalorAbsorbido: 0,
+      totalTrabajo: 0,
+      totalCalorExpulsado: 0,
+      ciclosCompletados: 0
+    });
+  };
+
+  const eficienciaCarnot = ((1 - parametros.Tc / parametros.Th) * 100).toFixed(1);
+  const eficienciaReal = (eficienciaCarnot * 0.7).toFixed(1);
+  const copCarnot = (parametros.Tc / (parametros.Th - parametros.Tc)).toFixed(2);
+  const copReal = (copCarnot * 0.6).toFixed(2);
+
+  const etapasTermica = [
+    { nombre: 'Absorción de Calor (Qh)', color: 'bg-red-400', descripcion: 'El sistema absorbe calor de la fuente caliente' },
+    { nombre: 'Conversión en Trabajo (W)', color: 'bg-green-400', descripcion: 'Parte del calor se convierte en trabajo útil' },
+    { nombre: 'Expulsión de Calor (Qc)', color: 'bg-blue-400', descripcion: 'El calor restante se expulsa a la fuente fría' },
+    { nombre: 'Ciclo Completo', color: 'bg-purple-400', descripcion: 'El sistema vuelve al estado inicial' }
+  ];
+
+  const etapasRefrigerador = [
+    { nombre: 'Extracción de Calor (Qc)', color: 'bg-blue-400', descripcion: 'Se extrae calor del espacio frío' },
+    { nombre: 'Suministro de Trabajo (W)', color: 'bg-green-400', descripcion: 'Se aplica trabajo al sistema' },
+    { nombre: 'Expulsión de Calor (Qh)', color: 'bg-red-400', descripcion: 'Se expulsa calor a la fuente caliente' },
+    { nombre: 'Ciclo Completo', color: 'bg-purple-400', descripcion: 'El sistema vuelve al estado inicial' }
+  ];
+
+  const etapasActuales = tipoMaquina === 'termica' ? etapasTermica : etapasRefrigerador;
+
+  return (
+    <div className="p-8 max-w-6xl mx-auto">
+      <h2 className="text-3xl font-bold text-gray-800 mb-6">Simulación del Segundo Principio de la Termodinámica</h2>
+
+      <div className="bg-purple-50 border-l-4 border-purple-500 p-4 mb-6">
+        <p className="text-sm text-gray-700">
+          <strong>Observe cómo:</strong> Las máquinas térmicas nunca alcanzan 100% de eficiencia y los refrigeradores 
+          requieren trabajo para transferir calor contra su flujo natural.
+          <br />
+          <strong>Límite de Carnot:</strong> Representa la máxima eficiencia teórica posible.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        {/* Panel de Control */}
+        <div className="bg-white border border-gray-200 rounded-lg p-6">
+          <h3 className="text-xl font-bold text-gray-800 mb-4">Panel de Control</h3>
+          
+          <div className="mb-4">
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Tipo de Máquina</label>
+            <select
+              value={tipoMaquina}
+              onChange={(e) => { setTipoMaquina(e.target.value); resetSimulacion(); }}
+              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+              disabled={simulando}
+            >
+              <option value="termica">Máquina Térmica (Motor)</option>
+              <option value="refrigerador">Refrigerador</option>
+            </select>
+          </div>
+
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Temperatura Fuente Caliente (Th): {parametros.Th} K
+            </label>
+            <input
+              type="range"
+              min="400"
+              max="800"
+              step="10"
+              value={parametros.Th}
+              onChange={(e) => setParametros({...parametros, Th: parseFloat(e.target.value)})}
+              className="w-full"
+              disabled={simulando}
+            />
+          </div>
+
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Temperatura Fuente Fría (Tc): {parametros.Tc} K
+            </label>
+            <input
+              type="range"
+              min="200"
+              max="400"
+              step="10"
+              value={parametros.Tc}
+              onChange={(e) => setParametros({...parametros, Tc: parseFloat(e.target.value)})}
+              className="w-full"
+              disabled={simulando}
+            />
+          </div>
+
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Velocidad de Simulación: {parametros.velocidad}%
+            </label>
+            <input
+              type="range"
+              min="10"
+              max="100"
+              step="10"
+              value={parametros.velocidad}
+              onChange={(e) => setParametros({...parametros, velocidad: parseFloat(e.target.value)})}
+              className="w-full"
+            />
+          </div>
+
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4 text-sm">
+            {tipoMaquina === 'termica' ? (
+              <>
+                <div className="font-semibold text-gray-800 mb-1">Eficiencia de Carnot (Máxima teórica):</div>
+                <div className="text-2xl font-bold text-blue-600">{eficienciaCarnot}%</div>
+                <div className="font-semibold text-gray-800 mt-2 mb-1">Eficiencia Real (≈70% de Carnot):</div>
+                <div className="text-2xl font-bold text-green-600">{eficienciaReal}%</div>
+              </>
+            ) : (
+              <>
+                <div className="font-semibold text-gray-800 mb-1">COP de Carnot (Máximo teórico):</div>
+                <div className="text-2xl font-bold text-blue-600">{copCarnot}</div>
+                <div className="font-semibold text-gray-800 mt-2 mb-1">COP Real (≈60% de Carnot):</div>
+                <div className="text-2xl font-bold text-green-600">{copReal}</div>
+              </>
+            )}
+          </div>
+
+          <div className="flex gap-2">
+            <button
+              onClick={simulando ? pausarSimulacion : iniciarSimulacion}
+              className={`flex-1 py-3 rounded-lg font-semibold transition-colors ${
+                simulando 
+                  ? 'bg-yellow-600 text-white hover:bg-yellow-700' 
+                  : 'bg-purple-600 text-white hover:bg-purple-700'
+              }`}
+            >
+              {simulando ? 'Pausar' : 'Iniciar Simulación'}
+            </button>
+
+            <button
+              onClick={resetSimulacion}
+              className="px-6 py-3 bg-gray-600 text-white rounded-lg font-semibold hover:bg-gray-700 transition-colors"
+            >
+              Reset
+            </button>
+          </div>
+        </div>
+
+        {/* Visualización de la Máquina */}
+        <div className="bg-white border border-gray-200 rounded-lg p-6">
+          <h3 className="text-xl font-bold text-gray-800 mb-4">
+            {tipoMaquina === 'termica' ? 'Máquina Térmica' : 'Refrigerador'}
+          </h3>
+          
+          <div className="relative h-96 bg-gradient-to-b from-gray-50 to-gray-100 rounded-lg p-4">
+            {/* Fuente Caliente */}
+            <div className="absolute top-4 left-1/2 transform -translate-x-1/2 w-32 h-20 bg-gradient-to-b from-red-500 to-red-400 rounded-lg flex items-center justify-center border-4 border-red-600 shadow-lg">
+              <div className="text-center text-white">
+                <div className="text-xs font-bold">Fuente Caliente</div>
+                <div className="text-lg font-bold">{parametros.Th} K</div>
+              </div>
+            </div>
+
+            {/* Flecha Qh */}
+            {(etapaCiclo === 0 || (tipoMaquina === 'refrigerador' && etapaCiclo === 2)) && (
+              <div className={`absolute top-28 left-1/2 transform -translate-x-1/2 flex flex-col items-center ${simulando ? 'animate-pulse' : ''}`}>
+                <div className="text-xs font-bold text-red-600">
+                  {tipoMaquina === 'termica' ? 'Qh (absorbe)' : 'Qh (expulsa)'}
+                </div>
+                <div className="text-2xl text-red-600">
+                  {tipoMaquina === 'termica' ? '↓' : '↑'}
+                </div>
+              </div>
+            )}
+
+            {/* Máquina Central */}
+            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-40 h-32 bg-gradient-to-br from-gray-700 to-gray-600 rounded-xl flex items-center justify-center border-4 border-gray-800 shadow-xl">
+              <div className="text-center text-white">
+                <div className="text-sm font-bold mb-1">
+                  {tipoMaquina === 'termica' ? 'MOTOR' : 'COMPRESOR'}
+                </div>
+                <div className="text-xs bg-gray-800 rounded px-2 py-1">
+                  Ciclo {cicloActual}
+                </div>
+                <div className={`mt-2 w-8 h-8 mx-auto rounded-full ${etapasActuales[etapaCiclo].color} ${simulando ? 'animate-spin' : ''}`}></div>
+              </div>
+            </div>
+
+            {/* Flecha Trabajo */}
+            {etapaCiclo === 1 && (
+              <div className={`absolute top-1/2 ${tipoMaquina === 'termica' ? 'right-4' : 'left-4'} transform -translate-y-1/2 flex ${tipoMaquina === 'termica' ? 'flex-row' : 'flex-row-reverse'} items-center ${simulando ? 'animate-pulse' : ''}`}>
+                <div className="text-2xl text-green-600">
+                  {tipoMaquina === 'termica' ? '→' : '←'}
+                </div>
+                <div className="text-xs font-bold text-green-600 ml-1">
+                  W {tipoMaquina === 'termica' ? '(sale)' : '(entra)'}
+                </div>
+              </div>
+            )}
+
+            {/* Flecha Qc */}
+            {(etapaCiclo === 2 || (tipoMaquina === 'refrigerador' && etapaCiclo === 0)) && (
+              <div className={`absolute bottom-28 left-1/2 transform -translate-x-1/2 flex flex-col items-center ${simulando ? 'animate-pulse' : ''}`}>
+                <div className="text-2xl text-blue-600">
+                  {tipoMaquina === 'termica' ? '↓' : '↑'}
+                </div>
+                <div className="text-xs font-bold text-blue-600">
+                  {tipoMaquina === 'termica' ? 'Qc (expulsa)' : 'Qc (extrae)'}
+                </div>
+              </div>
+            )}
+
+            {/* Fuente Fría */}
+            <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 w-32 h-20 bg-gradient-to-b from-blue-400 to-blue-500 rounded-lg flex items-center justify-center border-4 border-blue-600 shadow-lg">
+              <div className="text-center text-white">
+                <div className="text-xs font-bold">Fuente Fría</div>
+                <div className="text-lg font-bold">{parametros.Tc} K</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Indicador de Etapa */}
+          <div className="mt-4 bg-gray-50 rounded-lg p-3 border border-gray-200">
+            <div className="text-sm font-semibold text-gray-700 mb-2">Etapa Actual:</div>
+            <div className={`${etapasActuales[etapaCiclo].color} text-gray-800 font-bold py-2 px-3 rounded`}>
+              {etapasActuales[etapaCiclo].nombre}
+            </div>
+            <div className="text-xs text-gray-600 mt-1">
+              {etapasActuales[etapaCiclo].descripcion}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Estadísticas */}
+      {estadisticas.ciclosCompletados > 0 && (
+        <div className="bg-white border border-gray-200 rounded-lg p-6 mb-6">
+          <h3 className="text-xl font-bold text-gray-800 mb-4">Estadísticas Acumuladas</h3>
+          
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+            <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+              <div className="text-sm text-gray-600 mb-1">Ciclos Completados</div>
+              <div className="text-2xl font-bold text-blue-600">{estadisticas.ciclosCompletados}</div>
+            </div>
+            <div className="bg-red-50 p-4 rounded-lg border border-red-200">
+              <div className="text-sm text-gray-600 mb-1">
+                {tipoMaquina === 'termica' ? 'Calor Absorbido' : 'Calor Extraído'}
+              </div>
+              <div className="text-2xl font-bold text-red-600">
+                {(estadisticas.totalCalorAbsorbido / 1000).toFixed(1)} kJ
+              </div>
+            </div>
+            <div className="bg-green-50 p-4 rounded-lg border border-green-200">
+              <div className="text-sm text-gray-600 mb-1">
+                {tipoMaquina === 'termica' ? 'Trabajo Producido' : 'Trabajo Consumido'}
+              </div>
+              <div className="text-2xl font-bold text-green-600">
+                {(estadisticas.totalTrabajo / 1000).toFixed(1)} kJ
+              </div>
+            </div>
+            <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
+              <div className="text-sm text-gray-600 mb-1">
+                {tipoMaquina === 'termica' ? 'Eficiencia Real' : 'COP Real'}
+              </div>
+              <div className="text-2xl font-bold text-purple-600">
+                {tipoMaquina === 'termica' 
+                  ? ((estadisticas.totalTrabajo / estadisticas.totalCalorAbsorbido) * 100).toFixed(1) + '%'
+                  : (estadisticas.totalCalorAbsorbido / estadisticas.totalTrabajo).toFixed(2)
+                }
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+            <div className="text-sm font-semibold text-gray-800 mb-2">Verificación del Balance Energético:</div>
+            {tipoMaquina === 'termica' ? (
+              <div className="text-center font-mono text-sm">
+                <span className="text-red-600">Qh</span> = 
+                <span className="text-green-600"> W</span> + 
+                <span className="text-blue-600"> Qc</span>
+                <br />
+                <span className="text-red-600">{(estadisticas.totalCalorAbsorbido / 1000).toFixed(1)} kJ</span> = 
+                <span className="text-green-600"> {(estadisticas.totalTrabajo / 1000).toFixed(1)} kJ</span> + 
+                <span className="text-blue-600"> {(estadisticas.totalCalorExpulsado / 1000).toFixed(1)} kJ</span>
+              </div>
+            ) : (
+              <div className="text-center font-mono text-sm">
+                <span className="text-red-600">Qh</span> = 
+                <span className="text-blue-600"> Qc</span> + 
+                <span className="text-green-600"> W</span>
+                <br />
+                <span className="text-red-600">{(estadisticas.totalCalorExpulsado / 1000).toFixed(1)} kJ</span> = 
+                <span className="text-blue-600"> {(estadisticas.totalCalorAbsorbido / 1000).toFixed(1)} kJ</span> + 
+                <span className="text-green-600"> {(estadisticas.totalTrabajo / 1000).toFixed(1)} kJ</span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Información Educativa */}
+      <div className="bg-gray-50 border border-gray-200 rounded-lg p-6">
+        <h3 className="text-lg font-bold text-gray-800 mb-3">Conceptos del Segundo Principio</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-700">
+          <div className="bg-white p-4 rounded-lg border border-gray-300">
+            <strong className="text-purple-600">Enunciado de Kelvin-Planck:</strong>
+            <p className="mt-2">Es imposible construir una máquina térmica que convierta todo el calor en trabajo (η = 100%). Siempre se debe expulsar calor a la fuente fría.</p>
+          </div>
+          <div className="bg-white p-4 rounded-lg border border-gray-300">
+            <strong className="text-blue-600">Enunciado de Clausius:</strong>
+            <p className="mt-2">El calor no fluye espontáneamente de un cuerpo frío a uno caliente. Los refrigeradores necesitan trabajo externo para lograrlo.</p>
+          </div>
+          <div className="bg-white p-4 rounded-lg border border-gray-300">
+            <strong className="text-red-600">Límite de Carnot:</strong>
+            <p className="mt-2">η_carnot = 1 - Tc/Th representa la máxima eficiencia posible. Ninguna máquina real puede alcanzarla debido a irreversibilidades.</p>
+          </div>
+          <div className="bg-white p-4 rounded-lg border border-gray-300">
+            <strong className="text-green-600">Dirección Natural:</strong>
+            <p className="mt-2">Los procesos naturales tienen dirección preferida: el calor fluye de caliente a frío, nunca al revés sin trabajo externo.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+function EntropiaMotoresCalculator() {
+  const [calcType, setCalcType] = useState('entropia-basica');
+  const [inputs, setInputs] = useState({});
+  const [result, setResult] = useState(null);
+  const [findVariable, setFindVariable] = useState('deltaS');
+
+  const calculateEntropiaBasica = () => {
+    const { Q, T, m, c, T1, T2 } = inputs;
+    
+    if (findVariable === 'deltaS') {
+      // ΔS = Q/T (proceso isotérmico reversible)
+      const deltaS = parseFloat(Q) / parseFloat(T);
+      setResult({ 
+        variacionEntropia: deltaS.toFixed(4),
+        calor: parseFloat(Q).toFixed(2),
+        temperatura: parseFloat(T).toFixed(2),
+        interpretacion: deltaS > 0 ? 'El desorden del sistema aumenta' : 'El desorden del sistema disminuye'
+      });
+    } else if (findVariable === 'deltaS-temp') {
+      // ΔS = m*c*ln(T2/T1) (proceso a presión constante)
+      const deltaS = parseFloat(m) * parseFloat(c) * Math.log(parseFloat(T2) / parseFloat(T1));
+      setResult({ 
+        variacionEntropia: deltaS.toFixed(4),
+        masa: parseFloat(m).toFixed(2),
+        capacidadCalorica: parseFloat(c).toFixed(2),
+        temperaturaInicial: parseFloat(T1).toFixed(2),
+        temperaturaFinal: parseFloat(T2).toFixed(2),
+        interpretacion: deltaS > 0 ? 'La entropía aumenta (calentamiento)' : 'La entropía disminuye (enfriamiento)'
+      });
+    } else if (findVariable === 'Q-entropia') {
+      // Q = T * ΔS
+      const calor = parseFloat(T) * parseFloat(inputs.deltaS);
+      setResult({ 
+        calor: calor.toFixed(2),
+        temperatura: parseFloat(T).toFixed(2),
+        variacionEntropia: parseFloat(inputs.deltaS).toFixed(4)
+      });
+    }
+  };
+
+  const calculateEntropiaCarnot = () => {
+    const { Qh, Qc, Th, Tc } = inputs;
+    
+    // En ciclo de Carnot: ΔS_total = 0 (reversible)
+    const deltaSh = -parseFloat(Qh) / parseFloat(Th); // Sale de fuente caliente
+    const deltaSc = parseFloat(Qc) / parseFloat(Tc);   // Entra a fuente fría
+    const deltaStotal = deltaSh + deltaSc;
+    
+    setResult({
+      entropiaFuenteCaliente: deltaSh.toFixed(4),
+      entropiaFuenteFria: deltaSc.toFixed(4),
+      entropiaTotal: deltaStotal.toFixed(6),
+      nota: 'En ciclo de Carnot reversible: ΔS_total = 0',
+      interpretacion: Math.abs(deltaStotal) < 0.001 
+        ? 'Proceso reversible ideal' 
+        : 'Hay irreversibilidades (ΔS_total > 0)'
+    });
+  };
+
+  const calculateIrreversibilidad = () => {
+    const { Qh, Th, Qc, Tc, T0 } = inputs;
+    
+    // Entropía generada por irreversibilidades
+    const Sgen = parseFloat(Qc) / parseFloat(Tc) - parseFloat(Qh) / parseFloat(Th);
+    const exergiaDestruida = parseFloat(T0) * Sgen;
+    const eficienciaIdeal = (1 - parseFloat(Tc) / parseFloat(Th)) * 100;
+    const eficienciaReal = ((parseFloat(Qh) - parseFloat(Qc)) / parseFloat(Qh)) * 100;
+    const perdidaPorIrreversibilidad = eficienciaIdeal - eficienciaReal;
+    
+    setResult({
+      entropiaGenerada: Sgen.toFixed(4),
+      exergiaDestruida: exergiaDestruida.toFixed(2),
+      eficienciaIdeal: eficienciaIdeal.toFixed(2) + '%',
+      eficienciaReal: eficienciaReal.toFixed(2) + '%',
+      perdidaEficiencia: perdidaPorIrreversibilidad.toFixed(2) + '%',
+      nota: Sgen > 0 ? 'Proceso irreversible (real)' : 'Proceso reversible (ideal)'
+    });
+  };
+
+  const calculateMotorOtto = () => {
+    const { r, gamma } = inputs;
+    
+    // Eficiencia del ciclo Otto: η = 1 - 1/r^(γ-1)
+    const eficiencia = (1 - 1 / Math.pow(parseFloat(r), parseFloat(gamma) - 1)) * 100;
+    const relacionCompresion = parseFloat(r);
+    
+    setResult({
+      eficienciaOtto: eficiencia.toFixed(2) + '%',
+      relacionCompresion: relacionCompresion.toFixed(2),
+      gamma: parseFloat(gamma).toFixed(2),
+      tipoMotor: 'Ciclo Otto (gasolina)',
+      nota: 'Mayor relación de compresión → mayor eficiencia',
+      comparacionCarnot: 'Menor que Carnot debido a irreversibilidades'
+    });
+  };
+
+  const calculateMotorDiesel = () => {
+    const { r, rc, gamma } = inputs;
+    
+    // Eficiencia del ciclo Diesel: η = 1 - (1/r^(γ-1)) * [(rc^γ - 1)/(γ(rc - 1))]
+    const term1 = 1 / Math.pow(parseFloat(r), parseFloat(gamma) - 1);
+    const term2 = (Math.pow(parseFloat(rc), parseFloat(gamma)) - 1) / (parseFloat(gamma) * (parseFloat(rc) - 1));
+    const eficiencia = (1 - term1 * term2) * 100;
+    
+    setResult({
+      eficienciaDiesel: eficiencia.toFixed(2) + '%',
+      relacionCompresion: parseFloat(r).toFixed(2),
+      relacionCorte: parseFloat(rc).toFixed(2),
+      gamma: parseFloat(gamma).toFixed(2),
+      tipoMotor: 'Ciclo Diesel',
+      nota: 'Diesel tiene mayor relación de compresión que Otto',
+      ventaja: 'Mayor eficiencia y menor consumo de combustible'
+    });
+  };
+
+  const calculateComparacionMotores = () => {
+    const { Th, Tc, rOtto, rDiesel, rc, gamma } = inputs;
+    
+    // Carnot
+    const eficienciaCarnot = (1 - parseFloat(Tc) / parseFloat(Th)) * 100;
+    
+    // Otto
+    const eficienciaOtto = (1 - 1 / Math.pow(parseFloat(rOtto), parseFloat(gamma) - 1)) * 100;
+    
+    // Diesel
+    const term1 = 1 / Math.pow(parseFloat(rDiesel), parseFloat(gamma) - 1);
+    const term2 = (Math.pow(parseFloat(rc), parseFloat(gamma)) - 1) / (parseFloat(gamma) * (parseFloat(rc) - 1));
+    const eficienciaDiesel = (1 - term1 * term2) * 100;
+    
+    // Comparaciones
+    const perdidaOtto = eficienciaCarnot - eficienciaOtto;
+    const perdidaDiesel = eficienciaCarnot - eficienciaDiesel;
+    
+    setResult({
+      eficienciaCarnot: eficienciaCarnot.toFixed(2) + '%',
+      eficienciaOtto: eficienciaOtto.toFixed(2) + '%',
+      eficienciaDiesel: eficienciaDiesel.toFixed(2) + '%',
+      perdidaOtto: perdidaOtto.toFixed(2) + '%',
+      perdidaDiesel: perdidaDiesel.toFixed(2) + '%',
+      mejorMotor: eficienciaDiesel > eficienciaOtto ? 'Diesel' : 'Otto',
+      ranking: 'Carnot > Diesel > Otto (típicamente)'
+    });
+  };
+
+  const handleCalculate = () => {
+    if (calcType === 'entropia-basica') calculateEntropiaBasica();
+    else if (calcType === 'entropia-carnot') calculateEntropiaCarnot();
+    else if (calcType === 'irreversibilidad') calculateIrreversibilidad();
+    else if (calcType === 'motor-otto') calculateMotorOtto();
+    else if (calcType === 'motor-diesel') calculateMotorDiesel();
+    else if (calcType === 'comparacion-motores') calculateComparacionMotores();
+  };
+
+  return (
+    <div className="p-8 max-w-4xl mx-auto">
+      <h2 className="text-3xl font-bold text-gray-800 mb-6">Calculadora - Entropía y Eficiencia de Motores</h2>
+
+      <div className="bg-indigo-50 border-l-4 border-indigo-500 p-4 mb-6">
+        <p className="text-sm text-gray-700">
+          <strong>Entropía (S):</strong> Medida del desorden molecular y de la irreversibilidad de los procesos.
+          <br />
+          <strong>Segunda Ley:</strong> En procesos irreversibles, ΔS_universo &gt; 0. En procesos reversibles, ΔS_universo = 0.
+          <br />
+          <strong>Motores Reales:</strong> La irreversibilidad siempre reduce la eficiencia por debajo del límite de Carnot.
+        </p>
+      </div>
+
+      <div className="mb-6">
+        <label className="block text-sm font-semibold text-gray-700 mb-2">Variable a encontrar</label>
+        <select
+          value={findVariable}
+          onChange={(e) => { setFindVariable(e.target.value); setInputs({}); setResult(null); }}
+          className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 mb-4"
+        >
+          {calcType === 'entropia-basica' && (
+            <>
+              <option value="deltaS">Variación de entropía (ΔS)</option>
+              <option value="deltaS-temp">ΔS con cambio de temperatura</option>
+              <option value="Q-entropia">Calor a partir de ΔS</option>
+            </>
+          )}
+          {calcType === 'entropia-carnot' && (
+            <option value="entropia-carnot">Entropía en ciclo de Carnot</option>
+          )}
+          {calcType === 'irreversibilidad' && (
+            <option value="irreversibilidad">Análisis de irreversibilidad</option>
+          )}
+          {calcType === 'motor-otto' && (
+            <option value="otto">Eficiencia ciclo Otto</option>
+          )}
+          {calcType === 'motor-diesel' && (
+            <option value="diesel">Eficiencia ciclo Diesel</option>
+          )}
+          {calcType === 'comparacion-motores' && (
+            <option value="comparacion">Comparación de motores</option>
+          )}
+        </select>
+        
+        <label className="block text-sm font-semibold text-gray-700 mb-2">Tipo de Cálculo</label>
+        <select
+          value={calcType}
+          onChange={(e) => { 
+            setCalcType(e.target.value); 
+            setInputs({}); 
+            setResult(null); 
+            setFindVariable(
+              e.target.value === 'entropia-basica' ? 'deltaS' :
+              e.target.value === 'entropia-carnot' ? 'entropia-carnot' :
+              e.target.value === 'irreversibilidad' ? 'irreversibilidad' :
+              e.target.value === 'motor-otto' ? 'otto' :
+              e.target.value === 'motor-diesel' ? 'diesel' : 'comparacion'
+            ); 
+          }}
+          className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+        >
+          <option value="entropia-basica">Cálculo Básico de Entropía</option>
+          <option value="entropia-carnot">Entropía en Ciclo de Carnot</option>
+          <option value="irreversibilidad">Irreversibilidad y Exergía</option>
+          <option value="motor-otto">Motor Otto (Gasolina)</option>
+          <option value="motor-diesel">Motor Diesel</option>
+          <option value="comparacion-motores">Comparación de Motores</option>
+        </select>
+      </div>
+
+      <div className="bg-white border border-gray-200 rounded-lg p-6 mb-6">
+        {calcType === 'entropia-basica' && (
+          <div className="space-y-4">
+            {findVariable === 'deltaS' && (
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Calor transferido Q (J)</label>
+                  <input type="number" step="any" value={inputs.Q || ''} onChange={(e) => setInputs({...inputs, Q: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" placeholder="Positivo si entra al sistema" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Temperatura T (K)</label>
+                  <input type="number" step="any" value={inputs.T || ''} onChange={(e) => setInputs({...inputs, T: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" placeholder="Proceso isotérmico" />
+                </div>
+              </>
+            )}
+            {findVariable === 'deltaS-temp' && (
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Masa m (kg)</label>
+                  <input type="number" step="any" value={inputs.m || ''} onChange={(e) => setInputs({...inputs, m: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Capacidad calorífica específica c (J/kg·K)</label>
+                  <input type="number" step="any" value={inputs.c || ''} onChange={(e) => setInputs({...inputs, c: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" placeholder="Agua: 4186, Aire: 1005" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Temperatura inicial T₁ (K)</label>
+                  <input type="number" step="any" value={inputs.T1 || ''} onChange={(e) => setInputs({...inputs, T1: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Temperatura final T₂ (K)</label>
+                  <input type="number" step="any" value={inputs.T2 || ''} onChange={(e) => setInputs({...inputs, T2: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+                </div>
+              </>
+            )}
+            {findVariable === 'Q-entropia' && (
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Variación de entropía ΔS (J/K)</label>
+                  <input type="number" step="any" value={inputs.deltaS || ''} onChange={(e) => setInputs({...inputs, deltaS: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Temperatura T (K)</label>
+                  <input type="number" step="any" value={inputs.T || ''} onChange={(e) => setInputs({...inputs, T: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+                </div>
+              </>
+            )}
+            <div className="bg-blue-50 border border-blue-200 rounded p-3 text-sm text-gray-700">
+              <strong>Ecuaciones:</strong><br />
+              • Proceso isotérmico: ΔS = Q/T<br />
+              • Cambio de temperatura: ΔS = m·c·ln(T₂/T₁)<br />
+              <strong>Interpretación:</strong> ΔS &gt; 0 aumenta desorden, ΔS &lt; 0 disminuye desorden
+            </div>
+          </div>
+        )}
+
+        {calcType === 'entropia-carnot' && (
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Calor de fuente caliente Qh (J)</label>
+              <input type="number" step="any" value={inputs.Qh || ''} onChange={(e) => setInputs({...inputs, Qh: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Calor a fuente fría Qc (J)</label>
+              <input type="number" step="any" value={inputs.Qc || ''} onChange={(e) => setInputs({...inputs, Qc: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Temperatura fuente caliente Th (K)</label>
+              <input type="number" step="any" value={inputs.Th || ''} onChange={(e) => setInputs({...inputs, Th: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Temperatura fuente fría Tc (K)</label>
+              <input type="number" step="any" value={inputs.Tc || ''} onChange={(e) => setInputs({...inputs, Tc: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+            </div>
+            <div className="bg-green-50 border border-green-200 rounded p-3 text-sm text-gray-700">
+              <strong>Ciclo de Carnot reversible:</strong><br />
+              ΔS_total = ΔS_caliente + ΔS_fría = -Qh/Th + Qc/Tc = 0<br />
+              Si ΔS_total &gt; 0 → Proceso irreversible
+            </div>
+          </div>
+        )}
+
+        {calcType === 'irreversibilidad' && (
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Calor absorbido Qh (J)</label>
+              <input type="number" step="any" value={inputs.Qh || ''} onChange={(e) => setInputs({...inputs, Qh: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Temperatura Th (K)</label>
+              <input type="number" step="any" value={inputs.Th || ''} onChange={(e) => setInputs({...inputs, Th: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Calor expulsado Qc (J)</label>
+              <input type="number" step="any" value={inputs.Qc || ''} onChange={(e) => setInputs({...inputs, Qc: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Temperatura Tc (K)</label>
+              <input type="number" step="any" value={inputs.Tc || ''} onChange={(e) => setInputs({...inputs, Tc: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Temperatura ambiente T₀ (K)</label>
+              <input type="number" step="any" value={inputs.T0 || ''} onChange={(e) => setInputs({...inputs, T0: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" placeholder="Típicamente 298 K" />
+            </div>
+            <div className="bg-yellow-50 border border-yellow-200 rounded p-3 text-sm text-gray-700">
+              <strong>Irreversibilidad:</strong><br />
+              S_gen = Qc/Tc - Qh/Th<br />
+              Exergía destruida = T₀ · S_gen<br />
+              Mayor irreversibilidad → menor eficiencia
+            </div>
+          </div>
+        )}
+
+        {calcType === 'motor-otto' && (
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Relación de compresión r = V₁/V₂</label>
+              <input type="number" step="any" value={inputs.r || ''} onChange={(e) => setInputs({...inputs, r: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" placeholder="Típico: 8-12 para gasolina" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Coeficiente adiabático γ (Cp/Cv)</label>
+              <input type="number" step="any" value={inputs.gamma || ''} onChange={(e) => setInputs({...inputs, gamma: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" placeholder="Aire: 1.4" />
+            </div>
+            <div className="bg-red-50 border border-red-200 rounded p-3 text-sm text-gray-700">
+              <strong>Ciclo Otto (motor de gasolina):</strong><br />
+              η = 1 - 1/r^(γ-1)<br />
+              4 etapas: Admisión → Compresión → Explosión → Escape<br />
+              Mayor r → Mayor eficiencia
+            </div>
+          </div>
+        )}
+
+        {calcType === 'motor-diesel' && (
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Relación de compresión r = V₁/V₂</label>
+              <input type="number" step="any" value={inputs.r || ''} onChange={(e) => setInputs({...inputs, r: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" placeholder="Típico: 14-25 para diesel" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Relación de corte rc = V₃/V₂</label>
+              <input type="number" step="any" value={inputs.rc || ''} onChange={(e) => setInputs({...inputs, rc: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" placeholder="Típico: 1.5-3" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Coeficiente adiabático γ</label>
+              <input type="number" step="any" value={inputs.gamma || ''} onChange={(e) => setInputs({...inputs, gamma: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" placeholder="1.4" />
+            </div>
+            <div className="bg-orange-50 border border-orange-200 rounded p-3 text-sm text-gray-700">
+              <strong>Ciclo Diesel:</strong><br />
+              Mayor relación de compresión que Otto<br />
+              Combustión a presión constante<br />
+              Mayor eficiencia y economía de combustible
+            </div>
+          </div>
+        )}
+
+        {calcType === 'comparacion-motores' && (
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Temperatura máxima Th (K)</label>
+              <input type="number" step="any" value={inputs.Th || ''} onChange={(e) => setInputs({...inputs, Th: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" placeholder="≈1500-2000 K" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Temperatura mínima Tc (K)</label>
+              <input type="number" step="any" value={inputs.Tc || ''} onChange={(e) => setInputs({...inputs, Tc: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" placeholder="≈300-400 K" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Relación compresión Otto</label>
+              <input type="number" step="any" value={inputs.rOtto || ''} onChange={(e) => setInputs({...inputs, rOtto: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" placeholder="8-12" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Relación compresión Diesel</label>
+              <input type="number" step="any" value={inputs.rDiesel || ''} onChange={(e) => setInputs({...inputs, rDiesel: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" placeholder="14-25" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Relación de corte (Diesel) rc</label>
+              <input type="number" step="any" value={inputs.rc || ''} onChange={(e) => setInputs({...inputs, rc: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" placeholder="1.5-3" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">γ (gamma)</label>
+              <input type="number" step="any" value={inputs.gamma || ''} onChange={(e) => setInputs({...inputs, gamma: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" placeholder="1.4" />
+            </div>
+            <div className="bg-purple-50 border border-purple-200 rounded p-3 text-sm text-gray-700">
+              <strong>Comparación de ciclos termodinámicos</strong><br />
+              Carnot: Límite teórico máximo<br />
+              Diesel: Más eficiente que Otto<br />
+              Otto: Más común en automóviles pequeños
+            </div>
+          </div>
+        )}
+
+        <button onClick={handleCalculate} className="mt-6 w-full bg-indigo-600 text-white py-3 rounded-lg font-semibold hover:bg-indigo-700 transition-colors">
+          Calcular
+        </button>
+      </div>
+
+      {result && (
+        <div className="bg-green-50 border border-green-200 rounded-lg p-6">
+          <h3 className="text-xl font-bold text-gray-800 mb-4">Resultados</h3>
+          <div className="space-y-2">
+            {Object.entries(result).map(([key, value]) => (
+              <div key={key} className={`flex justify-between items-center py-2 border-b border-green-100 ${
+                key === 'nota' || key === 'interpretacion' || key === 'comparacionCarnot' || key === 'ventaja' || key === 'ranking' ? 'bg-blue-50' : ''
+              }`}>
+                <span className="font-medium text-gray-700 capitalize">
+                  {key === 'variacionEntropia' ? 'Variación de Entropía (ΔS)' :
+                   key === 'calor' ? 'Calor (Q)' :
+                   key === 'temperatura' ? 'Temperatura (T)' :
+                   key === 'masa' ? 'Masa (m)' :
+                   key === 'capacidadCalorica' ? 'Capacidad Calorífica (c)' :
+                   key === 'temperaturaInicial' ? 'Temperatura Inicial (T₁)' :
+                   key === 'temperaturaFinal' ? 'Temperatura Final (T₂)' :
+                   key === 'entropiaFuenteCaliente' ? 'ΔS Fuente Caliente' :
+                   key === 'entropiaFuenteFria' ? 'ΔS Fuente Fría' :
+                   key === 'entropiaTotal' ? 'ΔS Total del Universo' :
+                   key === 'entropiaGenerada' ? 'Entropía Generada (S_gen)' :
+                   key === 'exergiaDestruida' ? 'Exergía Destruida' :
+                   key === 'eficienciaIdeal' ? 'Eficiencia Ideal (Carnot)' :
+                   key === 'eficienciaReal' ? 'Eficiencia Real' :
+                   key === 'perdidaEficiencia' ? 'Pérdida por Irreversibilidad' :
+                   key === 'eficienciaOtto' ? 'Eficiencia Ciclo Otto' :
+                   key === 'eficienciaDiesel' ? 'Eficiencia Ciclo Diesel' :
+                   key === 'eficienciaCarnot' ? 'Eficiencia Carnot (Límite)' :
+                   key === 'relacionCompresion' ? 'Relación de Compresión (r)' :
+                   key === 'relacionCorte' ? 'Relación de Corte (rc)' :
+                   key === 'gamma' ? 'Coeficiente γ' :
+                   key === 'tipoMotor' ? 'Tipo de Motor' :
+                   key === 'perdidaOtto' ? 'Pérdida vs Carnot (Otto)' :
+                   key === 'perdidaDiesel' ? 'Pérdida vs Carnot (Diesel)' :
+                   key === 'mejorMotor' ? 'Motor Más Eficiente' :
+                   key === 'interpretacion' ? 'Interpretación' :
+                   key === 'nota' ? 'Nota' :
+                   key === 'comparacionCarnot' ? 'Comparación con Carnot' :
+                   key === 'ventaja' ? 'Ventaja' :
+                   key === 'ranking' ? 'Ranking' :
+                   key.replace(/([A-Z])/g, ' $1').trim()}:
+                </span>
+                <span className="text-lg font-semibold text-gray-900">
+                  {key === 'variacionEntropia' || key === 'entropiaFuenteCaliente' || key === 'entropiaFuenteFria' || key === 'entropiaTotal' || key === 'entropiaGenerada' ? `${value} J/K` :
+                   key === 'calor' || key === 'exergiaDestruida' ? `${value} J` :
+                   key === 'temperatura' || key === 'temperaturaInicial' || key === 'temperaturaFinal' ? `${value} K` :
+                   key === 'masa' ? `${value} kg` :
+                   key === 'capacidadCalorica' ? `${value} J/kg·K` :
+                   value}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="mt-6 bg-gray-50 border border-gray-200 rounded-lg p-6">
+        <h3 className="text-lg font-bold text-gray-800 mb-3">Conceptos Clave</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-700">
+          <div className="bg-white p-4 rounded-lg border border-gray-300">
+            <strong className="text-indigo-600">Entropía:</strong>
+            <p className="mt-2">Medida del desorden molecular. ΔS &gt; 0 en procesos irreversibles. ΔS = 0 en procesos reversibles ideales.</p>
+          </div>
+          <div className="bg-white p-4 rounded-lg border border-gray-300">
+            <strong className="text-blue-600">Irreversibilidad:</strong>
+            <p className="mt-2">Toda máquina real tiene irreversibilidades (fricción, turbulencia) que generan entropía y reducen eficiencia.</p>
+          </div>
+          <div className="bg-white p-4 rounded-lg border border-gray-300">
+            <strong className="text-red-600">Motor Otto:</strong>
+            <p className="mt-2">Usado en motores de gasolina. η = 1 - 1/r^(γ-1). Relación de compresión típica: 8-12.</p>
+          </div>
+          <div className="bg-white p-4 rounded-lg border border-gray-300">
+            <strong className="text-orange-600">Motor Diesel:</strong>
+            <p className="mt-2">Mayor eficiencia que Otto. Relación de compresión típica: 14-25. Más económico en combustible.</p>
+          </div>
+          <div className="bg-white p-4 rounded-lg border border-gray-300">
+            <strong className="text-purple-600">Ciclo de Carnot:</strong>
+            <p className="mt-2">Límite teórico máximo. ΔS_universo = 0. Ningún motor real lo alcanza debido a irreversibilidades.</p>
+          </div>
+          <div className="bg-white p-4 rounded-lg border border-gray-300">
+            <strong className="text-green-600">Exergía:</strong>
+            <p className="mt-2">Trabajo útil máximo disponible. Las irreversibilidades destruyen exergía: E_destruida = T₀·S_gen.</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-6 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+        <h4 className="font-bold text-gray-800 mb-2">Eficiencias Típicas de Motores Reales</h4>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+          <div className="bg-white p-3 rounded border border-yellow-300">
+            <div className="font-semibold text-red-600">Motor Otto (Gasolina)</div>
+            <div className="text-gray-700">Eficiencia: 25-30%</div>
+            <div className="text-xs text-gray-600">Automóviles convencionales</div>
+          </div>
+          <div className="bg-white p-3 rounded border border-yellow-300">
+            <div className="font-semibold text-orange-600">Motor Diesel</div>
+            <div className="text-gray-700">Eficiencia: 30-40%</div>
+            <div className="text-xs text-gray-600">Camiones, maquinaria pesada</div>
+          </div>
+          <div className="bg-white p-3 rounded border border-yellow-300">
+            <div className="font-semibold text-purple-600">Ciclo Carnot (Ideal)</div>
+            <div className="text-gray-700">Eficiencia: 60-80%</div>
+            <div className="text-xs text-gray-600">Límite teórico inalcanzable</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+function EntropiaMotoresSimulacion() {
+  const [tipoMotor, setTipoMotor] = useState('otto');
+  const [parametros, setParametros] = useState({
+    relacionCompresion: 10,
+    relacionCorte: 2,
+    Th: 1800,
+    Tc: 350,
+    velocidad: 50,
+    gamma: 1.4
+  });
+  const [simulando, setSimulando] = useState(false);
+  const [etapaCiclo, setEtapaCiclo] = useState(0);
+  const [posicionPiston, setPosicionPiston] = useState(0);
+  const [estadisticas, setEstadisticas] = useState({
+    ciclosCompletados: 0,
+    trabajoTotal: 0,
+    entropiaGenerada: 0,
+    eficienciaPromedio: 0
+  });
+
+  useEffect(() => {
+    if (simulando) {
+      const velocidadTimer = 1500 / parametros.velocidad;
+      const timer = setTimeout(() => {
+        setEtapaCiclo(prev => {
+          if (prev >= etapasActuales.length - 1) {
+            actualizarEstadisticas();
+            return 0;
+          }
+          return prev + 1;
+        });
+      }, velocidadTimer);
+      return () => clearTimeout(timer);
+    }
+  }, [simulando, etapaCiclo, parametros.velocidad]);
+
+  useEffect(() => {
+    // Animar posición del pistón
+    if (simulando) {
+      if (tipoMotor === 'otto') {
+        // Otto: 0(admisión) → 1(compresión) → 2(explosión) → 3(escape)
+        if (etapaCiclo === 0) setPosicionPiston(0); // Admisión - pistón baja
+        else if (etapaCiclo === 1) setPosicionPiston(100); // Compresión - pistón sube
+        else if (etapaCiclo === 2) setPosicionPiston(100); // Explosión - en PMI
+        else if (etapaCiclo === 3) setPosicionPiston(0); // Escape - pistón sube
+      } else if (tipoMotor === 'diesel') {
+        // Diesel similar a Otto
+        if (etapaCiclo === 0) setPosicionPiston(0);
+        else if (etapaCiclo === 1) setPosicionPiston(100);
+        else if (etapaCiclo === 2) setPosicionPiston(100);
+        else if (etapaCiclo === 3) setPosicionPiston(0);
+      } else if (tipoMotor === 'carnot') {
+        // Carnot: 4 etapas isotérmicas y adiabáticas
+        if (etapaCiclo === 0) setPosicionPiston(0); // Expansión isotérmica
+        else if (etapaCiclo === 1) setPosicionPiston(50); // Expansión adiabática
+        else if (etapaCiclo === 2) setPosicionPiston(100); // Compresión isotérmica
+        else if (etapaCiclo === 3) setPosicionPiston(50); // Compresión adiabática
+      }
+    }
+  }, [etapaCiclo, simulando, tipoMotor]);
+
+  const actualizarEstadisticas = () => {
+    let eficiencia, trabajo, entropiaGen;
+    
+    if (tipoMotor === 'otto') {
+      eficiencia = (1 - 1 / Math.pow(parametros.relacionCompresion, parametros.gamma - 1)) * 100;
+      trabajo = 1000 * eficiencia / 100;
+      // Entropía generada por irreversibilidades (aproximación)
+      const eficienciaCarnot = (1 - parametros.Tc / parametros.Th) * 100;
+      entropiaGen = (eficienciaCarnot - eficiencia) * 10 / eficienciaCarnot;
+    } else if (tipoMotor === 'diesel') {
+      const r = parametros.relacionCompresion;
+      const rc = parametros.relacionCorte;
+      const gamma = parametros.gamma;
+      const term1 = 1 / Math.pow(r, gamma - 1);
+      const term2 = (Math.pow(rc, gamma) - 1) / (gamma * (rc - 1));
+      eficiencia = (1 - term1 * term2) * 100;
+      trabajo = 1000 * eficiencia / 100;
+      const eficienciaCarnot = (1 - parametros.Tc / parametros.Th) * 100;
+      entropiaGen = (eficienciaCarnot - eficiencia) * 10 / eficienciaCarnot;
+    } else {
+      eficiencia = (1 - parametros.Tc / parametros.Th) * 100;
+      trabajo = 1000 * eficiencia / 100;
+      entropiaGen = 0; // Carnot es reversible
+    }
+    
+    setEstadisticas(prev => ({
+      ciclosCompletados: prev.ciclosCompletados + 1,
+      trabajoTotal: prev.trabajoTotal + trabajo,
+      entropiaGenerada: prev.entropiaGenerada + entropiaGen,
+      eficienciaPromedio: eficiencia
+    }));
+  };
+
+  const iniciarSimulacion = () => {
+    setSimulando(true);
+    setEtapaCiclo(0);
+  };
+
+  const pausarSimulacion = () => {
+    setSimulando(false);
+  };
+
+  const resetSimulacion = () => {
+    setSimulando(false);
+    setEtapaCiclo(0);
+    setPosicionPiston(0);
+    setEstadisticas({
+      ciclosCompletados: 0,
+      trabajoTotal: 0,
+      entropiaGenerada: 0,
+      eficienciaPromedio: 0
+    });
+  };
+
+  const etapasOtto = [
+    { nombre: 'Admisión', color: 'bg-blue-400', descripcion: 'Mezcla aire-combustible entra al cilindro', temp: 'Baja' },
+    { nombre: 'Compresión', color: 'bg-yellow-400', descripcion: 'Compresión adiabática, aumenta T y P', temp: 'Media' },
+    { nombre: 'Explosión', color: 'bg-red-500', descripcion: 'Ignición y expansión, produce trabajo', temp: 'Alta' },
+    { nombre: 'Escape', color: 'bg-gray-400', descripcion: 'Gases quemados salen del cilindro', temp: 'Media' }
+  ];
+
+  const etapasDiesel = [
+    { nombre: 'Admisión', color: 'bg-blue-400', descripcion: 'Solo aire entra al cilindro', temp: 'Baja' },
+    { nombre: 'Compresión', color: 'bg-yellow-400', descripcion: 'Compresión muy alta del aire', temp: 'Alta' },
+    { nombre: 'Combustión', color: 'bg-red-500', descripcion: 'Inyección y combustión gradual', temp: 'Muy Alta' },
+    { nombre: 'Escape', color: 'bg-gray-400', descripcion: 'Expulsión de gases', temp: 'Media' }
+  ];
+
+  const etapasCarnot = [
+    { nombre: 'Expansión Isotérmica', color: 'bg-red-400', descripcion: 'Absorbe calor de fuente caliente', temp: 'Th constante' },
+    { nombre: 'Expansión Adiabática', color: 'bg-orange-400', descripcion: 'Expansión sin intercambio de calor', temp: 'Th → Tc' },
+    { nombre: 'Compresión Isotérmica', color: 'bg-blue-400', descripcion: 'Expulsa calor a fuente fría', temp: 'Tc constante' },
+    { nombre: 'Compresión Adiabática', color: 'bg-yellow-400', descripcion: 'Compresión sin intercambio de calor', temp: 'Tc → Th' }
+  ];
+
+  const etapasActuales = tipoMotor === 'otto' ? etapasOtto : tipoMotor === 'diesel' ? etapasDiesel : etapasCarnot;
+
+  const calcularEficiencia = () => {
+    if (tipoMotor === 'otto') {
+      return ((1 - 1 / Math.pow(parametros.relacionCompresion, parametros.gamma - 1)) * 100).toFixed(1);
+    } else if (tipoMotor === 'diesel') {
+      const r = parametros.relacionCompresion;
+      const rc = parametros.relacionCorte;
+      const gamma = parametros.gamma;
+      const term1 = 1 / Math.pow(r, gamma - 1);
+      const term2 = (Math.pow(rc, gamma) - 1) / (gamma * (rc - 1));
+      return ((1 - term1 * term2) * 100).toFixed(1);
+    } else {
+      return ((1 - parametros.Tc / parametros.Th) * 100).toFixed(1);
+    }
+  };
+
+  const eficienciaCarnot = ((1 - parametros.Tc / parametros.Th) * 100).toFixed(1);
+  const eficienciaActual = calcularEficiencia();
+
+  return (
+    <div className="p-8 max-w-6xl mx-auto">
+      <h2 className="text-3xl font-bold text-gray-800 mb-6">Simulación de Motores Térmicos y Entropía</h2>
+
+      <div className="bg-indigo-50 border-l-4 border-indigo-500 p-4 mb-6">
+        <p className="text-sm text-gray-700">
+          <strong>Observe cómo:</strong> Los diferentes ciclos termodinámicos convierten calor en trabajo mecánico.
+          <br />
+          <strong>Entropía:</strong> Las irreversibilidades generan entropía y reducen la eficiencia por debajo del límite de Carnot.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        {/* Panel de Control */}
+        <div className="bg-white border border-gray-200 rounded-lg p-6">
+          <h3 className="text-xl font-bold text-gray-800 mb-4">Panel de Control</h3>
+          
+          <div className="mb-4">
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Tipo de Motor</label>
+            <select
+              value={tipoMotor}
+              onChange={(e) => { setTipoMotor(e.target.value); resetSimulacion(); }}
+              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+              disabled={simulando}
+            >
+              <option value="otto">Ciclo Otto (Gasolina)</option>
+              <option value="diesel">Ciclo Diesel</option>
+              <option value="carnot">Ciclo de Carnot (Ideal)</option>
+            </select>
+          </div>
+
+          {(tipoMotor === 'otto' || tipoMotor === 'diesel') && (
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Relación de Compresión: {parametros.relacionCompresion}
+              </label>
+              <input
+                type="range"
+                min={tipoMotor === 'otto' ? '6' : '12'}
+                max={tipoMotor === 'otto' ? '14' : '25'}
+                step="1"
+                value={parametros.relacionCompresion}
+                onChange={(e) => setParametros({...parametros, relacionCompresion: parseFloat(e.target.value)})}
+                className="w-full"
+                disabled={simulando}
+              />
+              <div className="text-xs text-gray-600 mt-1">
+                {tipoMotor === 'otto' ? 'Otto típico: 8-12' : 'Diesel típico: 14-22'}
+              </div>
+            </div>
+          )}
+
+          {tipoMotor === 'diesel' && (
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Relación de Corte: {parametros.relacionCorte.toFixed(1)}
+              </label>
+              <input
+                type="range"
+                min="1.5"
+                max="3"
+                step="0.1"
+                value={parametros.relacionCorte}
+                onChange={(e) => setParametros({...parametros, relacionCorte: parseFloat(e.target.value)})}
+                className="w-full"
+                disabled={simulando}
+              />
+            </div>
+          )}
+
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Temperatura Máxima (Th): {parametros.Th} K
+            </label>
+            <input
+              type="range"
+              min="1200"
+              max="2400"
+              step="50"
+              value={parametros.Th}
+              onChange={(e) => setParametros({...parametros, Th: parseFloat(e.target.value)})}
+              className="w-full"
+              disabled={simulando}
+            />
+          </div>
+
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Temperatura Mínima (Tc): {parametros.Tc} K
+            </label>
+            <input
+              type="range"
+              min="250"
+              max="500"
+              step="10"
+              value={parametros.Tc}
+              onChange={(e) => setParametros({...parametros, Tc: parseFloat(e.target.value)})}
+              className="w-full"
+              disabled={simulando}
+            />
+          </div>
+
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Velocidad: {parametros.velocidad}%
+            </label>
+            <input
+              type="range"
+              min="10"
+              max="100"
+              step="10"
+              value={parametros.velocidad}
+              onChange={(e) => setParametros({...parametros, velocidad: parseFloat(e.target.value)})}
+              className="w-full"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 mb-4">
+            <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
+              <div className="text-xs text-gray-600">Eficiencia Actual</div>
+              <div className="text-2xl font-bold text-blue-600">{eficienciaActual}%</div>
+            </div>
+            <div className="bg-purple-50 p-3 rounded-lg border border-purple-200">
+              <div className="text-xs text-gray-600">Límite de Carnot</div>
+              <div className="text-2xl font-bold text-purple-600">{eficienciaCarnot}%</div>
+            </div>
+          </div>
+
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
+            <div className="text-xs font-semibold text-gray-700 mb-1">Pérdida por Irreversibilidad:</div>
+            <div className="text-lg font-bold text-red-600">
+              {(eficienciaCarnot - eficienciaActual).toFixed(1)}%
+            </div>
+          </div>
+
+          <div className="flex gap-2">
+            <button
+              onClick={simulando ? pausarSimulacion : iniciarSimulacion}
+              className={`flex-1 py-3 rounded-lg font-semibold transition-colors ${
+                simulando 
+                  ? 'bg-yellow-600 text-white hover:bg-yellow-700' 
+                  : 'bg-indigo-600 text-white hover:bg-indigo-700'
+              }`}
+            >
+              {simulando ? 'Pausar' : 'Iniciar'}
+            </button>
+
+            <button
+              onClick={resetSimulacion}
+              className="px-6 py-3 bg-gray-600 text-white rounded-lg font-semibold hover:bg-gray-700 transition-colors"
+            >
+              Reset
+            </button>
+          </div>
+        </div>
+
+        {/* Visualización del Motor */}
+        <div className="bg-white border border-gray-200 rounded-lg p-6">
+          <h3 className="text-xl font-bold text-gray-800 mb-4">
+            {tipoMotor === 'otto' ? 'Motor Otto' : tipoMotor === 'diesel' ? 'Motor Diesel' : 'Ciclo de Carnot'}
+          </h3>
+          
+          <div className="relative h-96 bg-gradient-to-b from-gray-100 to-gray-200 rounded-lg p-4 overflow-hidden">
+            {/* Cilindro */}
+            <div className="absolute left-1/2 transform -translate-x-1/2 bottom-8 w-32 h-80 border-4 border-gray-700 rounded-t-lg bg-gradient-to-b from-transparent to-gray-300">
+              {/* Gas dentro del cilindro */}
+              <div 
+                className={`absolute bottom-0 w-full transition-all duration-500 ${etapasActuales[etapaCiclo].color} opacity-60`}
+                style={{ height: `${100 - posicionPiston * 0.6}%` }}
+              >
+                <div className="flex items-center justify-center h-full">
+                  <div className="text-center text-gray-800 font-bold text-xs">
+                    {etapasActuales[etapaCiclo].temp}
+                  </div>
+                </div>
+              </div>
+
+              {/* Pistón */}
+              <div 
+                className="absolute w-full h-6 bg-gray-600 border-2 border-gray-800 transition-all duration-500 flex items-center justify-center"
+                style={{ bottom: `${100 - posicionPiston * 0.6}%` }}
+              >
+                <div className="w-2 h-4 bg-gray-400"></div>
+              </div>
+
+              {/* Biela (simplificada) */}
+              <div 
+                className="absolute left-1/2 w-1 bg-gray-700 transition-all duration-500"
+                style={{ 
+                  bottom: `${106 - posicionPiston * 0.6}%`,
+                  height: '40px',
+                  transform: 'translateX(-50%)'
+                }}
+              ></div>
+            </div>
+
+            {/* Válvulas */}
+            {(tipoMotor === 'otto' || tipoMotor === 'diesel') && (
+              <>
+                <div className={`absolute top-8 left-1/4 w-6 h-6 rounded-full border-2 ${etapaCiclo === 0 ? 'bg-green-400 border-green-600' : 'bg-gray-300 border-gray-500'}`}>
+                  <div className="text-xs text-center mt-6 font-semibold">Admisión</div>
+                </div>
+                <div className={`absolute top-8 right-1/4 w-6 h-6 rounded-full border-2 ${etapaCiclo === 3 ? 'bg-red-400 border-red-600' : 'bg-gray-300 border-gray-500'}`}>
+                  <div className="text-xs text-center mt-6 font-semibold">Escape</div>
+                </div>
+              </>
+            )}
+
+            {/* Bujía (Otto) */}
+            {tipoMotor === 'otto' && etapaCiclo === 2 && (
+              <div className="absolute top-4 left-1/2 transform -translate-x-1/2">
+                <div className="w-4 h-8 bg-yellow-300 border-2 border-yellow-600 rounded-b-lg"></div>
+                <div className="text-xs text-center font-bold text-yellow-600 animate-pulse">⚡ CHISPA</div>
+              </div>
+            )}
+
+            {/* Inyector (Diesel) */}
+            {tipoMotor === 'diesel' && etapaCiclo === 2 && (
+              <div className="absolute top-4 left-1/2 transform -translate-x-1/2">
+                <div className="w-3 h-6 bg-blue-400 border-2 border-blue-600 rounded-b"></div>
+                <div className="text-xs text-center font-bold text-blue-600 animate-pulse">💧 INYECCIÓN</div>
+              </div>
+            )}
+
+            {/* Indicador de entropía */}
+            <div className="absolute bottom-4 right-4 bg-white rounded-lg p-2 border-2 border-gray-400 shadow-lg">
+              <div className="text-xs font-semibold text-gray-700">Entropía</div>
+              <div className="flex items-center gap-1 mt-1">
+                {tipoMotor === 'carnot' ? (
+                  <div className="text-green-600 font-bold text-sm">ΔS = 0</div>
+                ) : (
+                  <div className="text-red-600 font-bold text-sm">ΔS &gt; 0</div>
+                )}
+              </div>
+            </div>
+
+            {/* Cigüeñal */}
+            <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2">
+              <div className={`w-12 h-12 rounded-full bg-gray-700 border-4 border-gray-900 flex items-center justify-center ${simulando ? 'animate-spin' : ''}`}>
+                <div className="w-2 h-6 bg-gray-400"></div>
+              </div>
+            </div>
+          </div>
+
+          {/* Indicador de Etapa */}
+          <div className="mt-4 bg-gray-50 rounded-lg p-3 border border-gray-200">
+            <div className="text-sm font-semibold text-gray-700 mb-2">
+              Etapa {etapaCiclo + 1} de {etapasActuales.length}:
+            </div>
+            <div className={`${etapasActuales[etapaCiclo].color} text-gray-800 font-bold py-2 px-3 rounded mb-2`}>
+              {etapasActuales[etapaCiclo].nombre}
+            </div>
+            <div className="text-xs text-gray-600">
+              {etapasActuales[etapaCiclo].descripcion}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Diagrama P-V */}
+      <div className="bg-white border border-gray-200 rounded-lg p-6 mb-6">
+        <h3 className="text-xl font-bold text-gray-800 mb-4">Diagrama Presión-Volumen (P-V)</h3>
+        <div className="relative h-64 bg-gray-50 rounded-lg border-2 border-gray-300">
+          <svg className="w-full h-full" viewBox="0 0 400 300">
+            {/* Ejes */}
+            <line x1="40" y1="260" x2="360" y2="260" stroke="#333" strokeWidth="2" />
+            <line x1="40" y1="260" x2="40" y2="20" stroke="#333" strokeWidth="2" />
+            <text x="200" y="290" textAnchor="middle" className="text-sm fill-gray-700">Volumen (V)</text>
+            <text x="10" y="140" textAnchor="middle" className="text-sm fill-gray-700" transform="rotate(-90 10 140)">Presión (P)</text>
+
+            {/* Ciclo Otto */}
+            {tipoMotor === 'otto' && (
+              <path
+                d="M 80 240 L 80 80 L 280 60 L 280 240 Z"
+                fill="none"
+                stroke="#4F46E5"
+                strokeWidth="3"
+              />
+            )}
+
+            {/* Ciclo Diesel */}
+            {tipoMotor === 'diesel' && (
+              <path
+                d="M 80 240 L 80 60 L 200 60 L 280 80 L 280 240 Z"
+                fill="none"
+                stroke="#F59E0B"
+                strokeWidth="3"
+              />
+            )}
+
+            {/* Ciclo Carnot */}
+            {tipoMotor === 'carnot' && (
+              <path
+                d="M 80 120 Q 180 60 280 100 L 280 200 Q 180 240 80 200 Z"
+                fill="none"
+                stroke="#10B981"
+                strokeWidth="3"
+              />
+            )}
+
+            {/* Punto actual */}
+            {simulando && (
+              <circle
+                cx={80 + (etapaCiclo * 60)}
+                cy={240 - (etapaCiclo % 2) * 160}
+                r="8"
+                fill="#EF4444"
+                className="animate-pulse"
+              />
+            )}
+          </svg>
+        </div>
+        <div className="mt-3 text-sm text-gray-600 text-center">
+          El área encerrada representa el trabajo neto producido por ciclo
+        </div>
+      </div>
+
+      {/* Estadísticas */}
+      {estadisticas.ciclosCompletados > 0 && (
+        <div className="bg-white border border-gray-200 rounded-lg p-6 mb-6">
+          <h3 className="text-xl font-bold text-gray-800 mb-4">Estadísticas Acumuladas</h3>
+          
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+              <div className="text-sm text-gray-600 mb-1">Ciclos</div>
+              <div className="text-2xl font-bold text-blue-600">{estadisticas.ciclosCompletados}</div>
+            </div>
+            <div className="bg-green-50 p-4 rounded-lg border border-green-200">
+              <div className="text-sm text-gray-600 mb-1">Trabajo Total</div>
+              <div className="text-2xl font-bold text-green-600">
+                {(estadisticas.trabajoTotal / 1000).toFixed(1)} kJ
+              </div>
+            </div>
+            <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
+              <div className="text-sm text-gray-600 mb-1">Eficiencia</div>
+              <div className="text-2xl font-bold text-purple-600">
+                {estadisticas.eficienciaPromedio.toFixed(1)}%
+              </div>
+            </div>
+            <div className="bg-red-50 p-4 rounded-lg border border-red-200">
+              <div className="text-sm text-gray-600 mb-1">Entropía Gen.</div>
+              <div className="text-2xl font-bold text-red-600">
+                {estadisticas.entropiaGenerada.toFixed(2)} J/K
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Información Educativa */}
+      <div className="bg-gray-50 border border-gray-200 rounded-lg p-6">
+        <h3 className="text-lg font-bold text-gray-800 mb-3">Comparación de Ciclos Termodinámicos</h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+          <div className="bg-white p-4 rounded-lg border border-gray-300">
+            <strong className="text-blue-600 text-base">Ciclo Otto</strong>
+            <ul className="mt-2 space-y-1 text-gray-700">
+              <li>• Motores de gasolina</li>
+              <li>• Ignición por chispa</li>
+              <li>• r = 8-12</li>
+              <li>• η ≈ 25-30%</li>
+              <li>• Combustión a V constante</li>
+            </ul>
+          </div>
+          <div className="bg-white p-4 rounded-lg border border-gray-300">
+            <strong className="text-orange-600 text-base">Ciclo Diesel</strong>
+            <ul className="mt-2 space-y-1 text-gray-700">
+              <li>• Motores diesel</li>
+              <li>• Autoignición</li>
+              <li>• r = 14-25</li>
+              <li>• η ≈ 30-40%</li>
+              <li>• Combustión a P constante</li>
+            </ul>
+          </div>
+          <div className="bg-white p-4 rounded-lg border border-gray-300">
+            <strong className="text-green-600 text-base">Ciclo Carnot</strong>
+            <ul className="mt-2 space-y-1 text-gray-700">
+              <li>• Ciclo ideal teórico</li>
+              <li>• Completamente reversible</li>
+              <li>• η = 1 - Tc/Th</li>
+              <li>• ΔS_universo = 0</li>
+              <li>• Inalcanzable en práctica</li>
+            </ul>
+          </div>
+        </div>
+
+        <div className="mt-4 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+          <strong className="text-gray-800">💡 Concepto Clave - Entropía:</strong>
+          <p className="text-sm text-gray-700 mt-2">
+            La entropía es una medida del desorden molecular y de la irreversibilidad de los procesos. 
+            En los motores reales, las irreversibilidades (fricción, turbulencia, pérdidas de calor) 
+            generan entropía y reducen la eficiencia por debajo del límite de Carnot. 
+            El ciclo de Carnot es el único que no genera entropía (ΔS = 0), pero es imposible de construir en la práctica.
+          </p>
+        </div>
+
+        <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+            <strong className="text-gray-800">🔥 Fuentes de Irreversibilidad:</strong>
+            <ul className="text-sm text-gray-700 mt-2 space-y-1">
+              <li>• Fricción mecánica entre pistón y cilindro</li>
+              <li>• Turbulencia en el flujo de gases</li>
+              <li>• Transferencia de calor con diferencias finitas de temperatura</li>
+              <li>• Combustión rápida (no cuasiestática)</li>
+              <li>• Pérdidas de calor por las paredes</li>
+            </ul>
+          </div>
+          <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+            <strong className="text-gray-800">📈 Mejoras de Eficiencia:</strong>
+            <ul className="text-sm text-gray-700 mt-2 space-y-1">
+              <li>• Aumentar relación de compresión</li>
+              <li>• Mejorar aislamiento térmico</li>
+              <li>• Reducir fricción (mejores lubricantes)</li>
+              <li>• Optimizar forma de cámara de combustión</li>
+              <li>• Usar materiales que soporten mayores temperaturas</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+function CalculadoraElectrostatica() {
+  const [calcType, setCalcType] = useState('coulomb');
+  const [inputs, setInputs] = useState({});
+  const [result, setResult] = useState(null);
+  const [findVariable, setFindVariable] = useState('F');
+
+  const k = 8.99e9; // Constante de Coulomb (N·m²/C²)
+  const e = 1.602e-19; // Carga elemental (C)
+
+  const calculateCoulomb = () => {
+    const { q1, q2, r, F } = inputs;
+    
+    if (findVariable === 'F') {
+      const fuerza = (k * parseFloat(q1) * parseFloat(q2)) / Math.pow(parseFloat(r), 2);
+      setResult({ 
+        fuerza: fuerza.toExponential(3),
+        fuerzaMagnitud: Math.abs(fuerza).toExponential(3),
+        tipo: fuerza > 0 ? 'Repulsiva' : 'Atractiva'
+      });
+    } else if (findVariable === 'q1') {
+      const carga = (parseFloat(F) * Math.pow(parseFloat(r), 2)) / (k * parseFloat(q2));
+      setResult({ 
+        carga1: carga.toExponential(3),
+        numeroElectrones: (Math.abs(carga) / e).toExponential(3)
+      });
+    } else if (findVariable === 'q2') {
+      const carga = (parseFloat(F) * Math.pow(parseFloat(r), 2)) / (k * parseFloat(q1));
+      setResult({ 
+        carga2: carga.toExponential(3),
+        numeroElectrones: (Math.abs(carga) / e).toExponential(3)
+      });
+    } else if (findVariable === 'r') {
+      const distancia = Math.sqrt((k * parseFloat(q1) * parseFloat(q2)) / parseFloat(F));
+      setResult({ distancia: distancia.toExponential(3) });
+    }
+  };
+
+  const calculateCampoElectrico = () => {
+    const { q, r, E, F, qtest } = inputs;
+    
+    if (findVariable === 'E') {
+      if (inputs.q && inputs.r) {
+        const campo = (k * parseFloat(q)) / Math.pow(parseFloat(r), 2);
+        setResult({ 
+          campoElectrico: campo.toExponential(3),
+          direccion: parseFloat(q) > 0 ? 'Alejándose de la carga' : 'Hacia la carga'
+        });
+      } else if (inputs.F && inputs.qtest) {
+        const campo = parseFloat(F) / parseFloat(qtest);
+        setResult({ campoElectrico: campo.toExponential(3) });
+      }
+    } else if (findVariable === 'F') {
+      const fuerza = parseFloat(E) * parseFloat(qtest);
+      setResult({ 
+        fuerza: fuerza.toExponential(3),
+        tipo: fuerza > 0 ? 'Misma dirección del campo' : 'Dirección opuesta al campo'
+      });
+    } else if (findVariable === 'q') {
+      const carga = (parseFloat(E) * Math.pow(parseFloat(r), 2)) / k;
+      setResult({ 
+        carga: carga.toExponential(3),
+        signo: carga > 0 ? 'Positiva' : 'Negativa'
+      });
+    } else if (findVariable === 'r') {
+      const distancia = Math.sqrt((k * parseFloat(q)) / parseFloat(E));
+      setResult({ distancia: distancia.toExponential(3) });
+    }
+  };
+
+  const calculatePotencial = () => {
+    const { q, r, V, W, qmov, V1, V2 } = inputs;
+    
+    if (findVariable === 'V') {
+      const potencial = (k * parseFloat(q)) / parseFloat(r);
+      setResult({ 
+        potencial: potencial.toExponential(3),
+        referencia: 'Respecto al infinito'
+      });
+    } else if (findVariable === 'q') {
+      const carga = (parseFloat(V) * parseFloat(r)) / k;
+      setResult({ carga: carga.toExponential(3) });
+    } else if (findVariable === 'r') {
+      const distancia = (k * parseFloat(q)) / parseFloat(V);
+      setResult({ distancia: distancia.toExponential(3) });
+    } else if (findVariable === 'W') {
+      const deltaV = parseFloat(V2) - parseFloat(V1);
+      const trabajo = parseFloat(qmov) * deltaV;
+      setResult({ 
+        trabajo: trabajo.toExponential(3),
+        tipo: trabajo > 0 ? 'Campo realiza trabajo' : 'Trabajo contra el campo'
+      });
+    } else if (findVariable === 'deltaV') {
+      const deltaV = parseFloat(W) / parseFloat(qmov);
+      setResult({ 
+        diferenciaPotencial: deltaV.toExponential(3),
+        voltaje: deltaV.toExponential(3)
+      });
+    }
+  };
+
+  const calculateEnergiaPotencial = () => {
+    const { q1, q2, r, U, qmov, V } = inputs;
+    
+    if (findVariable === 'U') {
+      if (inputs.q1 && inputs.q2 && inputs.r) {
+        const energia = (k * parseFloat(q1) * parseFloat(q2)) / parseFloat(r);
+        setResult({ 
+          energiaPotencial: energia.toExponential(3),
+          tipo: energia > 0 ? 'Repulsiva (energía positiva)' : 'Atractiva (energía negativa)'
+        });
+      } else if (inputs.qmov && inputs.V) {
+        const energia = parseFloat(qmov) * parseFloat(V);
+        setResult({ energiaPotencial: energia.toExponential(3) });
+      }
+    } else if (findVariable === 'r') {
+      const distancia = (k * parseFloat(q1) * parseFloat(q2)) / parseFloat(U);
+      setResult({ distancia: distancia.toExponential(3) });
+    } else if (findVariable === 'V') {
+      const potencial = parseFloat(U) / parseFloat(qmov);
+      setResult({ potencial: potencial.toExponential(3) });
+    }
+  };
+
+  const calculateCuantizacion = () => {
+    const { Q, n } = inputs;
+    
+    if (findVariable === 'Q') {
+      const carga = parseFloat(n) * e;
+      setResult({ 
+        cargaTotal: carga.toExponential(3),
+        cargaEnMicroCoulombs: (carga * 1e6).toExponential(3)
+      });
+    } else if (findVariable === 'n') {
+      const numElectrones = Math.abs(parseFloat(Q)) / e;
+      setResult({ 
+        numeroCargas: numElectrones.toExponential(3),
+        numeroRedondeado: Math.round(numElectrones).toExponential(3)
+      });
+    }
+  };
+
+  const handleCalculate = () => {
+    try {
+      if (calcType === 'coulomb') calculateCoulomb();
+      else if (calcType === 'campo') calculateCampoElectrico();
+      else if (calcType === 'potencial') calculatePotencial();
+      else if (calcType === 'energia') calculateEnergiaPotencial();
+      else if (calcType === 'cuantizacion') calculateCuantizacion();
+    } catch (error) {
+      setResult({ error: 'Por favor complete todos los campos requeridos correctamente' });
+    }
+  };
+
+  const resetCalculator = () => {
+    setInputs({});
+    setResult(null);
+  };
+
+  return (
+    <div className="p-8 max-w-5xl mx-auto bg-gradient-to-br from-blue-50 to-indigo-50 min-h-screen">
+      <div className="bg-white rounded-xl shadow-2xl p-8">
+        <h1 className="text-4xl font-bold text-indigo-900 mb-2">⚡ Calculadora de Electrostática</h1>
+        <p className="text-gray-600 mb-6">Cálculos de carga eléctrica, Ley de Coulomb, Campo y Potencial Eléctrico</p>
+
+        <div className="bg-indigo-50 border-l-4 border-indigo-500 p-4 mb-6 rounded">
+          <p className="text-sm text-gray-700">
+            <strong>💡 Instrucciones:</strong> Seleccione el tipo de cálculo, elija la variable a encontrar y complete los campos necesarios.
+          </p>
+        </div>
+
+        <div className="grid md:grid-cols-2 gap-6 mb-6">
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">📊 Tipo de Cálculo</label>
+            <select
+              value={calcType}
+              onChange={(e) => { setCalcType(e.target.value); resetCalculator(); setFindVariable(
+                e.target.value === 'coulomb' ? 'F' :
+                e.target.value === 'campo' ? 'E' :
+                e.target.value === 'potencial' ? 'V' :
+                e.target.value === 'energia' ? 'U' : 'Q'
+              ); }}
+              className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white"
+            >
+              <option value="coulomb">Ley de Coulomb (Fuerza eléctrica)</option>
+              <option value="campo">Campo Eléctrico (E)</option>
+              <option value="potencial">Potencial Eléctrico (V)</option>
+              <option value="energia">Energía Potencial Eléctrica (U)</option>
+              <option value="cuantizacion">Cuantización de Carga</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">🎯 Variable a Calcular</label>
+            <select
+              value={findVariable}
+              onChange={(e) => { setFindVariable(e.target.value); resetCalculator(); }}
+              className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white"
+            >
+              {calcType === 'coulomb' && (
+                <>
+                  <option value="F">Fuerza eléctrica (F)</option>
+                  <option value="q1">Carga 1 (q₁)</option>
+                  <option value="q2">Carga 2 (q₂)</option>
+                  <option value="r">Distancia (r)</option>
+                </>
+              )}
+              {calcType === 'campo' && (
+                <>
+                  <option value="E">Campo eléctrico (E)</option>
+                  <option value="F">Fuerza sobre carga (F)</option>
+                  <option value="q">Carga fuente (q)</option>
+                  <option value="r">Distancia (r)</option>
+                </>
+              )}
+              {calcType === 'potencial' && (
+                <>
+                  <option value="V">Potencial eléctrico (V)</option>
+                  <option value="q">Carga fuente (q)</option>
+                  <option value="r">Distancia (r)</option>
+                  <option value="W">Trabajo realizado (W)</option>
+                  <option value="deltaV">Diferencia de potencial (ΔV)</option>
+                </>
+              )}
+              {calcType === 'energia' && (
+                <>
+                  <option value="U">Energía potencial (U)</option>
+                  <option value="r">Distancia (r)</option>
+                  <option value="V">Potencial (V)</option>
+                </>
+              )}
+              {calcType === 'cuantizacion' && (
+                <>
+                  <option value="Q">Carga total (Q)</option>
+                  <option value="n">Número de cargas elementales (n)</option>
+                </>
+              )}
+            </select>
+          </div>
+        </div>
+
+        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-indigo-200 rounded-lg p-6 mb-6">
+          <h3 className="text-lg font-bold text-indigo-900 mb-4">📝 Datos de Entrada</h3>
+          
+          {calcType === 'coulomb' && (
+            <div className="grid md:grid-cols-2 gap-4">
+              {findVariable !== 'q1' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Carga 1 (q₁) en Coulombs [C]</label>
+                  <input 
+                    type="number" 
+                    step="any" 
+                    value={inputs.q1 || ''} 
+                    onChange={(e) => setInputs({...inputs, q1: e.target.value})} 
+                    className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                    placeholder="ej: 1e-6 o 0.000001" 
+                  />
+                </div>
+              )}
+              {findVariable !== 'q2' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Carga 2 (q₂) en Coulombs [C]</label>
+                  <input 
+                    type="number" 
+                    step="any" 
+                    value={inputs.q2 || ''} 
+                    onChange={(e) => setInputs({...inputs, q2: e.target.value})} 
+                    className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                    placeholder="ej: -2e-6 o -0.000002" 
+                  />
+                </div>
+              )}
+              {findVariable !== 'r' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Distancia (r) en metros [m]</label>
+                  <input 
+                    type="number" 
+                    step="any" 
+                    value={inputs.r || ''} 
+                    onChange={(e) => setInputs({...inputs, r: e.target.value})} 
+                    className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                    placeholder="ej: 0.1" 
+                  />
+                </div>
+              )}
+              {findVariable !== 'F' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Fuerza (F) en Newtons [N]</label>
+                  <input 
+                    type="number" 
+                    step="any" 
+                    value={inputs.F || ''} 
+                    onChange={(e) => setInputs({...inputs, F: e.target.value})} 
+                    className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                    placeholder="ej: 0.0899" 
+                  />
+                </div>
+              )}
+            </div>
+          )}
+
+          {calcType === 'campo' && (
+            <div className="grid md:grid-cols-2 gap-4">
+              {findVariable !== 'q' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Carga fuente (q) en Coulombs [C]</label>
+                  <input 
+                    type="number" 
+                    step="any" 
+                    value={inputs.q || ''} 
+                    onChange={(e) => setInputs({...inputs, q: e.target.value})} 
+                    className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                    placeholder="ej: 5e-6" 
+                  />
+                </div>
+              )}
+              {findVariable !== 'r' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Distancia (r) en metros [m]</label>
+                  <input 
+                    type="number" 
+                    step="any" 
+                    value={inputs.r || ''} 
+                    onChange={(e) => setInputs({...inputs, r: e.target.value})} 
+                    className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                    placeholder="ej: 0.05" 
+                  />
+                </div>
+              )}
+              {findVariable !== 'E' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Campo eléctrico (E) en N/C</label>
+                  <input 
+                    type="number" 
+                    step="any" 
+                    value={inputs.E || ''} 
+                    onChange={(e) => setInputs({...inputs, E: e.target.value})} 
+                    className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                    placeholder="ej: 1000" 
+                  />
+                </div>
+              )}
+              {findVariable === 'F' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Carga de prueba (q) en Coulombs [C]</label>
+                  <input 
+                    type="number" 
+                    step="any" 
+                    value={inputs.qtest || ''} 
+                    onChange={(e) => setInputs({...inputs, qtest: e.target.value})} 
+                    className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                    placeholder="ej: 1e-6" 
+                  />
+                </div>
+              )}
+              {findVariable === 'E' && !inputs.q && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Fuerza (F) en Newtons [N]</label>
+                    <input 
+                      type="number" 
+                      step="any" 
+                      value={inputs.F || ''} 
+                      onChange={(e) => setInputs({...inputs, F: e.target.value})} 
+                      className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                      placeholder="ej: 0.001" 
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Carga de prueba (q) en Coulombs [C]</label>
+                    <input 
+                      type="number" 
+                      step="any" 
+                      value={inputs.qtest || ''} 
+                      onChange={(e) => setInputs({...inputs, qtest: e.target.value})} 
+                      className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                      placeholder="ej: 1e-6" 
+                    />
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          {calcType === 'potencial' && (
+            <div className="grid md:grid-cols-2 gap-4">
+              {findVariable !== 'q' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Carga fuente (q) en Coulombs [C]</label>
+                  <input 
+                    type="number" 
+                    step="any" 
+                    value={inputs.q || ''} 
+                    onChange={(e) => setInputs({...inputs, q: e.target.value})} 
+                    className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                    placeholder="ej: 1e-6" 
+                  />
+                </div>
+              )}
+              {findVariable !== 'r' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Distancia (r) en metros [m]</label>
+                  <input 
+                    type="number" 
+                    step="any" 
+                    value={inputs.r || ''} 
+                    onChange={(e) => setInputs({...inputs, r: e.target.value})} 
+                    className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                    placeholder="ej: 0.1" 
+                  />
+                </div>
+              )}
+              {findVariable !== 'V' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Potencial (V) en Voltios [V]</label>
+                  <input 
+                    type="number" 
+                    step="any" 
+                    value={inputs.V || ''} 
+                    onChange={(e) => setInputs({...inputs, V: e.target.value})} 
+                    className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                    placeholder="ej: 1000" 
+                  />
+                </div>
+              )}
+              {findVariable === 'W' && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Carga móvil (q) en Coulombs [C]</label>
+                    <input 
+                      type="number" 
+                      step="any" 
+                      value={inputs.qmov || ''} 
+                      onChange={(e) => setInputs({...inputs, qmov: e.target.value})} 
+                      className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                      placeholder="ej: 1e-6" 
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Potencial inicial (V₁) en Voltios [V]</label>
+                    <input 
+                      type="number" 
+                      step="any" 
+                      value={inputs.V1 || ''} 
+                      onChange={(e) => setInputs({...inputs, V1: e.target.value})} 
+                      className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                      placeholder="ej: 100" 
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Potencial final (V₂) en Voltios [V]</label>
+                    <input 
+                      type="number" 
+                      step="any" 
+                      value={inputs.V2 || ''} 
+                      onChange={(e) => setInputs({...inputs, V2: e.target.value})} 
+                      className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                      placeholder="ej: 50" 
+                    />
+                  </div>
+                </>
+              )}
+              {findVariable === 'deltaV' && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Trabajo (W) en Joules [J]</label>
+                    <input 
+                      type="number" 
+                      step="any" 
+                      value={inputs.W || ''} 
+                      onChange={(e) => setInputs({...inputs, W: e.target.value})} 
+                      className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                      placeholder="ej: 0.001" 
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Carga móvil (q) en Coulombs [C]</label>
+                    <input 
+                      type="number" 
+                      step="any" 
+                      value={inputs.qmov || ''} 
+                      onChange={(e) => setInputs({...inputs, qmov: e.target.value})} 
+                      className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                      placeholder="ej: 1e-6" 
+                    />
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          {calcType === 'energia' && (
+            <div className="grid md:grid-cols-2 gap-4">
+              {findVariable !== 'U' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Energía potencial (U) en Joules [J]</label>
+                  <input 
+                    type="number" 
+                    step="any" 
+                    value={inputs.U || ''} 
+                    onChange={(e) => setInputs({...inputs, U: e.target.value})} 
+                    className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                    placeholder="ej: 0.001" 
+                  />
+                </div>
+              )}
+              {findVariable === 'U' && !inputs.qmov && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Carga 1 (q₁) en Coulombs [C]</label>
+                    <input 
+                      type="number" 
+                      step="any" 
+                      value={inputs.q1 || ''} 
+                      onChange={(e) => setInputs({...inputs, q1: e.target.value})} 
+                      className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                      placeholder="ej: 1e-6" 
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Carga 2 (q₂) en Coulombs [C]</label>
+                    <input 
+                      type="number" 
+                      step="any" 
+                      value={inputs.q2 || ''} 
+                      onChange={(e) => setInputs({...inputs, q2: e.target.value})} 
+                      className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                      placeholder="ej: -2e-6" 
+                    />
+                  </div>
+                  {findVariable !== 'r' && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Distancia (r) en metros [m]</label>
+                      <input 
+                        type="number" 
+                        step="any" 
+                        value={inputs.r || ''} 
+                        onChange={(e) => setInputs({...inputs, r: e.target.value})} 
+                        className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                        placeholder="ej: 0.1" 
+                      />
+                    </div>
+                  )}
+                </>
+              )}
+              {findVariable === 'U' && inputs.qmov && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Carga móvil (q) en Coulombs [C]</label>
+                    <input 
+                      type="number" 
+                      step="any" 
+                      value={inputs.qmov || ''} 
+                      onChange={(e) => setInputs({...inputs, qmov: e.target.value})} 
+                      className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                      placeholder="ej: 1e-6" 
+                    />
+                  </div>
+                  {findVariable !== 'V' && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Potencial (V) en Voltios [V]</label>
+                      <input 
+                        type="number" 
+                        step="any" 
+                        value={inputs.V || ''} 
+                        onChange={(e) => setInputs({...inputs, V: e.target.value})} 
+                        className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                        placeholder="ej: 1000" 
+                      />
+                    </div>
+                  )}
+                </>
+              )}
+              {findVariable === 'r' && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Carga 1 (q₁) en Coulombs [C]</label>
+                    <input 
+                      type="number" 
+                      step="any" 
+                      value={inputs.q1 || ''} 
+                      onChange={(e) => setInputs({...inputs, q1: e.target.value})} 
+                      className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                      placeholder="ej: 1e-6" 
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Carga 2 (q₂) en Coulombs [C]</label>
+                    <input 
+                      type="number" 
+                      step="any" 
+                      value={inputs.q2 || ''} 
+                      onChange={(e) => setInputs({...inputs, q2: e.target.value})} 
+                      className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                      placeholder="ej: -2e-6" 
+                    />
+                  </div>
+                </>
+              )}
+              {findVariable === 'V' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Carga móvil (q) en Coulombs [C]</label>
+                  <input 
+                    type="number" 
+                    step="any" 
+                    value={inputs.qmov || ''} 
+                    onChange={(e) => setInputs({...inputs, qmov: e.target.value})} 
+                    className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                    placeholder="ej: 1e-6" 
+                  />
+                </div>
+              )}
+            </div>
+          )}
+
+          {calcType === 'cuantizacion' && (
+            <div className="grid md:grid-cols-2 gap-4">
+              {findVariable !== 'Q' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Carga total (Q) en Coulombs [C]</label>
+                  <input 
+                    type="number" 
+                    step="any" 
+                    value={inputs.Q || ''} 
+                    onChange={(e) => setInputs({...inputs, Q: e.target.value})} 
+                    className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                    placeholder="ej: 1.602e-19" 
+                  />
+                </div>
+              )}
+              {findVariable !== 'n' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Número de cargas elementales (n)</label>
+                  <input 
+                    type="number" 
+                    step="any" 
+                    value={inputs.n || ''} 
+                    onChange={(e) => setInputs({...inputs, n: e.target.value})} 
+                    className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                    placeholder="ej: 1000000" 
+                  />
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="mt-6 flex gap-3">
+            <button 
+              onClick={handleCalculate} 
+              className="flex-1 bg-gradient-to-r from-indigo-600 to-blue-600 text-white py-3 rounded-lg font-semibold hover:from-indigo-700 hover:to-blue-700 transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+            >
+              ⚡ Calcular
+            </button>
+            <button 
+              onClick={resetCalculator} 
+              className="px-6 bg-gray-200 text-gray-700 py-3 rounded-lg font-semibold hover:bg-gray-300 transition-colors"
+            >
+              🔄 Limpiar
+            </button>
+          </div>
+        </div>
+
+        {result && (
+          <div className={`${result.error ? 'bg-red-50 border-red-300' : 'bg-green-50 border-green-300'} border-2 rounded-xl p-6 shadow-lg`}>
+            <h3 className="text-2xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+              {result.error ? '❌' : '✅'} Resultados
+            </h3>
+            {result.error ? (
+              <p className="text-red-700 font-medium">{result.error}</p>
+            ) : (
+              <div className="space-y-3">
+                {Object.entries(result).map(([key, value]) => (
+                  <div key={key} className="flex justify-between items-center py-3 border-b border-green-200 last:border-0">
+                    <span className="font-medium text-gray-700 capitalize text-lg">
+                      {key === 'fuerza' ? '🔷 Fuerza' :
+                       key === 'fuerzaMagnitud' ? '📊 Magnitud de la fuerza' :
+                       key === 'tipo' ? '🎯 Tipo de fuerza' :
+                       key === 'carga1' ? '⚡ Carga 1' :
+                       key === 'carga2' ? '⚡ Carga 2' :
+                       key === 'carga' ? '⚡ Carga' :
+                       key === 'distancia' ? '📏 Distancia' :
+                       key === 'campoElectrico' ? '🔷 Campo Eléctrico' :
+                       key === 'direccion' ? '➡️ Dirección' :
+                       key === 'potencial' ? '⚡ Potencial Eléctrico' :
+                       key === 'voltaje' ? '⚡ Voltaje' :
+                       key === 'diferenciaPotencial' ? '🔋 Diferencia de Potencial' :
+                       key === 'trabajo' ? '💪 Trabajo' :
+                       key === 'energiaPotencial' ? '⚡ Energía Potencial' :
+                       key === 'numeroElectrones' ? '🔢 Número de electrones' :
+                       key === 'numeroCargas' ? '🔢 Número de cargas' :
+                       key === 'numeroRedondeado' ? '🔢 Número (redondeado)' :
+                       key === 'cargaTotal' ? '⚡ Carga Total' :
+                       key === 'cargaEnMicroCoulombs' ? '⚡ Carga en μC' :
+                       key === 'signo' ? '➕➖ Signo de la carga' :
+                       key === 'referencia' ? '📍 Referencia' :
+                       key === 'velocidadInicial' ? '🚀 Velocidad Inicial' :
+                       key.replace(/([A-Z])/g, ' $1').trim()}:
+                    </span>
+                    <span className="text-xl font-bold text-indigo-900 bg-white px-4 py-2 rounded-lg shadow">
+                      {value} {getUnit(key)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className="mt-8 bg-blue-50 border-2 border-blue-200 rounded-lg p-6">
+          <h3 className="text-xl font-bold text-blue-900 mb-3">📚 Fórmulas Utilizadas</h3>
+          <div className="text-sm text-gray-700 space-y-2">
+            {calcType === 'coulomb' && (
+              <div>
+                <p className="font-semibold">Ley de Coulomb:</p>
+                <p className="bg-white p-2 rounded mt-1 font-mono">F = k × |q₁ × q₂| / r²</p>
+                <p className="text-xs mt-1">donde k = 8.99 × 10⁹ N·m²/C² (constante de Coulomb)</p>
+              </div>
+            )}
+            {calcType === 'campo' && (
+              <div>
+                <p className="font-semibold">Campo Eléctrico:</p>
+                <p className="bg-white p-2 rounded mt-1 font-mono">E = k × q / r²</p>
+                <p className="bg-white p-2 rounded mt-1 font-mono">F = q × E</p>
+              </div>
+            )}
+            {calcType === 'potencial' && (
+              <div>
+                <p className="font-semibold">Potencial Eléctrico:</p>
+                <p className="bg-white p-2 rounded mt-1 font-mono">V = k × q / r</p>
+                <p className="bg-white p-2 rounded mt-1 font-mono">W = q × ΔV</p>
+              </div>
+            )}
+            {calcType === 'energia' && (
+              <div>
+                <p className="font-semibold">Energía Potencial Eléctrica:</p>
+                <p className="bg-white p-2 rounded mt-1 font-mono">U = k × q₁ × q₂ / r</p>
+                <p className="bg-white p-2 rounded mt-1 font-mono">U = q × V</p>
+              </div>
+            )}
+            {calcType === 'cuantizacion' && (
+              <div>
+                <p className="font-semibold">Cuantización de la Carga:</p>
+                <p className="bg-white p-2 rounded mt-1 font-mono">Q = n × e</p>
+                <p className="text-xs mt-1">donde e = 1.602 × 10⁻¹⁹ C (carga elemental)</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="mt-6 bg-amber-50 border-2 border-amber-200 rounded-lg p-6">
+          <h3 className="text-lg font-bold text-amber-900 mb-3">💡 Conceptos Importantes</h3>
+          <ul className="text-sm text-gray-700 space-y-2 list-disc list-inside">
+            <li><strong>Conductores:</strong> Materiales que permiten el movimiento libre de cargas (metales).</li>
+            <li><strong>Aisladores:</strong> Materiales que NO permiten el movimiento de cargas (plástico, vidrio).</li>
+            <li><strong>Semiconductores:</strong> Materiales con conductividad intermedia (silicio, germanio).</li>
+            <li><strong>Conservación de la carga:</strong> La carga total en un sistema aislado permanece constante.</li>
+            <li><strong>Cuantización:</strong> La carga siempre es un múltiplo entero de la carga elemental (e).</li>
+            <li><strong>Superficies equipotenciales:</strong> Superficies donde el potencial eléctrico es constante.</li>
+            <li><strong>Líneas de campo:</strong> Salen de cargas positivas y entran en cargas negativas.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  );
+}
+function getUnit(key) {
+  const units = {
+    'fuerza': 'N',
+    'fuerzaMagnitud': 'N',
+    'carga1': 'C',
+    'carga2': 'C',
+    'carga': 'C',
+    'distancia': 'm',
+    'campoElectrico': 'N/C',
+    'potencial': 'V',
+    'voltaje': 'V',
+    'diferenciaPotencial': 'V',
+    'trabajo': 'J',
+    'energiaPotencial': 'J',
+    'cargaTotal': 'C',
+    'cargaEnMicroCoulombs': 'μC',
+    'velocidadAngular': 'rad/s',
+    'aceleracion': 'm/s²'
+  };
+  return units[key] || '';
+}
+function SimulacionElectrostatica() {
+  const [simType, setSimType] = useState('coulomb');
+  const [isPlaying, setIsPlaying] = useState(false);
+  const canvasRef = useRef(null);
+  const animationRef = useRef(null);
+
+  // Estados para Ley de Coulomb
+  const [q1, setQ1] = useState(5);
+  const [q2, setQ2] = useState(-3);
+  const [distance, setDistance] = useState(200);
+
+  // Estados para Campo Eléctrico
+  const [sourceCharge, setSourceCharge] = useState(8);
+  const [showFieldLines, setShowFieldLines] = useState(true);
+  const [testCharge, setTestCharge] = useState(1);
+
+  // Estados para Potencial Eléctrico
+  const [potentialCharge, setPotentialCharge] = useState(5);
+  const [showEquipotentials, setShowEquipotentials] = useState(true);
+
+  // Estados para Energía Potencial
+  const [energyQ1, setEnergyQ1] = useState(4);
+  const [energyQ2, setEnergyQ2] = useState(-4);
+  const [separation, setSeparation] = useState(150);
+  const [animateApproach, setAnimateApproach] = useState(false);
+
+  // Estados para Cuantización
+  const [electronCount, setElectronCount] = useState(10);
+  const [showElectrons, setShowElectrons] = useState(true);
+
+  // Estado para conductor/aislador
+  const [materialType, setMaterialType] = useState('conductor');
+  const [chargeDistribution, setChargeDistribution] = useState([]);
+
+  const k = 8.99e9; // Constante de Coulomb
+
+  // Función para dibujar la simulación de Ley de Coulomb
+  const drawCoulombSimulation = (ctx, width, height) => {
+    ctx.clearRect(0, 0, width, height);
+    
+    const centerY = height / 2;
+    const q1X = width / 2 - distance / 2;
+    const q2X = width / 2 + distance / 2;
+
+    // Dibujar línea de conexión
+    ctx.strokeStyle = '#cbd5e1';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([5, 5]);
+    ctx.beginPath();
+    ctx.moveTo(q1X, centerY);
+    ctx.lineTo(q2X, centerY);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Dibujar cargas
+    const radius = 30;
+    
+    // Carga 1
+    const color1 = q1 > 0 ? '#ef4444' : '#3b82f6';
+    ctx.fillStyle = color1;
+    ctx.beginPath();
+    ctx.arc(q1X, centerY, radius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#1e293b';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    
+    ctx.fillStyle = 'white';
+    ctx.font = 'bold 20px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(q1 > 0 ? '+' : '−', q1X, centerY);
+    
+    ctx.fillStyle = '#1e293b';
+    ctx.font = '14px Arial';
+    ctx.fillText(`q₁=${q1}μC`, q1X, centerY + radius + 20);
+
+    // Carga 2
+    const color2 = q2 > 0 ? '#ef4444' : '#3b82f6';
+    ctx.fillStyle = color2;
+    ctx.beginPath();
+    ctx.arc(q2X, centerY, radius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#1e293b';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    
+    ctx.fillStyle = 'white';
+    ctx.font = 'bold 20px Arial';
+    ctx.fillText(q2 > 0 ? '+' : '−', q2X, centerY);
+    
+    ctx.fillStyle = '#1e293b';
+    ctx.font = '14px Arial';
+    ctx.fillText(`q₂=${q2}μC`, q2X, centerY + radius + 20);
+
+    // Calcular y mostrar fuerza
+    const F = Math.abs((k * q1 * q2 * 1e-12) / Math.pow(distance * 1e-2, 2));
+    const forceDirection = (q1 * q2) > 0 ? 'Repulsiva' : 'Atractiva';
+    
+    // Dibujar flechas de fuerza
+    const arrowLength = 60;
+    ctx.strokeStyle = '#f59e0b';
+    ctx.fillStyle = '#f59e0b';
+    ctx.lineWidth = 4;
+    
+    if (forceDirection === 'Repulsiva') {
+      // Flechas hacia afuera
+      drawArrow(ctx, q1X + radius, centerY, q1X - arrowLength, centerY);
+      drawArrow(ctx, q2X - radius, centerY, q2X + arrowLength, centerY);
+    } else {
+      // Flechas hacia adentro
+      drawArrow(ctx, q1X - radius, centerY, q1X + arrowLength, centerY);
+      drawArrow(ctx, q2X + radius, centerY, q2X - arrowLength, centerY);
+    }
+
+    // Mostrar información
+    ctx.fillStyle = '#1e293b';
+    ctx.font = 'bold 16px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText(`Distancia: ${(distance / 100).toFixed(2)} m`, width / 2, 40);
+    ctx.fillText(`Fuerza: ${F.toExponential(2)} N`, width / 2, 65);
+    ctx.fillText(`Tipo: ${forceDirection}`, width / 2, 90);
+  };
+
+  // Función para dibujar campo eléctrico
+  const drawFieldSimulation = (ctx, width, height) => {
+    ctx.clearRect(0, 0, width, height);
+    
+    const centerX = width / 2;
+    const centerY = height / 2;
+    const chargeRadius = 35;
+
+    // Dibujar líneas de campo si están activadas
+    if (showFieldLines) {
+      const numLines = 16;
+      const lineLength = 150;
+      
+      for (let i = 0; i < numLines; i++) {
+        const angle = (2 * Math.PI * i) / numLines;
+        const startX = centerX + chargeRadius * Math.cos(angle);
+        const startY = centerY + chargeRadius * Math.sin(angle);
+        
+        ctx.strokeStyle = sourceCharge > 0 ? '#ef4444' : '#3b82f6';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([]);
+        ctx.beginPath();
+        ctx.moveTo(startX, startY);
+        
+        if (sourceCharge > 0) {
+          // Líneas hacia afuera (carga positiva)
+          const endX = centerX + (chargeRadius + lineLength) * Math.cos(angle);
+          const endY = centerY + (chargeRadius + lineLength) * Math.sin(angle);
+          ctx.lineTo(endX, endY);
+          ctx.stroke();
+          drawArrow(ctx, startX + (lineLength * 0.7) * Math.cos(angle), 
+                       startY + (lineLength * 0.7) * Math.sin(angle),
+                       startX + (lineLength * 0.9) * Math.cos(angle), 
+                       startY + (lineLength * 0.9) * Math.sin(angle));
+        } else {
+          // Líneas hacia adentro (carga negativa)
+          const endX = centerX + (chargeRadius + lineLength) * Math.cos(angle);
+          const endY = centerY + (chargeRadius + lineLength) * Math.sin(angle);
+          ctx.moveTo(endX, endY);
+          ctx.lineTo(startX, startY);
+          ctx.stroke();
+          drawArrow(ctx, endX - (lineLength * 0.2) * Math.cos(angle), 
+                       endY - (lineLength * 0.2) * Math.sin(angle),
+                       endX - (lineLength * 0.4) * Math.cos(angle), 
+                       endY - (lineLength * 0.4) * Math.sin(angle));
+        }
+      }
+    }
+
+    // Dibujar carga fuente
+    const color = sourceCharge > 0 ? '#ef4444' : '#3b82f6';
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, chargeRadius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#1e293b';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    
+    ctx.fillStyle = 'white';
+    ctx.font = 'bold 24px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(sourceCharge > 0 ? '+' : '−', centerX, centerY);
+
+    // Calcular campo eléctrico a 1 metro
+    const E = Math.abs(k * sourceCharge * 1e-6 / 1);
+    
+    // Mostrar información
+    ctx.fillStyle = '#1e293b';
+    ctx.font = 'bold 16px Arial';
+    ctx.textAlign = 'left';
+    ctx.fillText(`Carga fuente: ${sourceCharge} μC`, 20, 30);
+    ctx.fillText(`Campo a 1m: ${E.toExponential(2)} N/C`, 20, 55);
+    ctx.fillText(`Dirección: ${sourceCharge > 0 ? 'Radial saliente' : 'Radial entrante'}`, 20, 80);
+  };
+
+  // Función para dibujar potencial eléctrico
+  const drawPotentialSimulation = (ctx, width, height) => {
+    ctx.clearRect(0, 0, width, height);
+    
+    const centerX = width / 2;
+    const centerY = height / 2;
+    const chargeRadius = 35;
+
+    // Dibujar superficies equipotenciales
+    if (showEquipotentials) {
+      const numCircles = 6;
+      for (let i = 1; i <= numCircles; i++) {
+        const radius = chargeRadius + (i * 35);
+        ctx.strokeStyle = potentialCharge > 0 ? 
+          `rgba(239, 68, 68, ${0.6 - i * 0.08})` : 
+          `rgba(59, 130, 246, ${0.6 - i * 0.08})`;
+        ctx.lineWidth = 3;
+        ctx.setLineDash([5, 5]);
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+        ctx.stroke();
+        
+        // Etiquetas de potencial
+        const V = (k * potentialCharge * 1e-6) / (radius * 0.01);
+        ctx.fillStyle = '#1e293b';
+        ctx.font = '11px Arial';
+        ctx.fillText(`${V.toExponential(1)} V`, centerX + radius + 5, centerY);
+      }
+    }
+    ctx.setLineDash([]);
+
+    // Dibujar carga
+    const color = potentialCharge > 0 ? '#ef4444' : '#3b82f6';
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, chargeRadius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#1e293b';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    
+    ctx.fillStyle = 'white';
+    ctx.font = 'bold 24px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(potentialCharge > 0 ? '+' : '−', centerX, centerY);
+
+    // Información
+    ctx.fillStyle = '#1e293b';
+    ctx.font = 'bold 16px Arial';
+    ctx.textAlign = 'left';
+    ctx.fillText(`Carga: ${potentialCharge} μC`, 20, 30);
+    ctx.fillText(`Superficies equipotenciales mostradas`, 20, 55);
+    ctx.fillText(`Referencia: V(∞) = 0`, 20, 80);
+  };
+
+  // Función para dibujar energía potencial
+  const drawEnergySimulation = (ctx, width, height) => {
+    ctx.clearRect(0, 0, width, height);
+    
+    const centerY = height / 2;
+    const q1X = width / 2 - separation / 2;
+    const q2X = width / 2 + separation / 2;
+    const radius = 30;
+
+    // Dibujar campo de energía (gradiente)
+    const gradient = ctx.createRadialGradient(q1X, centerY, 0, q1X, centerY, 200);
+    if (energyQ1 * energyQ2 > 0) {
+      gradient.addColorStop(0, 'rgba(239, 68, 68, 0.3)');
+      gradient.addColorStop(1, 'rgba(239, 68, 68, 0)');
+    } else {
+      gradient.addColorStop(0, 'rgba(59, 130, 246, 0.3)');
+      gradient.addColorStop(1, 'rgba(59, 130, 246, 0)');
+    }
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, width, height);
+
+    // Línea de conexión
+    ctx.strokeStyle = '#64748b';
+    ctx.lineWidth = 3;
+    ctx.setLineDash([]);
+    ctx.beginPath();
+    ctx.moveTo(q1X, centerY);
+    ctx.lineTo(q2X, centerY);
+    ctx.stroke();
+
+    // Carga 1
+    const color1 = energyQ1 > 0 ? '#ef4444' : '#3b82f6';
+    ctx.fillStyle = color1;
+    ctx.beginPath();
+    ctx.arc(q1X, centerY, radius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#1e293b';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    
+    ctx.fillStyle = 'white';
+    ctx.font = 'bold 20px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(energyQ1 > 0 ? '+' : '−', q1X, centerY);
+
+    // Carga 2
+    const color2 = energyQ2 > 0 ? '#ef4444' : '#3b82f6';
+    ctx.fillStyle = color2;
+    ctx.beginPath();
+    ctx.arc(q2X, centerY, radius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#1e293b';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    
+    ctx.fillStyle = 'white';
+    ctx.font = 'bold 20px Arial';
+    ctx.fillText(energyQ2 > 0 ? '+' : '−', q2X, centerY);
+
+    // Calcular energía potencial
+    const U = (k * energyQ1 * energyQ2 * 1e-12) / (separation * 0.01);
+    const type = U > 0 ? 'Repulsiva (U > 0)' : 'Atractiva (U < 0)';
+
+    // Información
+    ctx.fillStyle = '#1e293b';
+    ctx.font = 'bold 16px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText(`q₁=${energyQ1}μC    q₂=${energyQ2}μC`, width / 2, 40);
+    ctx.fillText(`Separación: ${(separation / 100).toFixed(2)} m`, width / 2, 65);
+    ctx.fillText(`Energía Potencial: ${U.toExponential(2)} J`, width / 2, 90);
+    ctx.fillText(type, width / 2, 115);
+  };
+
+  // Función para dibujar cuantización
+  const drawQuantizationSimulation = (ctx, width, height) => {
+    ctx.clearRect(0, 0, width, height);
+    
+    const centerX = width / 2;
+    const centerY = height / 2;
+    const mainRadius = 60;
+
+    // Dibujar átomo central
+    ctx.strokeStyle = '#64748b';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([3, 3]);
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, mainRadius, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Núcleo
+    ctx.fillStyle = '#ef4444';
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, 20, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#1e293b';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    
+    ctx.fillStyle = 'white';
+    ctx.font = 'bold 16px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('+', centerX, centerY);
+
+    // Dibujar electrones orbitando
+    if (showElectrons) {
+      for (let i = 0; i < Math.min(electronCount, 20); i++) {
+        const angle = (2 * Math.PI * i) / Math.min(electronCount, 20);
+        const orbit = i < 8 ? mainRadius : mainRadius * 1.6;
+        const x = centerX + orbit * Math.cos(angle);
+        const y = centerY + orbit * Math.sin(angle);
+        
+        ctx.fillStyle = '#3b82f6';
+        ctx.beginPath();
+        ctx.arc(x, y, 8, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#1e293b';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        
+        ctx.fillStyle = 'white';
+        ctx.font = 'bold 10px Arial';
+        ctx.fillText('−', x, y);
+      }
+
+      // Órbita exterior si hay muchos electrones
+      if (electronCount > 8) {
+        ctx.strokeStyle = '#64748b';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([3, 3]);
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, mainRadius * 1.6, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+    }
+
+    // Calcular carga total
+    const e = 1.602e-19;
+    const Q = electronCount * e;
+
+    // Información
+    ctx.fillStyle = '#1e293b';
+    ctx.font = 'bold 16px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText(`Número de electrones: ${electronCount}`, width / 2, height - 100);
+    ctx.fillText(`Carga elemental: e = ${e.toExponential(3)} C`, width / 2, height - 75);
+    ctx.fillText(`Carga total: Q = ${Q.toExponential(3)} C`, width / 2, height - 50);
+    ctx.fillText(`Principio: Q = n × e`, width / 2, height - 25);
+  };
+
+  // Función para dibujar conductor/aislador
+  const drawMaterialSimulation = (ctx, width, height) => {
+    ctx.clearRect(0, 0, width, height);
+    
+    const centerX = width / 2;
+    const centerY = height / 2;
+    const materialWidth = 200;
+    const materialHeight = 150;
+
+    // Dibujar material
+    if (materialType === 'conductor') {
+      // Conductor (metálico)
+      const gradient = ctx.createLinearGradient(centerX - materialWidth/2, 0, centerX + materialWidth/2, 0);
+      gradient.addColorStop(0, '#94a3b8');
+      gradient.addColorStop(0.5, '#cbd5e1');
+      gradient.addColorStop(1, '#94a3b8');
+      ctx.fillStyle = gradient;
+    } else if (materialType === 'aislador') {
+      // Aislador (plástico)
+      ctx.fillStyle = '#fbbf24';
+    } else {
+      // Semiconductor
+      ctx.fillStyle = '#8b5cf6';
+    }
+    
+    ctx.fillRect(centerX - materialWidth/2, centerY - materialHeight/2, materialWidth, materialHeight);
+    ctx.strokeStyle = '#1e293b';
+    ctx.lineWidth = 3;
+    ctx.strokeRect(centerX - materialWidth/2, centerY - materialHeight/2, materialWidth, materialHeight);
+
+    // Texto del material
+    ctx.fillStyle = 'white';
+    ctx.font = 'bold 20px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const materialName = materialType === 'conductor' ? 'CONDUCTOR' : 
+                         materialType === 'aislador' ? 'AISLADOR' : 'SEMICONDUCTOR';
+    ctx.fillText(materialName, centerX, centerY);
+
+    // Simular distribución de cargas
+    if (materialType === 'conductor') {
+      // Cargas libres moviéndose
+      for (let i = 0; i < 30; i++) {
+        const x = centerX - materialWidth/2 + Math.random() * materialWidth;
+        const y = centerY - materialHeight/2 + Math.random() * materialHeight;
+        
+        ctx.fillStyle = '#3b82f6';
+        ctx.beginPath();
+        ctx.arc(x, y, 4, 0, Math.PI * 2);
+        ctx.fill();
+        
+        ctx.fillStyle = 'white';
+        ctx.font = 'bold 8px Arial';
+        ctx.fillText('−', x, y);
+      }
+    } else if (materialType === 'aislador') {
+      // Cargas fijas
+      const rows = 4;
+      const cols = 6;
+      for (let i = 0; i < rows; i++) {
+        for (let j = 0; j < cols; j++) {
+          const x = centerX - materialWidth/2 + (j + 1) * (materialWidth / (cols + 1));
+          const y = centerY - materialHeight/2 + (i + 1) * (materialHeight / (rows + 1));
+          
+          // Par de cargas fijas
+          ctx.fillStyle = '#ef4444';
+          ctx.beginPath();
+          ctx.arc(x - 5, y, 3, 0, Math.PI * 2);
+          ctx.fill();
+          
+          ctx.fillStyle = '#3b82f6';
+          ctx.beginPath();
+          ctx.arc(x + 5, y, 3, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+    } else {
+      // Semiconductor - mezcla
+      for (let i = 0; i < 15; i++) {
+        const x = centerX - materialWidth/2 + Math.random() * materialWidth;
+        const y = centerY - materialHeight/2 + Math.random() * materialHeight;
+        
+        ctx.fillStyle = '#3b82f6';
+        ctx.beginPath();
+        ctx.arc(x, y, 4, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    // Información
+    ctx.fillStyle = '#1e293b';
+    ctx.font = 'bold 16px Arial';
+    ctx.textAlign = 'left';
+    if (materialType === 'conductor') {
+      ctx.fillText('✓ Cargas libres móviles', 20, height - 80);
+      ctx.fillText('✓ Alta conductividad', 20, height - 55);
+      ctx.fillText('✓ Ejemplos: Metales (Cu, Al, Ag)', 20, height - 30);
+    } else if (materialType === 'aislador') {
+      ctx.fillText('✗ Cargas fijas (no se mueven)', 20, height - 80);
+      ctx.fillText('✗ Baja conductividad', 20, height - 55);
+      ctx.fillText('✓ Ejemplos: Plástico, Vidrio, Madera', 20, height - 30);
+    } else {
+      ctx.fillText('∼ Conductividad intermedia', 20, height - 80);
+      ctx.fillText('∼ Controlable con dopaje', 20, height - 55);
+      ctx.fillText('✓ Ejemplos: Silicio, Germanio', 20, height - 30);
+    }
+  };
+
+  // Función auxiliar para dibujar flechas
+  const drawArrow = (ctx, fromX, fromY, toX, toY) => {
+    const headlen = 10;
+    const angle = Math.atan2(toY - fromY, toX - fromX);
+    
+    ctx.beginPath();
+    ctx.moveTo(fromX, fromY);
+    ctx.lineTo(toX, toY);
+    ctx.stroke();
+    
+    ctx.beginPath();
+    ctx.moveTo(toX, toY);
+    ctx.lineTo(toX - headlen * Math.cos(angle - Math.PI / 6), toY - headlen * Math.sin(angle - Math.PI / 6));
+    ctx.lineTo(toX - headlen * Math.cos(angle + Math.PI / 6), toY - headlen * Math.sin(angle + Math.PI / 6));
+    ctx.closePath();
+    ctx.fill();
+  };
+
+  // Efecto para dibujar en el canvas
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    
+    const ctx = canvas.getContext('2d');
+    const width = canvas.width;
+    const height = canvas.height;
+
+    switch(simType) {
+      case 'coulomb':
+        drawCoulombSimulation(ctx, width, height);
+        break;
+      case 'campo':
+        drawFieldSimulation(ctx, width, height);
+        break;
+      case 'potencial':
+        drawPotentialSimulation(ctx, width, height);
+        break;
+      case 'energia':
+        drawEnergySimulation(ctx, width, height);
+        break;
+      case 'cuantizacion':
+        drawQuantizationSimulation(ctx, width, height);
+        break;
+      case 'materiales':
+        drawMaterialSimulation(ctx, width, height);
+        break;
+      default:
+        break;
+    }
+  }, [simType, q1, q2, distance, sourceCharge, showFieldLines, testCharge, 
+      potentialCharge, showEquipotentials, energyQ1, energyQ2, separation,
+      electronCount, showElectrons, materialType]);
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-100 p-8">
+      <div className="max-w-7xl mx-auto">
+        <div className="bg-white rounded-2xl shadow-2xl overflow-hidden">
+          {/* Header */}
+          <div className="bg-gradient-to-r from-indigo-600 to-purple-600 p-6 text-white">
+            <h1 className="text-4xl font-bold mb-2">⚡ Simulaciones de Electrostática</h1>
+            <p className="text-indigo-100">Visualización interactiva de fenómenos eléctricos</p>
+          </div>
+
+          {/* Selector de simulación */}
+          <div className="p-6 bg-gradient-to-r from-blue-50 to-indigo-50">
+            <label className="block text-sm font-bold text-gray-700 mb-3">🎯 Seleccionar Simulación</label>
+            <select
+              value={simType}
+              onChange={(e) => setSimType(e.target.value)}
+              className="w-full p-4 text-lg border-2 border-indigo-300 rounded-xl focus:ring-4 focus:ring-indigo-300 focus:border-indigo-500 bg-white font-semibold"
+            >
+              <option value="coulomb">⚡ Ley de Coulomb - Fuerza entre cargas</option>
+              <option value="campo">🔷 Campo Eléctrico - Líneas de campo</option>
+              <option value="potencial">📊 Potencial Eléctrico - Superficies equipotenciales</option>
+              <option value="energia">💫 Energía Potencial Eléctrica</option>
+              <option value="cuantizacion">🔬 Cuantización de la Carga</option>
+              <option value="materiales">⚙️ Conductores, Aisladores y Semiconductores</option>
+            </select>
+          </div>
+
+          {/* Canvas de simulación */}
+          <div className="p-6 bg-gray-50">
+            <div className="bg-white rounded-xl shadow-lg overflow-hidden border-4 border-indigo-200">
+              <canvas 
+                ref={canvasRef} 
+                width={800} 
+                height={500}
+                className="w-full"
+              />
+            </div>
+          </div>
+
+          {/* Controles */}
+          <div className="p-6 bg-white border-t-4 border-indigo-200">
+            <h3 className="text-2xl font-bold text-indigo-900 mb-4">🎮 Controles</h3>
+            
+            {simType === 'coulomb' && (
+              <div className="grid md:grid-cols-3 gap-6">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Carga 1 (q₁): {q1} μC
+                  </label>
+                  <input
+                    type="range"
+                    min="-10"
+                    max="10"
+                    step="0.5"
+                    value={q1}
+                    onChange={(e) => setQ1(parseFloat(e.target.value))}
+                    className="w-full h-3 bg-indigo-200 rounded-lg appearance-none cursor-pointer"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Carga 2 (q₂): {q2} μC
+                  </label>
+                  <input
+                    type="range"
+                    min="-10"
+                    max="10"
+                    step="0.5"
+                    value={q2}
+                    onChange={(e) => setQ2(parseFloat(e.target.value))}
+                    className="w-full h-3 bg-indigo-200 rounded-lg appearance-none cursor-pointer"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Distancia: {(distance / 100).toFixed(2)} m
+                  </label>
+                  <input
+                    type="range"
+                    min="50"
+                    max="350"
+                    step="10"
+                    value={distance}
+                    onChange={(e) => setDistance(parseFloat(e.target.value))}
+                    className="w-full h-3 bg-indigo-200 rounded-lg appearance-none cursor-pointer"
+                  />
+                </div>
+              </div>
+            )}
+
+            {simType === 'campo' && (
+              <div className="grid md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Carga fuente: {sourceCharge} μC
+                  </label>
+                  <input
+                    type="range"
+                    min="-10"
+                    max="10"
+                    step="0.5"
+                    value={sourceCharge}
+                    onChange={(e) => setSourceCharge(parseFloat(e.target.value))}
+                    className="w-full h-3 bg-indigo-200 rounded-lg appearance-none cursor-pointer"
+                  />
+                </div>
+                <div className="flex items-center">
+                  <label className="flex items-center space-x-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={showFieldLines}
+                      onChange={(e) => setShowFieldLines(e.target.checked)}
+                      className="w-6 h-6 text-indigo-600 rounded focus:ring-2 focus:ring-indigo-500"
+                    />
+                    <span className="text-sm font-semibold text-gray-700">Mostrar líneas de campo</span>
+                  </label>
+                </div>
+              </div>
+            )}
+
+            {simType === 'potencial' && (
+              <div className="grid md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Carga: {potentialCharge} μC
+                  </label>
+                  <input
+                    type="range"
+                    min="-10"
+                    max="10"
+                    step="0.5"
+                    value={potentialCharge}
+                    onChange={(e) => setPotentialCharge(parseFloat(e.target.value))}
+                    className="w-full h-3 bg-indigo-200 rounded-lg appearance-none cursor-pointer"
+                  />
+                </div>
+                <div className="flex items-center">
+                  <label className="flex items-center space-x-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={showEquipotentials}
+                      onChange={(e) => setShowEquipotentials(e.target.checked)}
+                      className="w-6 h-6 text-indigo-600 rounded focus:ring-2 focus:ring-indigo-500"
+                    />
+                    <span className="text-sm font-semibold text-gray-700">Mostrar superficies equipotenciales</span>
+                  </label>
+                </div>
+              </div>
+            )}
+
+            {simType === 'energia' && (
+              <div className="grid md:grid-cols-3 gap-6">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Carga 1: {energyQ1} μC
+                  </label>
+                  <input
+                    type="range"
+                    min="-8"
+                    max="8"
+                    step="0.5"
+                    value={energyQ1}
+                    onChange={(e) => setEnergyQ1(parseFloat(e.target.value))}
+                    className="w-full h-3 bg-indigo-200 rounded-lg appearance-none cursor-pointer"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Carga 2: {energyQ2} μC
+                  </label>
+                  <input
+                    type="range"
+                    min="-8"
+                    max="8"
+                    step="0.5"
+                    value={energyQ2}
+                    onChange={(e) => setEnergyQ2(parseFloat(e.target.value))}
+                    className="w-full h-3 bg-indigo-200 rounded-lg appearance-none cursor-pointer"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Separación: {(separation / 100).toFixed(2)} m
+                  </label>
+                  <input
+                    type="range"
+                    min="50"
+                    max="300"
+                    step="10"
+                    value={separation}
+                    onChange={(e) => setSeparation(parseFloat(e.target.value))}
+                    className="w-full h-3 bg-indigo-200 rounded-lg appearance-none cursor-pointer"
+                  />
+                </div>
+              </div>
+            )}
+
+            {simType === 'cuantizacion' && (
+              <div className="grid md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Número de electrones: {electronCount}
+                  </label>
+                  <input
+                    type="range"
+                    min="1"
+                    max="20"
+                    step="1"
+                    value={electronCount}
+                    onChange={(e) => setElectronCount(parseInt(e.target.value))}
+                    className="w-full h-3 bg-indigo-200 rounded-lg appearance-none cursor-pointer"
+                  />
+                </div>
+                <div className="flex items-center">
+                  <label className="flex items-center space-x-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={showElectrons}
+                      onChange={(e) => setShowElectrons(e.target.checked)}
+                      className="w-6 h-6 text-indigo-600 rounded focus:ring-2 focus:ring-indigo-500"
+                    />
+                    <span className="text-sm font-semibold text-gray-700">Mostrar electrones</span>
+                  </label>
+                </div>
+              </div>
+            )}
+
+            {simType === 'materiales' && (
+              <div className="grid md:grid-cols-3 gap-4">
+                <button
+                  onClick={() => setMaterialType('conductor')}
+                  className={`p-4 rounded-xl font-bold text-lg transition-all ${
+                    materialType === 'conductor'
+                      ? 'bg-gradient-to-r from-gray-600 to-gray-800 text-white shadow-xl scale-105'
+                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                  }`}
+                >
+                  ⚡ Conductor
+                </button>
+                <button
+                  onClick={() => setMaterialType('aislador')}
+                  className={`p-4 rounded-xl font-bold text-lg transition-all ${
+                    materialType === 'aislador'
+                      ? 'bg-gradient-to-r from-yellow-500 to-orange-500 text-white shadow-xl scale-105'
+                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                  }`}
+                >
+                  🛡️ Aislador
+                </button>
+                <button
+                  onClick={() => setMaterialType('semiconductor')}
+                  className={`p-4 rounded-xl font-bold text-lg transition-all ${
+                    materialType === 'semiconductor'
+                      ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-xl scale-105'
+                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                  }`}
+                >
+                  💎 Semiconductor
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Explicación del fenómeno */}
+          <div className="p-6 bg-gradient-to-r from-indigo-50 to-purple-50 border-t-4 border-purple-200">
+            <h3 className="text-2xl font-bold text-purple-900 mb-4">📖 Explicación del Fenómeno</h3>
+            
+            {simType === 'coulomb' && (
+              <div className="space-y-3 text-gray-700">
+                <p className="text-lg leading-relaxed">
+                  <strong className="text-indigo-700">Ley de Coulomb:</strong> La fuerza eléctrica entre dos cargas puntuales es directamente proporcional al producto de las cargas e inversamente proporcional al cuadrado de la distancia entre ellas.
+                </p>
+                <p className="bg-white p-3 rounded-lg font-mono text-center text-xl">
+                  F = k × |q₁ × q₂| / r²
+                </p>
+                <ul className="space-y-2 list-disc list-inside bg-white p-4 rounded-lg">
+                  <li><strong>Cargas iguales:</strong> Se repelen (fuerza positiva)</li>
+                  <li><strong>Cargas opuestas:</strong> Se atraen (fuerza negativa)</li>
+                  <li><strong>Constante k:</strong> 8.99 × 10⁹ N·m²/C²</li>
+                  <li><strong>Principio de superposición:</strong> Las fuerzas son vectoriales y se suman</li>
+                </ul>
+              </div>
+            )}
+
+            {simType === 'campo' && (
+              <div className="space-y-3 text-gray-700">
+                <p className="text-lg leading-relaxed">
+                  <strong className="text-indigo-700">Campo Eléctrico:</strong> Es una región del espacio donde una carga eléctrica experimenta una fuerza. El campo se representa mediante líneas que indican la dirección de la fuerza sobre una carga positiva de prueba.
+                </p>
+                <p className="bg-white p-3 rounded-lg font-mono text-center text-xl">
+                  E = k × q / r²  &nbsp;|&nbsp;  F = q × E
+                </p>
+                <ul className="space-y-2 list-disc list-inside bg-white p-4 rounded-lg">
+                  <li><strong>Carga positiva:</strong> Las líneas de campo salen radialmente</li>
+                  <li><strong>Carga negativa:</strong> Las líneas de campo entran radialmente</li>
+                  <li><strong>Densidad de líneas:</strong> Indica la intensidad del campo</li>
+                  <li><strong>Dirección:</strong> Tangente a las líneas en cada punto</li>
+                </ul>
+              </div>
+            )}
+
+            {simType === 'potencial' && (
+              <div className="space-y-3 text-gray-700">
+                <p className="text-lg leading-relaxed">
+                  <strong className="text-indigo-700">Potencial Eléctrico:</strong> Es el trabajo por unidad de carga necesario para mover una carga desde el infinito hasta un punto en el campo eléctrico. Las superficies equipotenciales son perpendiculares a las líneas de campo.
+                </p>
+                <p className="bg-white p-3 rounded-lg font-mono text-center text-xl">
+                  V = k × q / r  &nbsp;|&nbsp;  W = q × ΔV
+                </p>
+                <ul className="space-y-2 list-disc list-inside bg-white p-4 rounded-lg">
+                  <li><strong>Superficies equipotenciales:</strong> Tienen el mismo valor de potencial</li>
+                  <li><strong>Referencia:</strong> V(∞) = 0 (infinito como referencia)</li>
+                  <li><strong>Relación con E:</strong> E = -dV/dr (gradiente del potencial)</li>
+                  <li><strong>Trabajo:</strong> No se realiza trabajo al mover una carga sobre una equipotencial</li>
+                </ul>
+              </div>
+            )}
+
+            {simType === 'energia' && (
+              <div className="space-y-3 text-gray-700">
+                <p className="text-lg leading-relaxed">
+                  <strong className="text-indigo-700">Energía Potencial Eléctrica:</strong> Es la energía almacenada en un sistema de cargas debido a su configuración. Depende de las magnitudes de las cargas y su separación.
+                </p>
+                <p className="bg-white p-3 rounded-lg font-mono text-center text-xl">
+                  U = k × q₁ × q₂ / r
+                </p>
+                <ul className="space-y-2 list-disc list-inside bg-white p-4 rounded-lg">
+                  <li><strong>U &gt; 0:</strong> Sistema repulsivo (cargas del mismo signo)</li>
+                  <li><strong>U &lt; 0:</strong> Sistema atractivo (cargas de signos opuestos)</li>
+                  <li><strong>Conservación:</strong> La energía mecánica total se conserva</li>
+                  <li><strong>Relación con V:</strong> U = q × V</li>
+                </ul>
+              </div>
+            )}
+
+            {simType === 'cuantizacion' && (
+              <div className="space-y-3 text-gray-700">
+                <p className="text-lg leading-relaxed">
+                  <strong className="text-indigo-700">Cuantización de la Carga:</strong> La carga eléctrica está cuantizada, lo que significa que solo puede existir en múltiplos enteros de la carga elemental (e = 1.602 × 10⁻¹⁹ C), que corresponde a la carga de un electrón o protón.
+                </p>
+                <p className="bg-white p-3 rounded-lg font-mono text-center text-xl">
+                  Q = n × e
+                </p>
+                <ul className="space-y-2 list-disc list-inside bg-white p-4 rounded-lg">
+                  <li><strong>Carga elemental:</strong> e = 1.602 × 10⁻¹⁹ C (valor fundamental)</li>
+                  <li><strong>Electrón:</strong> Carga negativa (-e)</li>
+                  <li><strong>Protón:</strong> Carga positiva (+e)</li>
+                  <li><strong>Conservación:</strong> La carga total se conserva en procesos físicos</li>
+                  <li><strong>No existe carga fraccionaria:</strong> Siempre múltiplos enteros de e</li>
+                </ul>
+              </div>
+            )}
+
+            {simType === 'materiales' && (
+              <div className="space-y-3 text-gray-700">
+                <p className="text-lg leading-relaxed">
+                  <strong className="text-indigo-700">Conductores, Aisladores y Semiconductores:</strong> Los materiales se clasifican según su capacidad para permitir el movimiento de cargas eléctricas.
+                </p>
+                <div className="grid md:grid-cols-3 gap-4 mt-4">
+                  <div className="bg-gradient-to-br from-gray-100 to-gray-200 p-4 rounded-lg border-2 border-gray-400">
+                    <h4 className="font-bold text-lg mb-2 text-gray-800">⚡ CONDUCTORES</h4>
+                    <ul className="text-sm space-y-1 list-disc list-inside">
+                      <li>Electrones libres móviles</li>
+                      <li>Alta conductividad</li>
+                      <li>Ejemplos: Cu, Al, Ag, Au</li>
+                      <li>σ &gt; 10⁷ S/m</li>
+                    </ul>
+                  </div>
+                  <div className="bg-gradient-to-br from-yellow-100 to-orange-100 p-4 rounded-lg border-2 border-orange-400">
+                    <h4 className="font-bold text-lg mb-2 text-orange-800">🛡️ AISLADORES</h4>
+                    <ul className="text-sm space-y-1 list-disc list-inside">
+                      <li>Cargas fijas (no móviles)</li>
+                      <li>Muy baja conductividad</li>
+                      <li>Ejemplos: Plástico, Vidrio</li>
+                      <li>σ &lt; 10⁻¹⁰ S/m</li>
+                    </ul>
+                  </div>
+                  <div className="bg-gradient-to-br from-purple-100 to-indigo-100 p-4 rounded-lg border-2 border-purple-400">
+                    <h4 className="font-bold text-lg mb-2 text-purple-800">💎 SEMICONDUCTORES</h4>
+                    <ul className="text-sm space-y-1 list-disc list-inside">
+                      <li>Conductividad intermedia</li>
+                      <li>Controlable por temperatura</li>
+                      <li>Ejemplos: Si, Ge</li>
+                      <li>10⁻¹⁰ &lt; σ &lt; 10⁷ S/m</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Footer con consejos */}
+          <div className="p-6 bg-gradient-to-r from-blue-600 to-indigo-600 text-white">
+            <h3 className="text-xl font-bold mb-3">💡 Consejos para usar la simulación</h3>
+            <ul className="space-y-2 text-sm">
+              <li>🎮 Usa los controles deslizantes para modificar los parámetros en tiempo real</li>
+              <li>🔍 Observa cómo cambian las fuerzas, campos y potenciales según las variables</li>
+              <li>⚡ Prueba combinaciones de cargas positivas y negativas para ver diferentes comportamientos</li>
+              <li>📊 Las visualizaciones muestran conceptos clave como líneas de campo y equipotenciales</li>
+              <li>🧪 Experimenta con diferentes materiales para entender sus propiedades eléctricas</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+function CalculadoraCapacitancia() {
+  const [calcType, setCalcType] = useState('basica');
+  const [inputs, setInputs] = useState({});
+  const [result, setResult] = useState(null);
+  const [findVariable, setFindVariable] = useState('C');
+
+  const e0 = 8.854e-12; // Permitividad del vacío (F/m)
+  const k = 8.99e9; // Constante de Coulomb
+
+  const calculateBasica = () => {
+    const { C, Q, V } = inputs;
+    
+    if (findVariable === 'C') {
+      const capacitancia = parseFloat(Q) / parseFloat(V);
+      setResult({ 
+        capacitancia: capacitancia.toExponential(3),
+        capacitanciaMicro: (capacitancia * 1e6).toFixed(3),
+        capacitanciaNano: (capacitancia * 1e9).toFixed(3)
+      });
+    } else if (findVariable === 'Q') {
+      const carga = parseFloat(C) * parseFloat(V);
+      setResult({ 
+        carga: carga.toExponential(3),
+        cargaMicro: (carga * 1e6).toFixed(3)
+      });
+    } else if (findVariable === 'V') {
+      const voltaje = parseFloat(Q) / parseFloat(C);
+      setResult({ 
+        voltaje: voltaje.toFixed(3),
+        voltajeKV: (voltaje / 1000).toFixed(3)
+      });
+    }
+  };
+
+  const calculatePlano = () => {
+    const { A, d, er, C } = inputs;
+    
+    if (findVariable === 'C') {
+      const permitividad = e0 * (parseFloat(er) || 1);
+      const capacitancia = (permitividad * parseFloat(A)) / parseFloat(d);
+      setResult({ 
+        capacitancia: capacitancia.toExponential(3),
+        capacitanciaPico: (capacitancia * 1e12).toFixed(3),
+        capacitanciaNano: (capacitancia * 1e9).toFixed(3)
+      });
+    } else if (findVariable === 'A') {
+      const permitividad = e0 * (parseFloat(er) || 1);
+      const area = (parseFloat(C) * parseFloat(d)) / permitividad;
+      setResult({ 
+        area: area.toExponential(3),
+        areaCm2: (area * 1e4).toFixed(3)
+      });
+    } else if (findVariable === 'd') {
+      const permitividad = e0 * (parseFloat(er) || 1);
+      const distancia = (permitividad * parseFloat(A)) / parseFloat(C);
+      setResult({ 
+        distancia: distancia.toExponential(3),
+        distanciaMm: (distancia * 1000).toFixed(3)
+      });
+    } else if (findVariable === 'er') {
+      const constDielectrica = (parseFloat(C) * parseFloat(d)) / (e0 * parseFloat(A));
+      setResult({ 
+        constanteDielectrica: constDielectrica.toFixed(3),
+        material: getMaterialName(constDielectrica)
+      });
+    }
+  };
+
+  const calculateEsferico = () => {
+    const { ra, rb, er, C } = inputs;
+    
+    if (findVariable === 'C') {
+      const permitividad = e0 * (parseFloat(er) || 1);
+      const capacitancia = 4 * Math.PI * permitividad * (parseFloat(ra) * parseFloat(rb)) / (parseFloat(rb) - parseFloat(ra));
+      setResult({ 
+        capacitancia: capacitancia.toExponential(3),
+        capacitanciaPico: (capacitancia * 1e12).toFixed(3)
+      });
+    } else if (findVariable === 'ra') {
+      const permitividad = e0 * (parseFloat(er) || 1);
+      const rb = parseFloat(inputs.rb);
+      const radioInterno = (parseFloat(C) * rb) / (4 * Math.PI * permitividad * rb - parseFloat(C));
+      setResult({ 
+        radioInterno: radioInterno.toExponential(3),
+        radioInternoCm: (radioInterno * 100).toFixed(3)
+      });
+    }
+  };
+
+  const calculateCilindrico = () => {
+    const { ra, rb, L, er, C } = inputs;
+    
+    if (findVariable === 'C') {
+      const permitividad = e0 * (parseFloat(er) || 1);
+      const capacitancia = (2 * Math.PI * permitividad * parseFloat(L)) / Math.log(parseFloat(rb) / parseFloat(ra));
+      setResult({ 
+        capacitancia: capacitancia.toExponential(3),
+        capacitanciaPico: (capacitancia * 1e12).toFixed(3)
+      });
+    } else if (findVariable === 'L') {
+      const permitividad = e0 * (parseFloat(er) || 1);
+      const longitud = (parseFloat(C) * Math.log(parseFloat(rb) / parseFloat(ra))) / (2 * Math.PI * permitividad);
+      setResult({ 
+        longitud: longitud.toExponential(3),
+        longitudCm: (longitud * 100).toFixed(3)
+      });
+    }
+  };
+
+  const calculateSerie = () => {
+    const { C1, C2, C3 } = inputs;
+    const capacitores = [C1, C2, C3].filter(c => c && parseFloat(c) > 0).map(c => parseFloat(c));
+    
+    if (capacitores.length < 2) {
+      setResult({ error: 'Ingrese al menos 2 capacitores' });
+      return;
+    }
+    
+    const invCeq = capacitores.reduce((sum, c) => sum + 1/c, 0);
+    const Ceq = 1 / invCeq;
+    
+    setResult({ 
+      capacitanciaEquivalente: Ceq.toExponential(3),
+      capacitanciaEquivalenteMicro: (Ceq * 1e6).toFixed(3),
+      numeroCapacitores: capacitores.length,
+      tipo: 'Serie'
+    });
+  };
+
+  const calculateParalelo = () => {
+    const { C1, C2, C3 } = inputs;
+    const capacitores = [C1, C2, C3].filter(c => c && parseFloat(c) > 0).map(c => parseFloat(c));
+    
+    if (capacitores.length < 2) {
+      setResult({ error: 'Ingrese al menos 2 capacitores' });
+      return;
+    }
+    
+    const Ceq = capacitores.reduce((sum, c) => sum + c, 0);
+    
+    setResult({ 
+      capacitanciaEquivalente: Ceq.toExponential(3),
+      capacitanciaEquivalenteMicro: (Ceq * 1e6).toFixed(3),
+      numeroCapacitores: capacitores.length,
+      tipo: 'Paralelo'
+    });
+  };
+
+  const calculateEnergia = () => {
+    const { C, V, Q, U } = inputs;
+    
+    if (findVariable === 'U') {
+      if (inputs.C && inputs.V) {
+        const energia = 0.5 * parseFloat(C) * Math.pow(parseFloat(V), 2);
+        setResult({ 
+          energia: energia.toExponential(3),
+          energiaMicro: (energia * 1e6).toFixed(3),
+          energiaMili: (energia * 1e3).toFixed(3)
+        });
+      } else if (inputs.Q && inputs.V) {
+        const energia = 0.5 * parseFloat(Q) * parseFloat(V);
+        setResult({ 
+          energia: energia.toExponential(3),
+          energiaMicro: (energia * 1e6).toFixed(3)
+        });
+      } else if (inputs.Q && inputs.C) {
+        const energia = Math.pow(parseFloat(Q), 2) / (2 * parseFloat(C));
+        setResult({ 
+          energia: energia.toExponential(3),
+          energiaMicro: (energia * 1e6).toFixed(3)
+        });
+      }
+    } else if (findVariable === 'C') {
+      if (inputs.U && inputs.V) {
+        const capacitancia = (2 * parseFloat(U)) / Math.pow(parseFloat(V), 2);
+        setResult({ 
+          capacitancia: capacitancia.toExponential(3),
+          capacitanciaMicro: (capacitancia * 1e6).toFixed(3)
+        });
+      }
+    } else if (findVariable === 'V') {
+      if (inputs.U && inputs.C) {
+        const voltaje = Math.sqrt((2 * parseFloat(U)) / parseFloat(C));
+        setResult({ 
+          voltaje: voltaje.toFixed(3),
+          voltajeKV: (voltaje / 1000).toFixed(3)
+        });
+      }
+    } else if (findVariable === 'Q') {
+      if (inputs.U && inputs.C) {
+        const carga = Math.sqrt(2 * parseFloat(U) * parseFloat(C));
+        setResult({ 
+          carga: carga.toExponential(3),
+          cargaMicro: (carga * 1e6).toFixed(3)
+        });
+      }
+    }
+  };
+
+  const calculateDielectrico = () => {
+    const { C0, er, C, d, E0, E } = inputs;
+    
+    if (findVariable === 'C') {
+      const capacitanciaConDielectrico = parseFloat(C0) * parseFloat(er);
+      setResult({ 
+        capacitanciaConDielectrico: capacitanciaConDielectrico.toExponential(3),
+        capacitanciaMicro: (capacitanciaConDielectrico * 1e6).toFixed(3),
+        factorAumento: parseFloat(er).toFixed(2)
+      });
+    } else if (findVariable === 'er') {
+      const constante = parseFloat(C) / parseFloat(C0);
+      setResult({ 
+        constanteDielectrica: constante.toFixed(3),
+        material: getMaterialName(constante)
+      });
+    } else if (findVariable === 'E') {
+      const campoReducido = parseFloat(E0) / parseFloat(er);
+      setResult({ 
+        campoElectrico: campoReducido.toExponential(3),
+        reduccionPorcentaje: ((1 - 1/parseFloat(er)) * 100).toFixed(2)
+      });
+    }
+  };
+
+  const getMaterialName = (er) => {
+    if (er >= 1 && er < 1.5) return 'Vacío o Aire';
+    if (er >= 1.5 && er < 3) return 'Teflón o Polietileno';
+    if (er >= 3 && er < 5) return 'Papel o Mylar';
+    if (er >= 5 && er < 7) return 'Vidrio';
+    if (er >= 7 && er < 10) return 'Mica';
+    if (er >= 10 && er < 100) return 'Cerámica';
+    if (er >= 100) return 'Titanato de Bario';
+    return 'Material desconocido';
+  };
+
+  const handleCalculate = () => {
+    try {
+      if (calcType === 'basica') calculateBasica();
+      else if (calcType === 'plano') calculatePlano();
+      else if (calcType === 'esferico') calculateEsferico();
+      else if (calcType === 'cilindrico') calculateCilindrico();
+      else if (calcType === 'serie') calculateSerie();
+      else if (calcType === 'paralelo') calculateParalelo();
+      else if (calcType === 'energia') calculateEnergia();
+      else if (calcType === 'dielectrico') calculateDielectrico();
+    } catch (error) {
+      setResult({ error: 'Por favor complete todos los campos requeridos correctamente' });
+    }
+  };
+
+  const resetCalculator = () => {
+    setInputs({});
+    setResult(null);
+  };
+
+  return (
+    <div className="p-8 max-w-5xl mx-auto bg-gradient-to-br from-cyan-50 to-blue-50 min-h-screen">
+      <div className="bg-white rounded-xl shadow-2xl p-8">
+        <h1 className="text-4xl font-bold text-blue-900 mb-2">⚡ Calculadora de Capacitancia</h1>
+        <p className="text-gray-600 mb-6">Cálculos de capacitancia, energía almacenada y dieléctricos</p>
+
+        <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6 rounded">
+          <p className="text-sm text-gray-700">
+            <strong>💡 Instrucciones:</strong> Seleccione el tipo de cálculo, elija la variable a encontrar y complete los campos necesarios.
+          </p>
+        </div>
+
+        <div className="grid md:grid-cols-2 gap-6 mb-6">
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">📊 Tipo de Cálculo</label>
+            <select
+              value={calcType}
+              onChange={(e) => { 
+                setCalcType(e.target.value); 
+                resetCalculator(); 
+                setFindVariable(
+                  e.target.value === 'basica' ? 'C' :
+                  e.target.value === 'plano' ? 'C' :
+                  e.target.value === 'esferico' ? 'C' :
+                  e.target.value === 'cilindrico' ? 'C' :
+                  e.target.value === 'serie' ? 'Ceq' :
+                  e.target.value === 'paralelo' ? 'Ceq' :
+                  e.target.value === 'energia' ? 'U' : 'C'
+                ); 
+              }}
+              className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+            >
+              <option value="basica">Capacitancia Básica (C = Q/V)</option>
+              <option value="plano">Capacitor Plano</option>
+              <option value="esferico">Capacitor Esférico</option>
+              <option value="cilindrico">Capacitor Cilíndrico</option>
+              <option value="serie">Capacitores en Serie</option>
+              <option value="paralelo">Capacitores en Paralelo</option>
+              <option value="energia">Energía Almacenada</option>
+              <option value="dielectrico">Dieléctricos</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">🎯 Variable a Calcular</label>
+            <select
+              value={findVariable}
+              onChange={(e) => { setFindVariable(e.target.value); resetCalculator(); }}
+              className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+            >
+              {calcType === 'basica' && (
+                <>
+                  <option value="C">Capacitancia (C)</option>
+                  <option value="Q">Carga (Q)</option>
+                  <option value="V">Voltaje (V)</option>
+                </>
+              )}
+              {calcType === 'plano' && (
+                <>
+                  <option value="C">Capacitancia (C)</option>
+                  <option value="A">Área de placas (A)</option>
+                  <option value="d">Separación (d)</option>
+                  <option value="er">Constante dieléctrica (εᵣ)</option>
+                </>
+              )}
+              {calcType === 'esferico' && (
+                <>
+                  <option value="C">Capacitancia (C)</option>
+                  <option value="ra">Radio interno (a)</option>
+                </>
+              )}
+              {calcType === 'cilindrico' && (
+                <>
+                  <option value="C">Capacitancia (C)</option>
+                  <option value="L">Longitud (L)</option>
+                </>
+              )}
+              {(calcType === 'serie' || calcType === 'paralelo') && (
+                <option value="Ceq">Capacitancia Equivalente (Ceq)</option>
+              )}
+              {calcType === 'energia' && (
+                <>
+                  <option value="U">Energía almacenada (U)</option>
+                  <option value="C">Capacitancia (C)</option>
+                  <option value="V">Voltaje (V)</option>
+                  <option value="Q">Carga (Q)</option>
+                </>
+              )}
+              {calcType === 'dielectrico' && (
+                <>
+                  <option value="C">Capacitancia con dieléctrico (C)</option>
+                  <option value="er">Constante dieléctrica (εᵣ)</option>
+                  <option value="E">Campo eléctrico (E)</option>
+                </>
+              )}
+            </select>
+          </div>
+        </div>
+
+        <div className="bg-gradient-to-r from-cyan-50 to-blue-50 border-2 border-blue-200 rounded-lg p-6 mb-6">
+          <h3 className="text-lg font-bold text-blue-900 mb-4">📝 Datos de Entrada</h3>
+          
+          {calcType === 'basica' && (
+            <div className="grid md:grid-cols-2 gap-4">
+              {findVariable !== 'C' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Capacitancia (C) en Farads [F]</label>
+                  <input 
+                    type="number" 
+                    step="any" 
+                    value={inputs.C || ''} 
+                    onChange={(e) => setInputs({...inputs, C: e.target.value})} 
+                    className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    placeholder="ej: 1e-6 (1 μF)" 
+                  />
+                </div>
+              )}
+              {findVariable !== 'Q' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Carga (Q) en Coulombs [C]</label>
+                  <input 
+                    type="number" 
+                    step="any" 
+                    value={inputs.Q || ''} 
+                    onChange={(e) => setInputs({...inputs, Q: e.target.value})} 
+                    className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    placeholder="ej: 1e-4" 
+                  />
+                </div>
+              )}
+              {findVariable !== 'V' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Voltaje (V) en Voltios [V]</label>
+                  <input 
+                    type="number" 
+                    step="any" 
+                    value={inputs.V || ''} 
+                    onChange={(e) => setInputs({...inputs, V: e.target.value})} 
+                    className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    placeholder="ej: 100" 
+                  />
+                </div>
+              )}
+            </div>
+          )}
+
+          {calcType === 'plano' && (
+            <div className="grid md:grid-cols-2 gap-4">
+              {findVariable !== 'A' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Área de placas (A) en m² [m²]</label>
+                  <input 
+                    type="number" 
+                    step="any" 
+                    value={inputs.A || ''} 
+                    onChange={(e) => setInputs({...inputs, A: e.target.value})} 
+                    className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    placeholder="ej: 0.01 (100 cm²)" 
+                  />
+                </div>
+              )}
+              {findVariable !== 'd' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Separación (d) en metros [m]</label>
+                  <input 
+                    type="number" 
+                    step="any" 
+                    value={inputs.d || ''} 
+                    onChange={(e) => setInputs({...inputs, d: e.target.value})} 
+                    className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    placeholder="ej: 0.001 (1 mm)" 
+                  />
+                </div>
+              )}
+              {findVariable !== 'er' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Constante dieléctrica (εᵣ) [adimensional]</label>
+                  <input 
+                    type="number" 
+                    step="any" 
+                    value={inputs.er || ''} 
+                    onChange={(e) => setInputs({...inputs, er: e.target.value})} 
+                    className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    placeholder="ej: 1 (vacío), 2.1 (teflón), 5 (vidrio)" 
+                  />
+                </div>
+              )}
+              {findVariable !== 'C' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Capacitancia (C) en Farads [F]</label>
+                  <input 
+                    type="number" 
+                    step="any" 
+                    value={inputs.C || ''} 
+                    onChange={(e) => setInputs({...inputs, C: e.target.value})} 
+                    className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    placeholder="ej: 1e-9" 
+                  />
+                </div>
+              )}
+            </div>
+          )}
+
+          {calcType === 'esferico' && (
+            <div className="grid md:grid-cols-2 gap-4">
+              {findVariable !== 'ra' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Radio interno (a) en metros [m]</label>
+                  <input 
+                    type="number" 
+                    step="any" 
+                    value={inputs.ra || ''} 
+                    onChange={(e) => setInputs({...inputs, ra: e.target.value})} 
+                    className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    placeholder="ej: 0.05" 
+                  />
+                </div>
+              )}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Radio externo (b) en metros [m]</label>
+                <input 
+                  type="number" 
+                  step="any" 
+                  value={inputs.rb || ''} 
+                  onChange={(e) => setInputs({...inputs, rb: e.target.value})} 
+                  className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  placeholder="ej: 0.1" 
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Constante dieléctrica (εᵣ)</label>
+                <input 
+                  type="number" 
+                  step="any" 
+                  value={inputs.er || ''} 
+                  onChange={(e) => setInputs({...inputs, er: e.target.value})} 
+                  className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  placeholder="ej: 1" 
+                />
+              </div>
+              {findVariable !== 'C' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Capacitancia (C) en Farads [F]</label>
+                  <input 
+                    type="number" 
+                    step="any" 
+                    value={inputs.C || ''} 
+                    onChange={(e) => setInputs({...inputs, C: e.target.value})} 
+                    className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    placeholder="ej: 1e-11" 
+                  />
+                </div>
+              )}
+            </div>
+          )}
+
+          {calcType === 'cilindrico' && (
+            <div className="grid md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Radio interno (a) en metros [m]</label>
+                <input 
+                  type="number" 
+                  step="any" 
+                  value={inputs.ra || ''} 
+                  onChange={(e) => setInputs({...inputs, ra: e.target.value})} 
+                  className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  placeholder="ej: 0.01" 
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Radio externo (b) en metros [m]</label>
+                <input 
+                  type="number" 
+                  step="any" 
+                  value={inputs.rb || ''} 
+                  onChange={(e) => setInputs({...inputs, rb: e.target.value})} 
+                  className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  placeholder="ej: 0.02" 
+                />
+              </div>
+              {findVariable !== 'L' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Longitud (L) en metros [m]</label>
+                  <input 
+                    type="number" 
+                    step="any" 
+                    value={inputs.L || ''} 
+                    onChange={(e) => setInputs({...inputs, L: e.target.value})} 
+                    className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    placeholder="ej: 1" 
+                  />
+                </div>
+              )}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Constante dieléctrica (εᵣ)</label>
+                <input 
+                  type="number" 
+                  step="any" 
+                  value={inputs.er || ''} 
+                  onChange={(e) => setInputs({...inputs, er: e.target.value})} 
+                  className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  placeholder="ej: 1" 
+                />
+              </div>
+              {findVariable !== 'C' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Capacitancia (C) en Farads [F]</label>
+                  <input 
+                    type="number" 
+                    step="any" 
+                    value={inputs.C || ''} 
+                    onChange={(e) => setInputs({...inputs, C: e.target.value})} 
+                    className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    placeholder="ej: 1e-10" 
+                  />
+                </div>
+              )}
+            </div>
+          )}
+
+          {(calcType === 'serie' || calcType === 'paralelo') && (
+            <div className="grid md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Capacitor 1 (C₁) en F</label>
+                <input 
+                  type="number" 
+                  step="any" 
+                  value={inputs.C1 || ''} 
+                  onChange={(e) => setInputs({...inputs, C1: e.target.value})} 
+                  className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  placeholder="ej: 1e-6" 
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Capacitor 2 (C₂) en F</label>
+                <input 
+                  type="number" 
+                  step="any" 
+                  value={inputs.C2 || ''} 
+                  onChange={(e) => setInputs({...inputs, C2: e.target.value})} 
+                  className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  placeholder="ej: 2e-6" 
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Capacitor 3 (C₃) en F (opcional)</label>
+                <input 
+                  type="number" 
+                  step="any" 
+                  value={inputs.C3 || ''} 
+                  onChange={(e) => setInputs({...inputs, C3: e.target.value})} 
+                  className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  placeholder="ej: 3e-6" 
+                />
+              </div>
+            </div>
+          )}
+
+          {calcType === 'energia' && (
+            <div className="grid md:grid-cols-2 gap-4">
+              {findVariable !== 'C' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Capacitancia (C) en Farads [F]</label>
+                  <input 
+                    type="number" 
+                    step="any" 
+                    value={inputs.C || ''} 
+                    onChange={(e) => setInputs({...inputs, C: e.target.value})} 
+                    className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    placeholder="ej: 1e-6" 
+                  />
+                </div>
+              )}
+              {findVariable !== 'V' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Voltaje (V) en Voltios [V]</label>
+                  <input 
+                    type="number" 
+                    step="any" 
+                    value={inputs.V || ''} 
+                    onChange={(e) => setInputs({...inputs, V: e.target.value})} 
+                    className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    placeholder="ej: 100" 
+                  />
+                </div>
+              )}
+              {findVariable !== 'Q' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Carga (Q) en Coulombs [C]</label>
+                  <input 
+                    type="number" 
+                    step="any" 
+                    value={inputs.Q || ''} 
+                    onChange={(e) => setInputs({...inputs, Q: e.target.value})} 
+                    className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    placeholder="ej: 1e-4" 
+                  />
+                </div>
+              )}
+              {findVariable !== 'U' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Energía (U) en Joules [J]</label>
+                  <input 
+                    type="number" 
+                    step="any" 
+                    value={inputs.U || ''} 
+                    onChange={(e) => setInputs({...inputs, U: e.target.value})} 
+                    className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    placeholder="ej: 0.005" 
+                  />
+                </div>
+              )}
+            </div>
+          )}
+
+          {calcType === 'dielectrico' && (
+            <div className="grid md:grid-cols-2 gap-4">
+              {findVariable !== 'C' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Capacitancia sin dieléctrico (C₀) en F</label>
+                  <input 
+                    type="number" 
+                    step="any" 
+                    value={inputs.C0 || ''} 
+                    onChange={(e) => setInputs({...inputs, C0: e.target.value})} 
+                    className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    placeholder="ej: 1e-9" 
+                  />
+                </div>
+              )}
+              {findVariable !== 'er' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Constante dieléctrica (εᵣ)</label>
+                  <input 
+                    type="number" 
+                    step="any" 
+                    value={inputs.er || ''} 
+                    onChange={(e) => setInputs({...inputs, er: e.target.value})} 
+                    className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    placeholder="ej: 2.1 (teflón), 5 (vidrio)" 
+                  />
+                </div>
+              )}
+              {findVariable === 'er' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Capacitancia con dieléctrico (C) en F</label>
+                  <input 
+                    type="number" 
+                    step="any" 
+                    value={inputs.C || ''} 
+                    onChange={(e) => setInputs({...inputs, C: e.target.value})} 
+                    className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    placeholder="ej: 2.1e-9" 
+                  />
+                </div>
+              )}
+              {findVariable === 'E' && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Campo sin dieléctrico (E₀) en V/m</label>
+                    <input 
+                      type="number" 
+                      step="any" 
+                      value={inputs.E0 || ''} 
+                      onChange={(e) => setInputs({...inputs, E0: e.target.value})} 
+                      className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      placeholder="ej: 10000" 
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Constante dieléctrica (εᵣ)</label>
+                    <input 
+                      type="number" 
+                      step="any" 
+                      value={inputs.er || ''} 
+                      onChange={(e) => setInputs({...inputs, er: e.target.value})} 
+                      className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      placeholder="ej: 5" 
+                    />
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          <div className="mt-6 flex gap-3">
+            <button 
+              onClick={handleCalculate} 
+              className="flex-1 bg-gradient-to-r from-blue-600 to-cyan-600 text-white py-3 rounded-lg font-semibold hover:from-blue-700 hover:to-cyan-700 transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+            >
+              ⚡ Calcular
+            </button>
+            <button 
+              onClick={resetCalculator} 
+              className="px-6 bg-gray-200 text-gray-700 py-3 rounded-lg font-semibold hover:bg-gray-300 transition-colors"
+            >
+              🔄 Limpiar
+            </button>
+          </div>
+        </div>
+
+        {result && (
+          <div className={`${result.error ? 'bg-red-50 border-red-300' : 'bg-green-50 border-green-300'} border-2 rounded-xl p-6 shadow-lg`}>
+            <h3 className="text-2xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+              {result.error ? '❌' : '✅'} Resultados
+            </h3>
+            {result.error ? (
+              <p className="text-red-700 font-medium">{result.error}</p>
+            ) : (
+              <div className="space-y-3">
+                {Object.entries(result).map(([key, value]) => (
+                  <div key={key} className="flex justify-between items-center py-3 border-b border-green-200 last:border-0">
+                    <span className="font-medium text-gray-700 capitalize text-lg">
+                      {key === 'capacitancia' ? '⚡ Capacitancia' :
+                       key === 'capacitanciaMicro' ? '⚡ Capacitancia en μF' :
+                       key === 'capacitanciaNano' ? '⚡ Capacitancia en nF' :
+                       key === 'capacitanciaPico' ? '⚡ Capacitancia en pF' :
+                       key === 'carga' ? '🔋 Carga' :
+                       key === 'cargaMicro' ? '🔋 Carga en μC' :
+                       key === 'voltaje' ? '⚡ Voltaje' :
+                       key === 'voltajeKV' ? '⚡ Voltaje en kV' :
+                       key === 'area' ? '📐 Área' :
+                       key === 'areaCm2' ? '📐 Área en cm²' :
+                       key === 'distancia' ? '📏 Distancia' :
+                       key === 'distanciaMm' ? '📏 Distancia en mm' :
+                       key === 'constanteDielectrica' ? '🔷 Constante Dieléctrica (εᵣ)' :
+                       key === 'material' ? '🧪 Material sugerido' :
+                       key === 'radioInterno' ? '⭕ Radio interno' :
+                       key === 'radioInternoCm' ? '⭕ Radio interno en cm' :
+                       key === 'longitud' ? '📏 Longitud' :
+                       key === 'longitudCm' ? '📏 Longitud en cm' :
+                       key === 'capacitanciaEquivalente' ? '⚡ Capacitancia Equivalente' :
+                       key === 'capacitanciaEquivalenteMicro' ? '⚡ C equivalente en μF' :
+                       key === 'numeroCapacitores' ? '🔢 Número de capacitores' :
+                       key === 'tipo' ? '🎯 Tipo de conexión' :
+                       key === 'energia' ? '💫 Energía almacenada' :
+                       key === 'energiaMicro' ? '💫 Energía en μJ' :
+                       key === 'energiaMili' ? '💫 Energía en mJ' :
+                       key === 'capacitanciaConDielectrico' ? '⚡ Capacitancia con dieléctrico' :
+                       key === 'factorAumento' ? '📈 Factor de aumento' :
+                       key === 'campoElectrico' ? '🔷 Campo eléctrico' :
+                       key === 'reduccionPorcentaje' ? '📉 Reducción del campo (%)' :
+                       key.replace(/([A-Z])/g, ' $1').trim()}:
+                    </span>
+                    <span className="text-xl font-bold text-blue-900 bg-white px-4 py-2 rounded-lg shadow">
+                      {value} {getUnit(key)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className="mt-8 bg-cyan-50 border-2 border-cyan-200 rounded-lg p-6">
+          <h3 className="text-xl font-bold text-cyan-900 mb-3">📚 Fórmulas Utilizadas</h3>
+          <div className="text-sm text-gray-700 space-y-2">
+            {calcType === 'basica' && (
+              <div>
+                <p className="font-semibold">Capacitancia Básica:</p>
+                <p className="bg-white p-2 rounded mt-1 font-mono">C = Q / V</p>
+                <p className="text-xs mt-1">donde C es capacitancia (F), Q es carga (C), V es voltaje (V)</p>
+              </div>
+            )}
+            {calcType === 'plano' && (
+              <div>
+                <p className="font-semibold">Capacitor de Placas Paralelas:</p>
+                <p className="bg-white p-2 rounded mt-1 font-mono">C = ε₀ × εᵣ × A / d</p>
+                <p className="text-xs mt-1">donde ε₀ = 8.854×10⁻¹² F/m, A es área (m²), d es separación (m)</p>
+              </div>
+            )}
+            {calcType === 'esferico' && (
+              <div>
+                <p className="font-semibold">Capacitor Esférico:</p>
+                <p className="bg-white p-2 rounded mt-1 font-mono">C = 4πε₀εᵣ × (a×b) / (b-a)</p>
+                <p className="text-xs mt-1">donde a es radio interno, b es radio externo</p>
+              </div>
+            )}
+            {calcType === 'cilindrico' && (
+              <div>
+                <p className="font-semibold">Capacitor Cilíndrico:</p>
+                <p className="bg-white p-2 rounded mt-1 font-mono">C = 2πε₀εᵣL / ln(b/a)</p>
+                <p className="text-xs mt-1">donde L es longitud, a y b son radios interno y externo</p>
+              </div>
+            )}
+            {calcType === 'serie' && (
+              <div>
+                <p className="font-semibold">Capacitores en Serie:</p>
+                <p className="bg-white p-2 rounded mt-1 font-mono">1/Ceq = 1/C₁ + 1/C₂ + 1/C₃ + ...</p>
+                <p className="text-xs mt-1">La capacitancia equivalente disminuye en serie</p>
+              </div>
+            )}
+            {calcType === 'paralelo' && (
+              <div>
+                <p className="font-semibold">Capacitores en Paralelo:</p>
+                <p className="bg-white p-2 rounded mt-1 font-mono">Ceq = C₁ + C₂ + C₃ + ...</p>
+                <p className="text-xs mt-1">La capacitancia equivalente aumenta en paralelo</p>
+              </div>
+            )}
+            {calcType === 'energia' && (
+              <div>
+                <p className="font-semibold">Energía Almacenada:</p>
+                <p className="bg-white p-2 rounded mt-1 font-mono">U = ½CV²  |  U = ½QV  |  U = Q²/(2C)</p>
+                <p className="text-xs mt-1">Tres formas equivalentes de calcular la energía</p>
+              </div>
+            )}
+            {calcType === 'dielectrico' && (
+              <div>
+                <p className="font-semibold">Efecto del Dieléctrico:</p>
+                <p className="bg-white p-2 rounded mt-1 font-mono">C = εᵣ × C₀  |  E = E₀ / εᵣ</p>
+                <p className="text-xs mt-1">El dieléctrico aumenta la capacitancia y reduce el campo</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="mt-6 bg-amber-50 border-2 border-amber-200 rounded-lg p-6">
+          <h3 className="text-lg font-bold text-amber-900 mb-3">💡 Conceptos Importantes</h3>
+          <ul className="text-sm text-gray-700 space-y-2 list-disc list-inside">
+            <li><strong>Capacitancia:</strong> Capacidad de almacenar carga eléctrica por unidad de voltaje (C = Q/V)</li>
+            <li><strong>Unidades comunes:</strong> 1 F = 10⁶ μF = 10⁹ nF = 10¹² pF</li>
+            <li><strong>Serie:</strong> Mismo Q, voltajes se suman, Ceq disminuye</li>
+            <li><strong>Paralelo:</strong> Mismo V, cargas se suman, Ceq aumenta</li>
+            <li><strong>Dieléctrico:</strong> Material aislante que aumenta la capacitancia</li>
+            <li><strong>Constante dieléctrica (εᵣ):</strong> Factor por el cual aumenta la capacitancia</li>
+            <li><strong>Energía:</strong> Se almacena en el campo eléctrico entre las placas</li>
+            <li><strong>Aplicaciones:</strong> Filtros, memorias, fuentes de poder, flash de cámaras</li>
+          </ul>
+        </div>
+
+        <div className="mt-6 bg-purple-50 border-2 border-purple-200 rounded-lg p-6">
+          <h3 className="text-lg font-bold text-purple-900 mb-3">🔬 Constantes Dieléctricas Comunes</h3>
+          <div className="grid md:grid-cols-3 gap-3 text-sm">
+            <div className="bg-white p-3 rounded-lg">
+              <p className="font-bold text-purple-800">Vacío/Aire</p>
+              <p className="text-gray-600">εᵣ ≈ 1.0</p>
+            </div>
+            <div className="bg-white p-3 rounded-lg">
+              <p className="font-bold text-purple-800">Teflón</p>
+              <p className="text-gray-600">εᵣ ≈ 2.1</p>
+            </div>
+            <div className="bg-white p-3 rounded-lg">
+              <p className="font-bold text-purple-800">Polietileno</p>
+              <p className="text-gray-600">εᵣ ≈ 2.3</p>
+            </div>
+            <div className="bg-white p-3 rounded-lg">
+              <p className="font-bold text-purple-800">Papel</p>
+              <p className="text-gray-600">εᵣ ≈ 3.7</p>
+            </div>
+            <div className="bg-white p-3 rounded-lg">
+              <p className="font-bold text-purple-800">Vidrio</p>
+              <p className="text-gray-600">εᵣ ≈ 4-10</p>
+            </div>
+            <div className="bg-white p-3 rounded-lg">
+              <p className="font-bold text-purple-800">Mica</p>
+              <p className="text-gray-600">εᵣ ≈ 5-7</p>
+            </div>
+            <div className="bg-white p-3 rounded-lg">
+              <p className="font-bold text-purple-800">Cerámica</p>
+              <p className="text-gray-600">εᵣ ≈ 10-100</p>
+            </div>
+            <div className="bg-white p-3 rounded-lg">
+              <p className="font-bold text-purple-800">Agua</p>
+              <p className="text-gray-600">εᵣ ≈ 80</p>
+            </div>
+            <div className="bg-white p-3 rounded-lg">
+              <p className="font-bold text-purple-800">Titanato de Ba</p>
+              <p className="text-gray-600">εᵣ ≈ 1200-10000</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+function getUnite(key) {
+  const units = {
+    'capacitancia': 'F',
+    'capacitanciaMicro': 'μF',
+    'capacitanciaNano': 'nF',
+    'capacitanciaPico': 'pF',
+    'carga': 'C',
+    'cargaMicro': 'μC',
+    'voltaje': 'V',
+    'voltajeKV': 'kV',
+    'area': 'm²',
+    'areaCm2': 'cm²',
+    'distancia': 'm',
+    'distanciaMm': 'mm',
+    'radioInterno': 'm',
+    'radioInternoCm': 'cm',
+    'longitud': 'm',
+    'longitudCm': 'cm',
+    'capacitanciaEquivalente': 'F',
+    'capacitanciaEquivalenteMicro': 'μF',
+    'energia': 'J',
+    'energiaMicro': 'μJ',
+    'energiaMili': 'mJ',
+    'capacitanciaConDielectrico': 'F',
+    'campoElectrico': 'V/m',
+    'reduccionPorcentaje': '%'
+  };
+  return units[key] || '';
+}
+function CapacitanciaSimulation() {
+  const canvasRef = useRef(null);
+  const [isRunning, setIsRunning] = useState(false);
+  const [simType, setSimType] = useState('plano');
+  const [params, setParams] = useState({ area: 100, distancia: 5, radio: 50, carga: 50, k: 1 });
+  const animationRef = useRef(null);
+  const timeRef = useRef(0);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+
+    if (isRunning) {
+      timeRef.current = 0;
+      
+      const animate = () => {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        const t = timeRef.current;
+        let shouldContinue = true;
+
+        if (simType === 'plano') {
+          // Capacitor de placas paralelas
+          const centerX = canvas.width / 2;
+          const baseY = canvas.height / 2;
+          const plateWidth = params.area * 2;
+          const gap = params.distancia * 8;
+          
+          // Placa superior (positiva)
+          ctx.fillStyle = '#ef4444';
+          ctx.fillRect(centerX - plateWidth/2, baseY - gap/2 - 15, plateWidth, 15);
+          
+          // Placa inferior (negativa)
+          ctx.fillStyle = '#3b82f6';
+          ctx.fillRect(centerX - plateWidth/2, baseY + gap/2, plateWidth, 15);
+          
+          // Campo eléctrico
+          ctx.strokeStyle = '#10b981';
+          ctx.lineWidth = 2;
+          const numLines = 8;
+          for (let i = 0; i < numLines; i++) {
+            const x = centerX - plateWidth/2 + (plateWidth / (numLines - 1)) * i;
+            const progress = Math.min(t / 2, 1);
+            const lineLength = gap * progress;
+            
+            ctx.beginPath();
+            ctx.moveTo(x, baseY - gap/2);
+            ctx.lineTo(x, baseY - gap/2 + lineLength);
+            ctx.stroke();
+            
+            // Flechas
+            if (progress > 0.5) {
+              ctx.beginPath();
+              ctx.moveTo(x, baseY - gap/2 + lineLength);
+              ctx.lineTo(x - 5, baseY - gap/2 + lineLength - 8);
+              ctx.lineTo(x + 5, baseY - gap/2 + lineLength - 8);
+              ctx.closePath();
+              ctx.fillStyle = '#10b981';
+              ctx.fill();
+            }
+          }
+          
+          // Cargas animadas
+          const phase = t * 2;
+          for (let i = 0; i < 10; i++) {
+            const x = centerX - plateWidth/2 + (plateWidth / 9) * i;
+            const oscillation = Math.sin(phase + i * 0.5) * 3;
+            
+            // Cargas positivas
+            ctx.fillStyle = '#ef4444';
+            ctx.beginPath();
+            ctx.arc(x, baseY - gap/2 - 7 + oscillation, 5, 0, 2 * Math.PI);
+            ctx.fill();
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 10px Arial';
+            ctx.fillText('+', x - 3, baseY - gap/2 - 4 + oscillation);
+            
+            // Cargas negativas
+            ctx.fillStyle = '#3b82f6';
+            ctx.beginPath();
+            ctx.arc(x, baseY + gap/2 + 7 - oscillation, 5, 0, 2 * Math.PI);
+            ctx.fill();
+            ctx.fillStyle = '#fff';
+            ctx.fillText('-', x - 3, baseY + gap/2 + 10 - oscillation);
+          }
+          
+          // Información
+          const epsilon0 = 8.854e-12;
+          const A = params.area / 100; // área en m²
+          const d = params.distancia / 1000; // distancia en m
+          const C = (epsilon0 * params.k * A) / d * 1e12; // en pF
+          const Q = params.carga / 100; // carga en µC
+          const V = (Q / C) * 1000; // voltaje
+          const E = V / (d * 1000); // campo eléctrico en V/m
+          const U = 0.5 * C * V * V / 1e6; // energía en µJ
+          
+          ctx.fillStyle = '#1f2937';
+          ctx.font = '14px Arial';
+          ctx.fillText(`Capacitancia: ${C.toFixed(2)} pF`, 20, 30);
+          ctx.fillText(`Carga: ${(Q * 1000).toFixed(1)} nC`, 20, 50);
+          ctx.fillText(`Voltaje: ${V.toFixed(2)} V`, 20, 70);
+          ctx.fillText(`Campo E: ${E.toFixed(0)} V/m`, 20, 90);
+          ctx.fillText(`Energía: ${U.toFixed(3)} µJ`, 20, 110);
+          
+          if (t > 4) shouldContinue = false;
+          
+        } else if (simType === 'esferico') {
+          // Capacitor esférico
+          const centerX = canvas.width / 2;
+          const centerY = canvas.height / 2;
+          const innerRadius = params.radio * 0.8;
+          const outerRadius = params.radio * 1.5;
+          
+          // Esfera externa (tierra)
+          ctx.strokeStyle = '#3b82f6';
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.arc(centerX, centerY, outerRadius, 0, 2 * Math.PI);
+          ctx.stroke();
+          
+          // Esfera interna (cargada)
+          ctx.fillStyle = '#ef4444';
+          ctx.beginPath();
+          ctx.arc(centerX, centerY, innerRadius, 0, 2 * Math.PI);
+          ctx.fill();
+          
+          // Líneas de campo radiales
+          ctx.strokeStyle = '#10b981';
+          ctx.lineWidth = 2;
+          const numRadialLines = 12;
+          for (let i = 0; i < numRadialLines; i++) {
+            const angle = (2 * Math.PI / numRadialLines) * i;
+            const progress = Math.min(t / 2, 1);
+            
+            const x1 = centerX + innerRadius * Math.cos(angle);
+            const y1 = centerY + innerRadius * Math.sin(angle);
+            const x2 = centerX + (innerRadius + (outerRadius - innerRadius) * progress) * Math.cos(angle);
+            const y2 = centerY + (innerRadius + (outerRadius - innerRadius) * progress) * Math.sin(angle);
+            
+            ctx.beginPath();
+            ctx.moveTo(x1, y1);
+            ctx.lineTo(x2, y2);
+            ctx.stroke();
+            
+            // Flechas
+            if (progress > 0.5) {
+              const arrowSize = 8;
+              ctx.save();
+              ctx.translate(x2, y2);
+              ctx.rotate(angle);
+              ctx.beginPath();
+              ctx.moveTo(0, 0);
+              ctx.lineTo(-arrowSize, -arrowSize/2);
+              ctx.lineTo(-arrowSize, arrowSize/2);
+              ctx.closePath();
+              ctx.fillStyle = '#10b981';
+              ctx.fill();
+              ctx.restore();
+            }
+          }
+          
+          // Símbolos de carga
+          ctx.fillStyle = '#fff';
+          ctx.font = 'bold 16px Arial';
+          ctx.fillText('+', centerX - 5, centerY + 5);
+          
+          // Información
+          const epsilon0 = 8.854e-12;
+          const a = (params.radio * 0.8) / 100; // radio interno en m
+          const b = (params.radio * 1.5) / 100; // radio externo en m
+          const C = (4 * Math.PI * epsilon0 * params.k * a * b) / (b - a) * 1e12; // en pF
+          const Q = params.carga / 100; // carga en µC
+          const V = (Q / C) * 1000;
+          const U = 0.5 * C * V * V / 1e6;
+          
+          ctx.fillStyle = '#1f2937';
+          ctx.font = '14px Arial';
+          ctx.fillText(`Capacitancia: ${C.toFixed(2)} pF`, 20, 30);
+          ctx.fillText(`Radio interno: ${(a * 100).toFixed(1)} cm`, 20, 50);
+          ctx.fillText(`Radio externo: ${(b * 100).toFixed(1)} cm`, 20, 70);
+          ctx.fillText(`Voltaje: ${V.toFixed(2)} V`, 20, 90);
+          ctx.fillText(`Energía: ${U.toFixed(3)} µJ`, 20, 110);
+          
+          if (t > 4) shouldContinue = false;
+          
+        } else if (simType === 'cilindrico') {
+          // Capacitor cilíndrico
+          const centerX = canvas.width / 2;
+          const centerY = canvas.height / 2;
+          const innerRadius = params.radio * 0.6;
+          const outerRadius = params.radio * 1.2;
+          const height = 200;
+          
+          // Cilindro externo
+          ctx.strokeStyle = '#3b82f6';
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.ellipse(centerX, centerY - height/2, outerRadius, outerRadius * 0.3, 0, 0, 2 * Math.PI);
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.moveTo(centerX - outerRadius, centerY - height/2);
+          ctx.lineTo(centerX - outerRadius, centerY + height/2);
+          ctx.moveTo(centerX + outerRadius, centerY - height/2);
+          ctx.lineTo(centerX + outerRadius, centerY + height/2);
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.ellipse(centerX, centerY + height/2, outerRadius, outerRadius * 0.3, 0, 0, 2 * Math.PI);
+          ctx.stroke();
+          
+          // Cilindro interno
+          ctx.fillStyle = '#ef4444';
+          ctx.beginPath();
+          ctx.ellipse(centerX, centerY - height/2, innerRadius, innerRadius * 0.3, 0, 0, 2 * Math.PI);
+          ctx.fill();
+          ctx.fillRect(centerX - innerRadius, centerY - height/2, innerRadius * 2, height);
+          ctx.beginPath();
+          ctx.ellipse(centerX, centerY + height/2, innerRadius, innerRadius * 0.3, 0, 0, 2 * Math.PI);
+          ctx.fill();
+          
+          // Líneas de campo
+          ctx.strokeStyle = '#10b981';
+          ctx.lineWidth = 2;
+          const levels = 5;
+          const progress = Math.min(t / 2, 1);
+          
+          for (let j = 0; j < levels; j++) {
+            const y = centerY - height/2 + (height / (levels - 1)) * j;
+            const numLines = 8;
+            
+            for (let i = 0; i < numLines; i++) {
+              const angle = (2 * Math.PI / numLines) * i;
+              const x1 = centerX + innerRadius * Math.cos(angle);
+              const y1 = y;
+              const x2 = centerX + (innerRadius + (outerRadius - innerRadius) * progress) * Math.cos(angle);
+              const y2 = y;
+              
+              ctx.beginPath();
+              ctx.moveTo(x1, y1);
+              ctx.lineTo(x2, y2);
+              ctx.stroke();
+              
+              if (progress > 0.5) {
+                ctx.beginPath();
+                ctx.moveTo(x2, y2);
+                ctx.lineTo(x2 - 6 * Math.cos(angle) - 3 * Math.sin(angle), y2 - 6 * Math.sin(angle) + 3 * Math.cos(angle));
+                ctx.lineTo(x2 - 6 * Math.cos(angle) + 3 * Math.sin(angle), y2 - 6 * Math.sin(angle) - 3 * Math.cos(angle));
+                ctx.closePath();
+                ctx.fillStyle = '#10b981';
+                ctx.fill();
+              }
+            }
+          }
+          
+          // Información
+          const epsilon0 = 8.854e-12;
+          const a = (params.radio * 0.6) / 100;
+          const b = (params.radio * 1.2) / 100;
+          const L = 2; // longitud en m
+          const C = (2 * Math.PI * epsilon0 * params.k * L) / Math.log(b/a) * 1e12;
+          const Q = params.carga / 100;
+          const V = (Q / C) * 1000;
+          const U = 0.5 * C * V * V / 1e6;
+          
+          ctx.fillStyle = '#1f2937';
+          ctx.font = '14px Arial';
+          ctx.fillText(`Capacitancia: ${C.toFixed(2)} pF`, 20, 30);
+          ctx.fillText(`Radio interno: ${(a * 100).toFixed(1)} cm`, 20, 50);
+          ctx.fillText(`Radio externo: ${(b * 100).toFixed(1)} cm`, 20, 70);
+          ctx.fillText(`Voltaje: ${V.toFixed(2)} V`, 20, 90);
+          ctx.fillText(`Energía: ${U.toFixed(3)} µJ`, 20, 110);
+          
+          if (t > 4) shouldContinue = false;
+          
+        } else if (simType === 'serie') {
+          // Capacitores en serie
+          const baseY = canvas.height / 2;
+          const spacing = 180;
+          const startX = 120;
+          
+          // Circuito
+          ctx.strokeStyle = '#374151';
+          ctx.lineWidth = 3;
+          
+          // Línea horizontal superior
+          ctx.beginPath();
+          ctx.moveTo(startX - 50, baseY - 80);
+          ctx.lineTo(startX + spacing * 2 + 50, baseY - 80);
+          ctx.stroke();
+          
+          // Línea horizontal inferior
+          ctx.beginPath();
+          ctx.moveTo(startX - 50, baseY + 80);
+          ctx.lineTo(startX + spacing * 2 + 50, baseY + 80);
+          ctx.stroke();
+          
+          // Líneas verticales
+          ctx.beginPath();
+          ctx.moveTo(startX - 50, baseY - 80);
+          ctx.lineTo(startX - 50, baseY + 80);
+          ctx.stroke();
+          
+          ctx.beginPath();
+          ctx.moveTo(startX + spacing * 2 + 50, baseY - 80);
+          ctx.lineTo(startX + spacing * 2 + 50, baseY + 80);
+          ctx.stroke();
+          
+          // Batería
+          ctx.fillStyle = '#ef4444';
+          ctx.fillRect(startX - 50 - 5, baseY - 20, 10, 40);
+          ctx.fillStyle = '#1f2937';
+          ctx.font = '18px Arial';
+          ctx.fillText('V', startX - 80, baseY + 5);
+          
+          const phase = t * 3;
+          
+          // Tres capacitores
+          for (let i = 0; i < 3; i++) {
+            const x = startX + spacing * i;
+            
+            // Conexión superior
+            ctx.strokeStyle = '#374151';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(x, baseY - 80);
+            ctx.lineTo(x, baseY - 40);
+            ctx.stroke();
+            
+            // Placas del capacitor
+            ctx.fillStyle = '#ef4444';
+            ctx.fillRect(x - 40, baseY - 40, 80, 8);
+            ctx.fillStyle = '#3b82f6';
+            ctx.fillRect(x - 40, baseY + 32, 80, 8);
+            
+            // Conexión inferior
+            ctx.strokeStyle = '#374151';
+            ctx.beginPath();
+            ctx.moveTo(x, baseY + 40);
+            ctx.lineTo(x, baseY + 80);
+            ctx.stroke();
+            
+            // Cargas oscilantes
+            for (let j = 0; j < 6; j++) {
+              const offsetX = -30 + j * 12;
+              const osc = Math.sin(phase + i * 0.5 + j * 0.3) * 2;
+              
+              ctx.fillStyle = '#ef4444';
+              ctx.beginPath();
+              ctx.arc(x + offsetX, baseY - 36 + osc, 4, 0, 2 * Math.PI);
+              ctx.fill();
+              
+              ctx.fillStyle = '#3b82f6';
+              ctx.beginPath();
+              ctx.arc(x + offsetX, baseY + 36 - osc, 4, 0, 2 * Math.PI);
+              ctx.fill();
+            }
+            
+            // Etiquetas
+            ctx.fillStyle = '#1f2937';
+            ctx.font = '14px Arial';
+            ctx.fillText(`C${i+1}`, x - 10, baseY + 60);
+          }
+          
+          // Flechas de corriente
+          if (Math.sin(phase) > 0) {
+            ctx.fillStyle = '#10b981';
+            ctx.beginPath();
+            ctx.moveTo(startX - 80, baseY - 80);
+            ctx.lineTo(startX - 88, baseY - 85);
+            ctx.lineTo(startX - 88, baseY - 75);
+            ctx.closePath();
+            ctx.fill();
+          }
+          
+          // Información
+          const C1 = 100; // pF
+          const C2 = 150; // pF
+          const C3 = 200; // pF
+          const Ceq = 1 / (1/C1 + 1/C2 + 1/C3);
+          const Vtotal = 12; // V
+          const Q = Ceq * Vtotal;
+          const U = 0.5 * Ceq * Vtotal * Vtotal;
+          
+          ctx.fillStyle = '#1f2937';
+          ctx.font = '14px Arial';
+          ctx.fillText('Serie: 1/Ceq = 1/C1 + 1/C2 + 1/C3', canvas.width - 300, 30);
+          ctx.fillText(`Ceq = ${Ceq.toFixed(1)} pF`, canvas.width - 300, 50);
+          ctx.fillText(`Carga total: ${Q.toFixed(1)} pC`, canvas.width - 300, 70);
+          ctx.fillText(`Energía: ${(U/1000).toFixed(2)} nJ`, canvas.width - 300, 90);
+          
+          if (t > 6) shouldContinue = false;
+          
+        } else if (simType === 'paralelo') {
+          // Capacitores en paralelo
+          const baseY = canvas.height / 2;
+          const spacing = 100;
+          const startX = 200;
+          
+          // Circuito
+          ctx.strokeStyle = '#374151';
+          ctx.lineWidth = 3;
+          
+          // Líneas verticales principales
+          ctx.beginPath();
+          ctx.moveTo(startX, baseY - 120);
+          ctx.lineTo(startX, baseY + 120);
+          ctx.stroke();
+          
+          ctx.beginPath();
+          ctx.moveTo(startX + 250, baseY - 120);
+          ctx.lineTo(startX + 250, baseY + 120);
+          ctx.stroke();
+          
+          // Conexiones horizontales
+          ctx.beginPath();
+          ctx.moveTo(startX - 100, baseY);
+          ctx.lineTo(startX, baseY);
+          ctx.stroke();
+          
+          ctx.beginPath();
+          ctx.moveTo(startX + 250, baseY);
+          ctx.lineTo(startX + 350, baseY);
+          ctx.stroke();
+          
+          // Batería
+          ctx.fillStyle = '#ef4444';
+          ctx.fillRect(startX - 100 - 5, baseY - 20, 10, 40);
+          ctx.fillStyle = '#1f2937';
+          ctx.font = '18px Arial';
+          ctx.fillText('V', startX - 130, baseY + 5);
+          
+          const phase = t * 3;
+          
+          // Tres capacitores en paralelo
+          for (let i = 0; i < 3; i++) {
+            const y = baseY - spacing + spacing * i;
+            
+            // Conexiones
+            ctx.strokeStyle = '#374151';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(startX, y);
+            ctx.lineTo(startX + 60, y);
+            ctx.stroke();
+            
+            ctx.beginPath();
+            ctx.moveTo(startX + 190, y);
+            ctx.lineTo(startX + 250, y);
+            ctx.stroke();
+            
+            // Placas del capacitor
+            ctx.fillStyle = '#ef4444';
+            ctx.fillRect(startX + 60, y - 30, 8, 60);
+            ctx.fillStyle = '#3b82f6';
+            ctx.fillRect(startX + 182, y - 30, 8, 60);
+            
+            // Cargas oscilantes
+            for (let j = 0; j < 5; j++) {
+              const offsetY = -25 + j * 12;
+              const osc = Math.sin(phase + i * 0.5 + j * 0.3) * 2;
+              
+              ctx.fillStyle = '#ef4444';
+              ctx.beginPath();
+              ctx.arc(startX + 64 + osc, y + offsetY, 4, 0, 2 * Math.PI);
+              ctx.fill();
+              
+              ctx.fillStyle = '#3b82f6';
+              ctx.beginPath();
+              ctx.arc(startX + 186 - osc, y + offsetY, 4, 0, 2 * Math.PI);
+              ctx.fill();
+            }
+            
+            // Etiquetas
+            ctx.fillStyle = '#1f2937';
+            ctx.font = '14px Arial';
+            ctx.fillText(`C${i+1}`, startX + 115, y + 50);
+          }
+          
+          // Flechas de corriente
+          if (Math.sin(phase) > 0) {
+            for (let i = 0; i < 3; i++) {
+              const y = baseY - spacing + spacing * i;
+              ctx.fillStyle = '#10b981';
+              ctx.beginPath();
+              ctx.moveTo(startX + 30, y);
+              ctx.lineTo(startX + 22, y - 5);
+              ctx.lineTo(startX + 22, y + 5);
+              ctx.closePath();
+              ctx.fill();
+            }
+          }
+          
+          // Información
+          const C1 = 100; // pF
+          const C2 = 150; // pF
+          const C3 = 200; // pF
+          const Ceq = C1 + C2 + C3;
+          const Vtotal = 12; // V
+          const Q = Ceq * Vtotal;
+          const U = 0.5 * Ceq * Vtotal * Vtotal;
+          
+          ctx.fillStyle = '#1f2937';
+          ctx.font = '14px Arial';
+          ctx.fillText('Paralelo: Ceq = C1 + C2 + C3', canvas.width - 300, 30);
+          ctx.fillText(`Ceq = ${Ceq.toFixed(1)} pF`, canvas.width - 300, 50);
+          ctx.fillText(`Carga total: ${Q.toFixed(1)} pC`, canvas.width - 300, 70);
+          ctx.fillText(`Energía: ${(U/1000).toFixed(2)} nJ`, canvas.width - 300, 90);
+          
+          if (t > 6) shouldContinue = false;
+          
+        } else if (simType === 'dielectrico') {
+          // Efecto del dieléctrico
+          const centerX = canvas.width / 2;
+          const baseY = canvas.height / 2;
+          const plateWidth = 300;
+          const gap = 80;
+          
+          // Placas
+          ctx.fillStyle = '#ef4444';
+          ctx.fillRect(centerX - plateWidth/2, baseY - gap/2 - 15, plateWidth, 15);
+          ctx.fillStyle = '#3b82f6';
+          ctx.fillRect(centerX - plateWidth/2, baseY + gap/2, plateWidth, 15);
+          
+          const progress = Math.min(t / 3, 1);
+          
+          // Dieléctrico insertándose
+          if (progress > 0) {
+            const dielWidth = plateWidth * progress;
+            ctx.fillStyle = `rgba(251, 191, 36, 0.3)`;
+            ctx.fillRect(centerX - plateWidth/2, baseY - gap/2, dielWidth, gap);
+            
+            // Borde del dieléctrico
+            ctx.strokeStyle = '#f59e0b';
+            ctx.lineWidth = 3;
+            ctx.strokeRect(centerX - plateWidth/2, baseY - gap/2, dielWidth, gap);
+            
+            // Moléculas polarizadas
+            const numMolecules = Math.floor(dielWidth / 40);
+            for (let i = 0; i < numMolecules; i++) {
+              for (let j = 0; j < 2; j++) {
+                const x = centerX - plateWidth/2 + 20 + i * 40;
+                const y = baseY - gap/2 + 20 + j * 40;
+                
+                // Dipolo
+                ctx.fillStyle = '#ef4444';
+                ctx.beginPath();
+                ctx.arc(x, y - 8, 6, 0, 2 * Math.PI);
+                ctx.fill();
+                
+                ctx.fillStyle = '#3b82f6';
+                ctx.beginPath();
+                ctx.arc(x, y + 8, 6, 0, 2 * Math.PI);
+                ctx.fill();
+                
+                // Línea de conexión
+                ctx.strokeStyle = '#6b7280';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(x, y - 8);
+                ctx.lineTo(x, y + 8);
+                ctx.stroke();
+              }
+            }
+          }
+          
+          // Campo eléctrico
+          ctx.strokeStyle = progress > 0.5 ? '#10b981' : '#10b981';
+          ctx.lineWidth = 2;
+          const numLines = 6;
+          const fieldStrength = progress > 0.5 ? 0.6 : 1; // Reducción del campo
+          
+          for (let i = 0; i < numLines; i++) {
+            const x = centerX - plateWidth/2 + (plateWidth / (numLines - 1)) * i;
+            const lineLength = gap * fieldStrength;
+            
+            ctx.beginPath();
+            ctx.moveTo(x, baseY - gap/2);
+            ctx.lineTo(x, baseY - gap/2 + lineLength);
+            ctx.stroke();
+            
+            ctx.beginPath();
+            ctx.moveTo(x, baseY - gap/2 + lineLength);
+            ctx.lineTo(x - 4, baseY - gap/2 + lineLength - 6);
+            ctx.lineTo(x + 4, baseY - gap/2 + lineLength - 6);
+            ctx.closePath();
+            ctx.fillStyle = '#10b981';
+            ctx.fill();
+          }
+          
+          // Información
+          const k = params.k;
+          const C0 = 100; // pF sin dieléctrico
+          const C = C0 * k;
+          const Q = 50; // pC
+          const V0 = Q / C0;
+          const V = Q / C;
+          const U0 = 0.5 * C0 * V0 * V0;
+          const U = 0.5 * C * V * V;
+          
+          ctx.fillStyle = '#1f2937';
+          ctx.font = '14px Arial';
+          ctx.fillText(`Constante dieléctrica: κ = ${k.toFixed(1)}`, 20, 30);
+          ctx.fillText(`C sin dieléctrico: ${C0.toFixed(1)} pF`, 20, 50);
+          ctx.fillText(`C con dieléctrico: ${C.toFixed(1)} pF`, 20, 70);
+          ctx.fillText(`Voltaje reducido: ${V.toFixed(2)} V`, 20, 90);
+          ctx.fillText(`Energía: ${U.toFixed(2)} pJ`, 20, 110);
+          ctx.fillText(`Factor: C × ${k.toFixed(1)}`, 20, 130);
+          
+          if (t > 5) shouldContinue = false;
+        }
+        
+        ctx.fillStyle = '#1f2937';
+        ctx.font = '14px Arial';
+        ctx.fillText('Tiempo: ' + t.toFixed(2) + ' s', canvas.width - 150, canvas.height - 20);
+
+        timeRef.current += 0.05;
+
+        if (shouldContinue) {
+          animationRef.current = requestAnimationFrame(animate);
+        } else {
+          setIsRunning(false);
+        }
+      };
+
+      animate();
+    }
+
+    return () => {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
+    };
+  }, [isRunning, simType, params]);
+
+  return (
+    <div className="p-8 max-w-6xl mx-auto">
+      <h2 className="text-3xl font-bold text-gray-800 mb-6">Simulación de Capacitancia y Energía Almacenada</h2>
+
+      <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6">
+        <p className="text-sm text-gray-700">Visualiza capacitores, asociaciones y el efecto de dieléctricos ajustando los parámetros.</p>
+      </div>
+
+      <div className="mb-6">
+        <label className="block text-sm font-semibold text-gray-700 mb-2">Tipo de Simulación</label>
+        <select value={simType} onChange={(e) => { setSimType(e.target.value); setIsRunning(false); }} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+          <option value="plano">Capacitor Plano (Placas Paralelas)</option>
+          <option value="esferico">Capacitor Esférico</option>
+          <option value="cilindrico">Capacitor Cilíndrico</option>
+          <option value="serie">Asociación en Serie</option>
+          <option value="paralelo">Asociación en Paralelo</option>
+          <option value="dielectrico">Efecto del Dieléctrico</option>
+        </select>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        {simType === 'plano' && (
+          <>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Área de placas: {params.area} cm²</label>
+              <input type="range" min="50" max="150" value={params.area} onChange={(e) => setParams({...params, area: Number(e.target.value)})} className="w-full" disabled={isRunning} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Distancia: {params.distancia} mm</label>
+              <input type="range" min="2" max="10" value={params.distancia} onChange={(e) => setParams({...params, distancia: Number(e.target.value)})} className="w-full" disabled={isRunning} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Carga: {params.carga} nC</label>
+              <input type="range" min="10" max="100" value={params.carga} onChange={(e) => setParams({...params, carga: Number(e.target.value)})} className="w-full" disabled={isRunning} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Constante κ: {params.k}</label>
+              <input type="range" min="1" max="10" step="0.5" value={params.k} onChange={(e) => setParams({...params, k: Number(e.target.value)})} className="w-full" disabled={isRunning} />
+            </div>
+          </>
+        )}
+        {(simType === 'esferico' || simType === 'cilindrico') && (
+          <>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Radio: {params.radio} px</label>
+              <input type="range" min="30" max="80" value={params.radio} onChange={(e) => setParams({...params, radio: Number(e.target.value)})} className="w-full" disabled={isRunning} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Carga: {params.carga} nC</label>
+              <input type="range" min="10" max="100" value={params.carga} onChange={(e) => setParams({...params, carga: Number(e.target.value)})} className="w-full" disabled={isRunning} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Constante κ: {params.k}</label>
+              <input type="range" min="1" max="10" step="0.5" value={params.k} onChange={(e) => setParams({...params, k: Number(e.target.value)})} className="w-full" disabled={isRunning} />
+            </div>
+          </>
+        )}
+        {simType === 'dielectrico' && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Constante dieléctrica κ: {params.k}</label>
+            <input type="range" min="1" max="10" step="0.5" value={params.k} onChange={(e) => setParams({...params, k: Number(e.target.value)})} className="w-full" disabled={isRunning} />
+          </div>
+        )}
+        <div className="flex items-end">
+          <button onClick={() => setIsRunning(!isRunning)} className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors">
+            {isRunning ? 'Detener' : 'Iniciar'}
+          </button>
+        </div>
+      </div>
+
+      <div className="bg-white border-2 border-gray-300 rounded-lg overflow-hidden mb-6">
+        <canvas ref={canvasRef} width={800} height={400} className="w-full" />
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-lg border border-blue-200">
+          <h3 className="font-bold text-gray-800 mb-2">📚 Conceptos Clave</h3>
+          <ul className="text-sm text-gray-700 space-y-1">
+            {simType === 'plano' && (
+              <>
+                <li>• <strong>Capacitancia:</strong> C = ε₀κA/d</li>
+                <li>• <strong>Carga:</strong> Q = CV</li>
+                <li>• <strong>Campo eléctrico:</strong> E = V/d</li>
+                <li>• <strong>Energía:</strong> U = ½CV²</li>
+              </>
+            )}
+            {simType === 'esferico' && (
+              <>
+                <li>• <strong>Capacitancia:</strong> C = 4πε₀κab/(b-a)</li>
+                <li>• a = radio interno, b = radio externo</li>
+                <li>• Campo radial desde el centro</li>
+                <li>• <strong>Energía:</strong> U = ½CV²</li>
+              </>
+            )}
+            {simType === 'cilindrico' && (
+              <>
+                <li>• <strong>Capacitancia:</strong> C = 2πε₀κL/ln(b/a)</li>
+                <li>• a = radio interno, b = radio externo</li>
+                <li>• L = longitud del cilindro</li>
+                <li>• <strong>Energía:</strong> U = ½CV²</li>
+              </>
+            )}
+            {simType === 'serie' && (
+              <>
+                <li>• <strong>Serie:</strong> 1/Ceq = 1/C₁ + 1/C₂ + 1/C₃</li>
+                <li>• Misma carga Q en todos</li>
+                <li>• Voltajes se suman: V = V₁ + V₂ + V₃</li>
+                <li>• Ceq es menor que el menor capacitor</li>
+              </>
+            )}
+            {simType === 'paralelo' && (
+              <>
+                <li>• <strong>Paralelo:</strong> Ceq = C₁ + C₂ + C₃</li>
+                <li>• Mismo voltaje V en todos</li>
+                <li>• Cargas se suman: Q = Q₁ + Q₂ + Q₃</li>
+                <li>• Ceq es mayor que el mayor capacitor</li>
+              </>
+            )}
+            {simType === 'dielectrico' && (
+              <>
+                <li>• <strong>Con dieléctrico:</strong> C = κC₀</li>
+                <li>• κ = constante dieléctrica (κ ≥ 1)</li>
+                <li>• Reduce el campo eléctrico</li>
+                <li>• Polarización molecular del material</li>
+              </>
+            )}
+          </ul>
+        </div>
+
+        <div className="bg-gradient-to-r from-green-50 to-emerald-50 p-4 rounded-lg border border-green-200">
+          <h3 className="font-bold text-gray-800 mb-2">🔧 Aplicaciones</h3>
+          <ul className="text-sm text-gray-700 space-y-1">
+            <li>• <strong>Almacenamiento de energía:</strong> Fuentes de alimentación, flash de cámaras</li>
+            <li>• <strong>Filtros:</strong> Circuitos electrónicos, eliminación de ruido</li>
+            <li>• <strong>Acoplamiento/desacoplamiento:</strong> Transmisión de señales AC</li>
+            <li>• <strong>Memorias:</strong> RAM dinámica (DRAM)</li>
+            <li>• <strong>Sensores:</strong> Táctiles capacitivos, detectores de proximidad</li>
+            <li>• <strong>Corrección de factor de potencia:</strong> Sistemas eléctricos industriales</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  );
+}
+function CalculadoraElectricidad() {
+  const [calcType, setCalcType] = useState('ley-ohm');
+  const [inputs, setInputs] = useState({});
+  const [result, setResult] = useState(null);
+  const [findVariable, setFindVariable] = useState('V');
+
+  const calculateLeyOhm = () => {
+    const { V, I, R } = inputs;
+    
+    if (findVariable === 'V') {
+      const voltaje = parseFloat(I) * parseFloat(R);
+      setResult({ voltaje: voltaje.toFixed(3) + ' V' });
+    } else if (findVariable === 'I') {
+      const corriente = parseFloat(V) / parseFloat(R);
+      setResult({ corriente: corriente.toFixed(3) + ' A' });
+    } else if (findVariable === 'R') {
+      const resistencia = parseFloat(V) / parseFloat(I);
+      setResult({ resistencia: resistencia.toFixed(3) + ' Ω' });
+    }
+  };
+
+  const calculateResistividad = () => {
+    const { rho, L, A, R } = inputs;
+    
+    if (findVariable === 'R') {
+      const resistencia = (parseFloat(rho) * parseFloat(L)) / parseFloat(A);
+      setResult({ resistencia: resistencia.toFixed(6) + ' Ω' });
+    } else if (findVariable === 'rho') {
+      const resistividad = (parseFloat(R) * parseFloat(A)) / parseFloat(L);
+      setResult({ resistividad: resistividad.toExponential(3) + ' Ω·m' });
+    } else if (findVariable === 'L') {
+      const longitud = (parseFloat(R) * parseFloat(A)) / parseFloat(rho);
+      setResult({ longitud: longitud.toFixed(3) + ' m' });
+    } else if (findVariable === 'A') {
+      const area = (parseFloat(rho) * parseFloat(L)) / parseFloat(R);
+      setResult({ área: area.toExponential(3) + ' m²' });
+    }
+  };
+
+  const calculatePotencia = () => {
+    const { V, I, R, P } = inputs;
+    
+    if (findVariable === 'P') {
+      if (inputs.V && inputs.I) {
+        const potencia = parseFloat(V) * parseFloat(I);
+        setResult({ potencia: potencia.toFixed(3) + ' W', energia: 'Energía = P × t' });
+      } else if (inputs.I && inputs.R) {
+        const potencia = Math.pow(parseFloat(I), 2) * parseFloat(R);
+        setResult({ potencia: potencia.toFixed(3) + ' W (Efecto Joule)', energia: 'Energía = P × t' });
+      } else if (inputs.V && inputs.R) {
+        const potencia = Math.pow(parseFloat(V), 2) / parseFloat(R);
+        setResult({ potencia: potencia.toFixed(3) + ' W', energia: 'Energía = P × t' });
+      }
+    } else if (findVariable === 'V') {
+      if (inputs.P && inputs.I) {
+        const voltaje = parseFloat(P) / parseFloat(I);
+        setResult({ voltaje: voltaje.toFixed(3) + ' V' });
+      } else if (inputs.P && inputs.R) {
+        const voltaje = Math.sqrt(parseFloat(P) * parseFloat(R));
+        setResult({ voltaje: voltaje.toFixed(3) + ' V' });
+      }
+    } else if (findVariable === 'I') {
+      if (inputs.P && inputs.V) {
+        const corriente = parseFloat(P) / parseFloat(V);
+        setResult({ corriente: corriente.toFixed(3) + ' A' });
+      } else if (inputs.P && inputs.R) {
+        const corriente = Math.sqrt(parseFloat(P) / parseFloat(R));
+        setResult({ corriente: corriente.toFixed(3) + ' A' });
+      }
+    } else if (findVariable === 'R') {
+      if (inputs.P && inputs.I) {
+        const resistencia = parseFloat(P) / Math.pow(parseFloat(I), 2);
+        setResult({ resistencia: resistencia.toFixed(3) + ' Ω' });
+      } else if (inputs.P && inputs.V) {
+        const resistencia = Math.pow(parseFloat(V), 2) / parseFloat(P);
+        setResult({ resistencia: resistencia.toFixed(3) + ' Ω' });
+      }
+    }
+  };
+
+  const calculateSerie = () => {
+    const resistencias = inputs.resistencias ? inputs.resistencias.split(',').map(r => parseFloat(r.trim())).filter(r => !isNaN(r)) : [];
+    
+    if (resistencias.length > 0) {
+      const Req = resistencias.reduce((sum, r) => sum + r, 0);
+      setResult({ 
+        resistenciaEquivalente: Req.toFixed(3) + ' Ω',
+        formula: 'Req = R₁ + R₂ + R₃ + ...',
+        resistencias: resistencias.join(' Ω + ') + ' Ω'
+      });
+    }
+  };
+
+  const calculateParalelo = () => {
+    const resistencias = inputs.resistencias ? inputs.resistencias.split(',').map(r => parseFloat(r.trim())).filter(r => !isNaN(r)) : [];
+    
+    if (resistencias.length > 0) {
+      const sumaInversos = resistencias.reduce((sum, r) => sum + (1/r), 0);
+      const Req = 1 / sumaInversos;
+      setResult({ 
+        resistenciaEquivalente: Req.toFixed(3) + ' Ω',
+        formula: '1/Req = 1/R₁ + 1/R₂ + 1/R₃ + ...',
+        resistencias: resistencias.map(r => `1/${r}`).join(' + ')
+      });
+    }
+  };
+
+  const handleCalculate = () => {
+    if (calcType === 'ley-ohm') calculateLeyOhm();
+    else if (calcType === 'resistividad') calculateResistividad();
+    else if (calcType === 'potencia') calculatePotencia();
+    else if (calcType === 'serie') calculateSerie();
+    else if (calcType === 'paralelo') calculateParalelo();
+  };
+
+  return (
+    <div className="p-8 max-w-4xl mx-auto bg-gradient-to-br from-blue-50 to-indigo-50 min-h-screen">
+      <h2 className="text-4xl font-bold text-indigo-900 mb-2">⚡ Calculadora de Electricidad</h2>
+      <p className="text-gray-600 mb-6">Corriente Eléctrica, Resistencias y Ley de Ohm</p>
+
+      <div className="bg-blue-100 border-l-4 border-blue-600 p-4 mb-6 rounded-r-lg">
+        <p className="text-sm text-gray-800">
+          <strong>💡 Nota:</strong> Selecciona el tipo de cálculo y la variable que deseas encontrar. Completa los demás campos con los valores conocidos.
+        </p>
+      </div>
+
+      <div className="mb-6 bg-white rounded-lg shadow-md p-6">
+        <label className="block text-sm font-semibold text-gray-700 mb-2">📊 Tipo de Cálculo</label>
+        <select
+          value={calcType}
+          onChange={(e) => { setCalcType(e.target.value); setInputs({}); setResult(null); setFindVariable(e.target.value === 'ley-ohm' ? 'V' : e.target.value === 'resistividad' ? 'R' : e.target.value === 'potencia' ? 'P' : ''); }}
+          className="w-full p-3 border-2 border-indigo-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 mb-4"
+        >
+          <option value="ley-ohm">Ley de Ohm (V = I × R)</option>
+          <option value="resistividad">Resistividad del Material (R = ρL/A)</option>
+          <option value="potencia">Potencia y Efecto Joule</option>
+          <option value="serie">Resistencias en Serie</option>
+          <option value="paralelo">Resistencias en Paralelo</option>
+        </select>
+
+        {(calcType === 'ley-ohm' || calcType === 'resistividad' || calcType === 'potencia') && (
+          <>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">🎯 Variable a Calcular</label>
+            <select
+              value={findVariable}
+              onChange={(e) => { setFindVariable(e.target.value); setInputs({}); setResult(null); }}
+              className="w-full p-3 border-2 border-indigo-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+            >
+              {calcType === 'ley-ohm' && (
+                <>
+                  <option value="V">Voltaje (V)</option>
+                  <option value="I">Corriente (I)</option>
+                  <option value="R">Resistencia (R)</option>
+                </>
+              )}
+              {calcType === 'resistividad' && (
+                <>
+                  <option value="R">Resistencia (R)</option>
+                  <option value="rho">Resistividad (ρ)</option>
+                  <option value="L">Longitud (L)</option>
+                  <option value="A">Área transversal (A)</option>
+                </>
+              )}
+              {calcType === 'potencia' && (
+                <>
+                  <option value="P">Potencia (P)</option>
+                  <option value="V">Voltaje (V)</option>
+                  <option value="I">Corriente (I)</option>
+                  <option value="R">Resistencia (R)</option>
+                </>
+              )}
+            </select>
+          </>
+        )}
+      </div>
+
+      <div className="bg-white border-2 border-indigo-200 rounded-lg shadow-lg p-6 mb-6">
+        <h3 className="text-lg font-bold text-indigo-900 mb-4">📝 Datos de Entrada</h3>
+        
+        {calcType === 'ley-ohm' && (
+          <div className="space-y-4">
+            {findVariable !== 'V' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Voltaje V (Volts)</label>
+                <input type="number" step="any" value={inputs.V || ''} onChange={(e) => setInputs({...inputs, V: e.target.value})} className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="Ej: 12" />
+              </div>
+            )}
+            {findVariable !== 'I' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Corriente I (Amperes)</label>
+                <input type="number" step="any" value={inputs.I || ''} onChange={(e) => setInputs({...inputs, I: e.target.value})} className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="Ej: 2" />
+              </div>
+            )}
+            {findVariable !== 'R' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Resistencia R (Ohms Ω)</label>
+                <input type="number" step="any" value={inputs.R || ''} onChange={(e) => setInputs({...inputs, R: e.target.value})} className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="Ej: 6" />
+              </div>
+            )}
+          </div>
+        )}
+
+        {calcType === 'resistividad' && (
+          <div className="space-y-4">
+            {findVariable !== 'R' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Resistencia R (Ω)</label>
+                <input type="number" step="any" value={inputs.R || ''} onChange={(e) => setInputs({...inputs, R: e.target.value})} className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="Ej: 0.5" />
+              </div>
+            )}
+            {findVariable !== 'rho' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Resistividad ρ (Ω·m)</label>
+                <input type="number" step="any" value={inputs.rho || ''} onChange={(e) => setInputs({...inputs, rho: e.target.value})} className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="Ej: 1.68e-8 (cobre)" />
+                <p className="text-xs text-gray-500 mt-1">Cobre: 1.68×10⁻⁸, Aluminio: 2.82×10⁻⁸, Plata: 1.59×10⁻⁸</p>
+              </div>
+            )}
+            {findVariable !== 'L' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Longitud L (metros)</label>
+                <input type="number" step="any" value={inputs.L || ''} onChange={(e) => setInputs({...inputs, L: e.target.value})} className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="Ej: 100" />
+              </div>
+            )}
+            {findVariable !== 'A' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Área transversal A (m²)</label>
+                <input type="number" step="any" value={inputs.A || ''} onChange={(e) => setInputs({...inputs, A: e.target.value})} className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="Ej: 0.0001" />
+              </div>
+            )}
+          </div>
+        )}
+
+        {calcType === 'potencia' && (
+          <div className="space-y-4">
+            <div className="bg-yellow-50 border border-yellow-200 rounded p-3 mb-3">
+              <p className="text-xs text-gray-700">
+                <strong>Fórmulas disponibles:</strong> P = V×I, P = I²×R (Efecto Joule), P = V²/R
+              </p>
+            </div>
+            {findVariable !== 'P' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Potencia P (Watts)</label>
+                <input type="number" step="any" value={inputs.P || ''} onChange={(e) => setInputs({...inputs, P: e.target.value})} className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="Ej: 100" />
+              </div>
+            )}
+            {findVariable !== 'V' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Voltaje V (Volts)</label>
+                <input type="number" step="any" value={inputs.V || ''} onChange={(e) => setInputs({...inputs, V: e.target.value})} className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="Ej: 220" />
+              </div>
+            )}
+            {findVariable !== 'I' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Corriente I (Amperes)</label>
+                <input type="number" step="any" value={inputs.I || ''} onChange={(e) => setInputs({...inputs, I: e.target.value})} className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="Ej: 5" />
+              </div>
+            )}
+            {findVariable !== 'R' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Resistencia R (Ohms Ω)</label>
+                <input type="number" step="any" value={inputs.R || ''} onChange={(e) => setInputs({...inputs, R: e.target.value})} className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="Ej: 10" />
+              </div>
+            )}
+          </div>
+        )}
+
+        {calcType === 'serie' && (
+          <div className="space-y-4">
+            <div className="bg-blue-50 border border-blue-200 rounded p-3 mb-3">
+              <p className="text-sm text-gray-700">
+                <strong>En serie:</strong> La resistencia equivalente es la suma de todas las resistencias.
+                <br />Fórmula: Req = R₁ + R₂ + R₃ + ...
+              </p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Resistencias (separadas por comas)</label>
+              <input type="text" value={inputs.resistencias || ''} onChange={(e) => setInputs({...inputs, resistencias: e.target.value})} className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="Ej: 10, 20, 30" />
+              <p className="text-xs text-gray-500 mt-1">Ingresa los valores en Ohms separados por comas</p>
+            </div>
+          </div>
+        )}
+
+        {calcType === 'paralelo' && (
+          <div className="space-y-4">
+            <div className="bg-green-50 border border-green-200 rounded p-3 mb-3">
+              <p className="text-sm text-gray-700">
+                <strong>En paralelo:</strong> El inverso de la resistencia equivalente es la suma de los inversos.
+                <br />Fórmula: 1/Req = 1/R₁ + 1/R₂ + 1/R₃ + ...
+              </p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Resistencias (separadas por comas)</label>
+              <input type="text" value={inputs.resistencias || ''} onChange={(e) => setInputs({...inputs, resistencias: e.target.value})} className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="Ej: 10, 20, 30" />
+              <p className="text-xs text-gray-500 mt-1">Ingresa los valores en Ohms separados por comas</p>
+            </div>
+          </div>
+        )}
+
+        <button onClick={handleCalculate} className="mt-6 w-full bg-gradient-to-r from-indigo-600 to-blue-600 text-white py-3 rounded-lg font-semibold hover:from-indigo-700 hover:to-blue-700 transition-all shadow-md hover:shadow-lg transform hover:-translate-y-0.5">
+          🧮 Calcular
+        </button>
+      </div>
+
+      {result && (
+        <div className="bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-300 rounded-lg shadow-lg p-6">
+          <h3 className="text-2xl font-bold text-green-800 mb-4">✅ Resultados</h3>
+          <div className="space-y-3">
+            {Object.entries(result).map(([key, value]) => (
+              <div key={key} className="flex justify-between items-center py-3 px-4 bg-white rounded-lg shadow-sm border border-green-200">
+                <span className="font-medium text-gray-700 capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}:</span>
+                <span className="text-lg font-bold text-green-700">{value}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="mt-8 bg-white rounded-lg shadow-md p-6">
+        <h3 className="text-xl font-bold text-indigo-900 mb-4">📚 Conceptos Clave</h3>
+        <div className="space-y-3 text-sm text-gray-700">
+          <div className="border-l-4 border-blue-500 pl-4 py-2">
+            <strong>Corriente Eléctrica (I):</strong> Flujo de carga eléctrica por unidad de tiempo. Se mide en Amperes (A).
+          </div>
+          <div className="border-l-4 border-purple-500 pl-4 py-2">
+            <strong>Sentido Convencional:</strong> La corriente fluye del polo positivo al negativo (opuesto al movimiento real de electrones).
+          </div>
+          <div className="border-l-4 border-indigo-500 pl-4 py-2">
+            <strong>Ley de Ohm:</strong> V = I × R. El voltaje es proporcional a la corriente y la resistencia.
+          </div>
+          <div className="border-l-4 border-green-500 pl-4 py-2">
+            <strong>Efecto Joule:</strong> La potencia disipada en forma de calor es P = I²R.
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+function CorrienteSimulation() {
+  const canvasRef = useRef(null);
+  const [isRunning, setIsRunning] = useState(false);
+  const [simType, setSimType] = useState('ohm');
+  const [params, setParams] = useState({ 
+    voltaje: 12, 
+    resistencia: 100, 
+    longitud: 2, 
+    area: 1, 
+    resistividad: 1.7,
+    r1: 100,
+    r2: 150,
+    r3: 200
+  });
+  const animationRef = useRef(null);
+  const timeRef = useRef(0);
+
+  // Calcular valores
+  const calcularOhm = () => {
+    const V = params.voltaje;
+    const R = params.resistencia;
+    const I = V / R;
+    const P = V * I;
+    const E = P * 3600; // Energía en 1 hora (J)
+    return { V, R, I: I * 1000, P, E }; // I en mA
+  };
+
+  const calcularResistividad = () => {
+    const rho = params.resistividad * 1e-8; // Ω·m
+    const L = params.longitud;
+    const A = params.area * 1e-6; // m²
+    const R = (rho * L) / A;
+    const V = params.voltaje;
+    const I = V / R;
+    const P = V * I;
+    return { R, I: I * 1000, P, rho: params.resistividad };
+  };
+
+  const calcularSerie = () => {
+    const R1 = params.r1;
+    const R2 = params.r2;
+    const R3 = params.r3;
+    const Req = R1 + R2 + R3;
+    const V = params.voltaje;
+    const I = V / Req;
+    const V1 = I * R1;
+    const V2 = I * R2;
+    const V3 = I * R3;
+    const P = V * I;
+    return { Req, I: I * 1000, V1, V2, V3, P };
+  };
+
+  const calcularParalelo = () => {
+    const R1 = params.r1;
+    const R2 = params.r2;
+    const R3 = params.r3;
+    const Req = 1 / (1/R1 + 1/R2 + 1/R3);
+    const V = params.voltaje;
+    const I = V / Req;
+    const I1 = V / R1;
+    const I2 = V / R2;
+    const I3 = V / R3;
+    const P = V * I;
+    return { Req, I: I * 1000, I1: I1 * 1000, I2: I2 * 1000, I3: I3 * 1000, P };
+  };
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+
+    if (isRunning) {
+      timeRef.current = 0;
+      
+      const animate = () => {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        const t = timeRef.current;
+        let shouldContinue = true;
+
+        if (simType === 'ohm') {
+          // Ley de Ohm - Circuito simple
+          const centerX = canvas.width / 2;
+          const centerY = canvas.height / 2;
+          const circuitWidth = 300;
+          const circuitHeight = 200;
+          
+          const valores = calcularOhm();
+          
+          // Cable del circuito
+          ctx.strokeStyle = '#374151';
+          ctx.lineWidth = 4;
+          ctx.beginPath();
+          ctx.moveTo(centerX - circuitWidth/2, centerY - circuitHeight/2);
+          ctx.lineTo(centerX + circuitWidth/2, centerY - circuitHeight/2);
+          ctx.lineTo(centerX + circuitWidth/2, centerY + circuitHeight/2);
+          ctx.lineTo(centerX - circuitWidth/2, centerY + circuitHeight/2);
+          ctx.closePath();
+          ctx.stroke();
+          
+          // Batería
+          ctx.fillStyle = '#ef4444';
+          ctx.fillRect(centerX - circuitWidth/2 - 10, centerY - 30, 20, 60);
+          ctx.fillStyle = '#fff';
+          ctx.font = 'bold 20px Arial';
+          ctx.fillText('+', centerX - circuitWidth/2 - 35, centerY - 10);
+          ctx.fillText('-', centerX - circuitWidth/2 - 35, centerY + 25);
+          
+          // Resistencia (zigzag)
+          ctx.strokeStyle = '#f59e0b';
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          const zigzagStart = centerX + circuitWidth/2 - 80;
+          const zigzagY = centerY - circuitHeight/2;
+          ctx.moveTo(zigzagStart, zigzagY);
+          for (let i = 0; i < 6; i++) {
+            ctx.lineTo(zigzagStart + i * 12 + 6, zigzagY + (i % 2 === 0 ? -15 : 15));
+          }
+          ctx.lineTo(zigzagStart + 72, zigzagY);
+          ctx.stroke();
+          
+          // Etiqueta resistencia
+          ctx.fillStyle = '#1f2937';
+          ctx.font = '16px Arial';
+          ctx.fillText(`R = ${valores.R} Ω`, zigzagStart + 10, zigzagY - 25);
+          
+          // Electrones moviéndose
+          const numElectrons = 15;
+          const speed = valores.I / 50; // Velocidad proporcional a la corriente
+          
+          for (let i = 0; i < numElectrons; i++) {
+            const progress = ((t * speed + i / numElectrons) % 1);
+            let x, y;
+            
+            if (progress < 0.25) {
+              // Lado superior
+              const localProgress = progress / 0.25;
+              x = centerX - circuitWidth/2 + circuitWidth * localProgress;
+              y = centerY - circuitHeight/2;
+            } else if (progress < 0.5) {
+              // Lado derecho
+              const localProgress = (progress - 0.25) / 0.25;
+              x = centerX + circuitWidth/2;
+              y = centerY - circuitHeight/2 + circuitHeight * localProgress;
+            } else if (progress < 0.75) {
+              // Lado inferior
+              const localProgress = (progress - 0.5) / 0.25;
+              x = centerX + circuitWidth/2 - circuitWidth * localProgress;
+              y = centerY + circuitHeight/2;
+            } else {
+              // Lado izquierdo
+              const localProgress = (progress - 0.75) / 0.25;
+              x = centerX - circuitWidth/2;
+              y = centerY + circuitHeight/2 - circuitHeight * localProgress;
+            }
+            
+            ctx.fillStyle = '#3b82f6';
+            ctx.shadowColor = '#3b82f6';
+            ctx.shadowBlur = 8;
+            ctx.beginPath();
+            ctx.arc(x, y, 5, 0, 2 * Math.PI);
+            ctx.fill();
+            ctx.shadowBlur = 0;
+            
+            // Símbolo negativo
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 8px Arial';
+            ctx.fillText('-', x - 2.5, y + 3);
+          }
+          
+          // Flecha de corriente convencional
+          ctx.strokeStyle = '#ef4444';
+          ctx.fillStyle = '#ef4444';
+          ctx.lineWidth = 3;
+          const arrowY = centerY - circuitHeight/2 - 30;
+          ctx.beginPath();
+          ctx.moveTo(centerX - 60, arrowY);
+          ctx.lineTo(centerX + 60, arrowY);
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.moveTo(centerX + 60, arrowY);
+          ctx.lineTo(centerX + 50, arrowY - 6);
+          ctx.lineTo(centerX + 50, arrowY + 6);
+          ctx.closePath();
+          ctx.fill();
+          
+          ctx.fillStyle = '#ef4444';
+          ctx.font = '14px Arial';
+          ctx.fillText('I (sentido convencional)', centerX - 55, arrowY - 15);
+          
+          // Información
+          ctx.fillStyle = '#1f2937';
+          ctx.font = '16px Arial';
+          ctx.fillText(`Voltaje (V): ${valores.V.toFixed(1)} V`, 20, 30);
+          ctx.fillText(`Corriente (I): ${valores.I.toFixed(1)} mA`, 20, 55);
+          ctx.fillText(`Potencia (P): ${valores.P.toFixed(2)} W`, 20, 80);
+          ctx.fillText(`Energía (1h): ${(valores.E / 3600).toFixed(2)} Wh`, 20, 105);
+          
+          ctx.fillStyle = '#3b82f6';
+          ctx.font = 'bold 18px Arial';
+          ctx.fillText('V = I × R', canvas.width - 150, 40);
+          
+          if (t > 10) shouldContinue = false;
+          
+        } else if (simType === 'joule') {
+          // Efecto Joule - Resistencia calentándose
+          const centerX = canvas.width / 2;
+          const centerY = canvas.height / 2;
+          
+          const valores = calcularOhm();
+          const heatIntensity = Math.min(valores.P / 5, 1);
+          
+          // Resistencia
+          const resWidth = 150;
+          const resHeight = 40;
+          
+          // Gradiente de calor
+          const gradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, resWidth);
+          gradient.addColorStop(0, `rgba(239, 68, 68, ${0.8 * heatIntensity})`);
+          gradient.addColorStop(0.5, `rgba(251, 146, 60, ${0.5 * heatIntensity})`);
+          gradient.addColorStop(1, `rgba(252, 211, 77, ${0.2 * heatIntensity})`);
+          
+          ctx.fillStyle = gradient;
+          ctx.fillRect(centerX - resWidth/2, centerY - resHeight/2, resWidth, resHeight);
+          
+          // Cuerpo de la resistencia
+          ctx.fillStyle = '#78716c';
+          ctx.fillRect(centerX - resWidth/2, centerY - resHeight/2, resWidth, resHeight);
+          
+          // Bandas de colores
+          const bandColors = ['#ef4444', '#eab308', '#22c55e', '#f59e0b'];
+          for (let i = 0; i < 4; i++) {
+            ctx.fillStyle = bandColors[i];
+            ctx.fillRect(centerX - resWidth/2 + 30 + i * 25, centerY - resHeight/2, 8, resHeight);
+          }
+          
+          // Terminales
+          ctx.fillStyle = '#52525b';
+          ctx.fillRect(centerX - resWidth/2 - 30, centerY - 5, 30, 10);
+          ctx.fillRect(centerX + resWidth/2, centerY - 5, 30, 10);
+          
+          // Partículas de calor
+          const numParticles = Math.floor(20 * heatIntensity);
+          for (let i = 0; i < numParticles; i++) {
+            const angle = (i / numParticles) * Math.PI * 2;
+            const dist = 50 + (t * 30 + i * 10) % 100;
+            const x = centerX + Math.cos(angle + t) * dist;
+            const y = centerY - resHeight/2 - (t * 30 + i * 10) % 100;
+            const alpha = 1 - ((t * 30 + i * 10) % 100) / 100;
+            
+            ctx.fillStyle = `rgba(239, 68, 68, ${alpha * heatIntensity})`;
+            ctx.beginPath();
+            ctx.arc(x, y, 3, 0, 2 * Math.PI);
+            ctx.fill();
+          }
+          
+          // Ondas de calor
+          const numWaves = 3;
+          for (let i = 0; i < numWaves; i++) {
+            const radius = 60 + ((t * 50 + i * 40) % 120);
+            const alpha = (1 - ((t * 50 + i * 40) % 120) / 120) * heatIntensity;
+            
+            ctx.strokeStyle = `rgba(239, 68, 68, ${alpha})`;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
+            ctx.stroke();
+          }
+          
+          // Termómetro animado
+          const thermX = canvas.width - 100;
+          const thermY = centerY;
+          const thermHeight = 150;
+          const temp = 25 + valores.P * 15; // Temperatura simulada
+          const tempProgress = Math.min(temp / 100, 1);
+          
+          // Bulbo del termómetro
+          ctx.fillStyle = '#ef4444';
+          ctx.beginPath();
+          ctx.arc(thermX, thermY + thermHeight/2 + 20, 15, 0, 2 * Math.PI);
+          ctx.fill();
+          
+          // Tubo del termómetro
+          ctx.strokeStyle = '#d1d5db';
+          ctx.lineWidth = 3;
+          ctx.fillStyle = '#f3f4f6';
+          ctx.fillRect(thermX - 8, thermY - thermHeight/2, 16, thermHeight);
+          ctx.strokeRect(thermX - 8, thermY - thermHeight/2, 16, thermHeight);
+          
+          // Mercurio
+          ctx.fillStyle = '#ef4444';
+          const mercuryHeight = thermHeight * tempProgress;
+          ctx.fillRect(thermX - 6, thermY + thermHeight/2 - mercuryHeight, 12, mercuryHeight + 20);
+          
+          // Escala
+          ctx.fillStyle = '#1f2937';
+          ctx.font = '12px Arial';
+          ctx.fillText('100°C', thermX + 20, thermY - thermHeight/2);
+          ctx.fillText('50°C', thermX + 20, thermY);
+          ctx.fillText('0°C', thermX + 20, thermY + thermHeight/2);
+          
+          ctx.font = 'bold 16px Arial';
+          ctx.fillText(`${temp.toFixed(1)}°C`, thermX - 30, thermY + thermHeight/2 + 60);
+          
+          // Información
+          ctx.fillStyle = '#1f2937';
+          ctx.font = '16px Arial';
+          ctx.fillText(`Potencia disipada: ${valores.P.toFixed(2)} W`, 20, 30);
+          ctx.fillText(`Calor generado: ${valores.P.toFixed(2)} J/s`, 20, 55);
+          ctx.fillText(`Corriente: ${valores.I.toFixed(1)} mA`, 20, 80);
+          ctx.fillText(`Resistencia: ${valores.R} Ω`, 20, 105);
+          
+          ctx.fillStyle = '#ef4444';
+          ctx.font = 'bold 18px Arial';
+          ctx.fillText('P = I² × R = V² / R', 20, 135);
+          
+          if (t > 10) shouldContinue = false;
+          
+        } else if (simType === 'resistividad') {
+          // Resistividad del material
+          const centerX = canvas.width / 2;
+          const centerY = canvas.height / 2;
+          
+          const valores = calcularResistividad();
+          
+          // Conductor (cilindro)
+          const wireLength = 400;
+          const wireHeight = 60;
+          
+          // Cuerpo del conductor
+          ctx.fillStyle = '#94a3b8';
+          ctx.fillRect(centerX - wireLength/2, centerY - wireHeight/2, wireLength, wireHeight);
+          
+          // Sombra y brillo
+          const gradientTop = ctx.createLinearGradient(centerX, centerY - wireHeight/2, centerX, centerY);
+          gradientTop.addColorStop(0, '#cbd5e1');
+          gradientTop.addColorStop(1, '#94a3b8');
+          ctx.fillStyle = gradientTop;
+          ctx.fillRect(centerX - wireLength/2, centerY - wireHeight/2, wireLength, wireHeight/2);
+          
+          // Extremos
+          ctx.fillStyle = '#64748b';
+          ctx.beginPath();
+          ctx.ellipse(centerX - wireLength/2, centerY, 15, wireHeight/2, 0, 0, 2 * Math.PI);
+          ctx.fill();
+          ctx.beginPath();
+          ctx.ellipse(centerX + wireLength/2, centerY, 15, wireHeight/2, 0, 0, 2 * Math.PI);
+          ctx.fill();
+          
+          // Dimensiones
+          ctx.strokeStyle = '#1f2937';
+          ctx.lineWidth = 2;
+          ctx.setLineDash([5, 5]);
+          
+          // Longitud
+          ctx.beginPath();
+          ctx.moveTo(centerX - wireLength/2, centerY + wireHeight/2 + 20);
+          ctx.lineTo(centerX + wireLength/2, centerY + wireHeight/2 + 20);
+          ctx.stroke();
+          
+          ctx.fillStyle = '#1f2937';
+          ctx.font = '14px Arial';
+          ctx.fillText(`L = ${params.longitud} m`, centerX - 30, centerY + wireHeight/2 + 40);
+          
+          // Área transversal
+          ctx.beginPath();
+          ctx.moveTo(centerX + wireLength/2 + 40, centerY - wireHeight/2);
+          ctx.lineTo(centerX + wireLength/2 + 40, centerY + wireHeight/2);
+          ctx.stroke();
+          ctx.setLineDash([]);
+          
+          ctx.fillText(`A = ${params.area} mm²`, centerX + wireLength/2 + 50, centerY);
+          
+          // Electrones moviéndose a través del material
+          const numElectrons = 20;
+          for (let i = 0; i < numElectrons; i++) {
+            const progress = ((t * 0.3 + i / numElectrons) % 1);
+            const x = centerX - wireLength/2 + wireLength * progress;
+            const y = centerY + (Math.sin(t * 2 + i) * 15);
+            
+            // Trayectoria zigzag para mostrar colisiones
+            const zigzag = Math.sin(progress * 20) * 8;
+            
+            ctx.fillStyle = '#3b82f6';
+            ctx.shadowColor = '#3b82f6';
+            ctx.shadowBlur = 6;
+            ctx.beginPath();
+            ctx.arc(x, y + zigzag, 4, 0, 2 * Math.PI);
+            ctx.fill();
+            ctx.shadowBlur = 0;
+          }
+          
+          // Átomos del material (fijos)
+          const numAtoms = 15;
+          for (let i = 0; i < numAtoms; i++) {
+            const x = centerX - wireLength/2 + 40 + (wireLength - 80) * (i / (numAtoms - 1));
+            const y = centerY;
+            
+            ctx.fillStyle = '#64748b';
+            ctx.beginPath();
+            ctx.arc(x, y, 8, 0, 2 * Math.PI);
+            ctx.fill();
+            
+            // Vibración térmica
+            const vibration = Math.sin(t * 5 + i) * 2;
+            ctx.strokeStyle = '#94a3b8';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.arc(x + vibration, y, 10, 0, 2 * Math.PI);
+            ctx.stroke();
+          }
+          
+          // Información
+          ctx.fillStyle = '#1f2937';
+          ctx.font = '16px Arial';
+          ctx.fillText(`Resistividad (ρ): ${valores.rho} × 10⁻⁸ Ω·m`, 20, 30);
+          ctx.fillText(`Resistencia: ${valores.R.toFixed(2)} Ω`, 20, 55);
+          ctx.fillText(`Corriente: ${valores.I.toFixed(1)} mA`, 20, 80);
+          ctx.fillText(`Voltaje: ${params.voltaje} V`, 20, 105);
+          
+          ctx.fillStyle = '#3b82f6';
+          ctx.font = 'bold 18px Arial';
+          ctx.fillText('R = ρ × L / A', canvas.width - 180, 40);
+          
+          // Leyenda materiales
+          ctx.fillStyle = '#1f2937';
+          ctx.font = '12px Arial';
+          ctx.fillText('Materiales comunes:', canvas.width - 180, 70);
+          ctx.fillText('Cobre: 1.7 × 10⁻⁸ Ω·m', canvas.width - 180, 90);
+          ctx.fillText('Aluminio: 2.8 × 10⁻⁸ Ω·m', canvas.width - 180, 110);
+          ctx.fillText('Hierro: 10 × 10⁻⁸ Ω·m', canvas.width - 180, 130);
+          
+          if (t > 10) shouldContinue = false;
+          
+        } else if (simType === 'serie') {
+          // Resistencias en serie
+          const baseY = canvas.height / 2;
+          const spacing = 180;
+          const startX = 150;
+          
+          const valores = calcularSerie();
+          
+          // Circuito
+          ctx.strokeStyle = '#374151';
+          ctx.lineWidth = 4;
+          
+          // Línea superior
+          ctx.beginPath();
+          ctx.moveTo(startX - 80, baseY - 100);
+          ctx.lineTo(startX + spacing * 2 + 80, baseY - 100);
+          ctx.stroke();
+          
+          // Línea inferior
+          ctx.beginPath();
+          ctx.moveTo(startX - 80, baseY + 100);
+          ctx.lineTo(startX + spacing * 2 + 80, baseY + 100);
+          ctx.stroke();
+          
+          // Líneas verticales
+          ctx.beginPath();
+          ctx.moveTo(startX - 80, baseY - 100);
+          ctx.lineTo(startX - 80, baseY + 100);
+          ctx.stroke();
+          
+          ctx.beginPath();
+          ctx.moveTo(startX + spacing * 2 + 80, baseY - 100);
+          ctx.lineTo(startX + spacing * 2 + 80, baseY + 100);
+          ctx.stroke();
+          
+          // Batería
+          ctx.fillStyle = '#ef4444';
+          ctx.fillRect(startX - 80 - 5, baseY - 30, 10, 60);
+          ctx.fillStyle = '#fff';
+          ctx.font = 'bold 20px Arial';
+          ctx.fillText('+', startX - 110, baseY - 5);
+          ctx.fillText('-', startX - 110, baseY + 25);
+          ctx.fillText(`${params.voltaje}V`, startX - 120, baseY + 55);
+          
+          // Tres resistencias
+          for (let i = 0; i < 3; i++) {
+            const x = startX + spacing * i;
+            const rValue = i === 0 ? params.r1 : i === 1 ? params.r2 : params.r3;
+            const vValue = i === 0 ? valores.V1 : i === 1 ? valores.V2 : valores.V3;
+            
+            // Conexión superior
+            ctx.strokeStyle = '#374151';
+            ctx.lineWidth = 4;
+            ctx.beginPath();
+            ctx.moveTo(x, baseY - 100);
+            ctx.lineTo(x, baseY - 50);
+            ctx.stroke();
+            
+            // Resistencia (zigzag)
+            ctx.strokeStyle = '#f59e0b';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(x, baseY - 50);
+            for (let j = 0; j < 8; j++) {
+              ctx.lineTo(x + (j % 2 === 0 ? -12 : 12), baseY - 40 + j * 10);
+            }
+            ctx.lineTo(x, baseY + 50);
+            ctx.stroke();
+            
+            // Conexión inferior
+            ctx.strokeStyle = '#374151';
+            ctx.lineWidth = 4;
+            ctx.beginPath();
+            ctx.moveTo(x, baseY + 50);
+            ctx.lineTo(x, baseY + 100);
+            ctx.stroke();
+            
+            // Etiquetas
+            ctx.fillStyle = '#1f2937';
+            ctx.font = '14px Arial';
+            ctx.fillText(`R${i+1} = ${rValue}Ω`, x - 35, baseY - 60);
+            ctx.fillStyle = '#3b82f6';
+            ctx.fillText(`${vValue.toFixed(2)}V`, x + 20, baseY);
+          }
+          
+          // Electrones moviéndose
+          const numElectrons = 12;
+          const speed = valores.I / 50;
+          
+          for (let i = 0; i < numElectrons; i++) {
+            const totalDist = (spacing * 2 + 160) * 2 + 200 * 2;
+            const progress = ((t * speed + i / numElectrons) % 1);
+            const currentDist = progress * totalDist;
+            
+            let x, y;
+            
+            if (currentDist < spacing * 2 + 160) {
+              // Lado superior
+              x = startX - 80 + currentDist;
+              y = baseY - 100;
+            } else if (currentDist < spacing * 2 + 160 + 200) {
+              // Lado derecho
+              x = startX + spacing * 2 + 80;
+              y = baseY - 100 + (currentDist - spacing * 2 - 160);
+            } else if (currentDist < spacing * 4 + 320 + 200) {
+              // Lado inferior
+              x = startX + spacing * 2 + 80 - (currentDist - spacing * 2 - 360);
+              y = baseY + 100;
+            } else {
+              // Lado izquierdo
+              x = startX - 80;
+              y = baseY + 100 - (currentDist - spacing * 4 - 520);
+            }
+            
+            ctx.fillStyle = '#3b82f6';
+            ctx.shadowColor = '#3b82f6';
+            ctx.shadowBlur = 8;
+            ctx.beginPath();
+            ctx.arc(x, y, 5, 0, 2 * Math.PI);
+            ctx.fill();
+            ctx.shadowBlur = 0;
+          }
+          
+          // Flecha de corriente
+          ctx.strokeStyle = '#ef4444';
+          ctx.fillStyle = '#ef4444';
+          ctx.lineWidth = 3;
+          const arrowY = baseY - 100 - 30;
+          ctx.beginPath();
+          ctx.moveTo(startX, arrowY);
+          ctx.lineTo(startX + 100, arrowY);
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.moveTo(startX + 100, arrowY);
+          ctx.lineTo(startX + 90, arrowY - 6);
+          ctx.lineTo(startX + 90, arrowY + 6);
+          ctx.closePath();
+          ctx.fill();
+          
+          ctx.fillStyle = '#ef4444';
+          ctx.font = '14px Arial';
+          ctx.fillText(`I = ${valores.I.toFixed(1)} mA`, startX + 20, arrowY - 10);
+          
+          // Información
+          ctx.fillStyle = '#1f2937';
+          ctx.font = '16px Arial';
+          ctx.fillText('SERIE: Req = R1 + R2 + R3', 20, 30);
+          ctx.fillText(`Req = ${valores.Req.toFixed(1)} Ω`, 20, 55);
+          ctx.fillText(`Corriente (misma): ${valores.I.toFixed(1)} mA`, 20, 80);
+          ctx.fillText(`Potencia total: ${valores.P.toFixed(2)} W`, 20, 105);
+          
+          if (t > 10) shouldContinue = false;
+          
+        } else if (simType === 'paralelo') {
+          // Resistencias en paralelo
+          const baseY = canvas.height / 2;
+          const spacing = 100;
+          const startX = 200;
+          
+          const valores = calcularParalelo();
+          
+          // Circuito
+          ctx.strokeStyle = '#374151';
+          ctx.lineWidth = 4;
+          
+          // Líneas verticales principales
+          ctx.beginPath();
+          ctx.moveTo(startX, baseY - 140);
+          ctx.lineTo(startX, baseY + 140);
+          ctx.stroke();
+          
+          ctx.beginPath();
+          ctx.moveTo(startX + 300, baseY - 140);
+          ctx.lineTo(startX + 300, baseY + 140);
+          ctx.stroke();
+          
+          // Conexiones horizontales
+          ctx.beginPath();
+          ctx.moveTo(startX - 100, baseY);
+          ctx.lineTo(startX, baseY);
+          ctx.stroke();
+          
+          ctx.beginPath();
+          ctx.moveTo(startX + 300, baseY);
+          ctx.lineTo(startX + 400, baseY);
+          ctx.stroke();
+          
+          // Batería
+          ctx.fillStyle = '#ef4444';
+          ctx.fillRect(startX - 100 - 5, baseY - 30, 10, 60);
+          ctx.fillStyle = '#fff';
+          ctx.font = 'bold 20px Arial';
+          ctx.fillText('+', startX - 130, baseY - 5);
+          ctx.fillText('-', startX - 130, baseY + 25);
+          ctx.fillText(`${params.voltaje}V`, startX - 140, baseY + 55);
+          
+          // Tres resistencias en paralelo
+          for (let i = 0; i < 3; i++) {
+            const y = baseY - spacing + spacing * i;
+            const rValue = i === 0 ? params.r1 : i === 1 ? params.r2 : params.r3;
+            const iValue = i === 0 ? valores.I1 : i === 1 ? valores.I2 : valores.I3;
+            
+            // Conexiones
+            ctx.strokeStyle = '#374151';
+            ctx.lineWidth = 4;
+            ctx.beginPath();
+            ctx.moveTo(startX, y);
+            ctx.lineTo(startX + 70, y);
+            ctx.stroke();
+            
+            ctx.beginPath();
+            ctx.moveTo(startX + 230, y);
+            ctx.lineTo(startX + 300, y);
+            ctx.stroke();
+            
+            // Resistencia (zigzag)
+            ctx.strokeStyle = '#f59e0b';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(startX + 70, y);
+            for (let j = 0; j < 12; j++) {
+              ctx.lineTo(startX + 70 + j * 13 + 6.5, y + (j % 2 === 0 ? -12 : 12));
+            }
+            ctx.lineTo(startX + 230, y);
+            ctx.stroke();
+            
+            // Etiquetas
+            ctx.fillStyle = '#1f2937';
+            ctx.font = '14px Arial';
+            ctx.fillText(`R${i+1} = ${rValue}Ω`, startX + 120, y - 20);
+            ctx.fillStyle = '#3b82f6';
+            ctx.fillText(`${iValue.toFixed(1)} mA`, startX + 120, y + 35);
+          }
+          
+          // Electrones moviéndose por cada rama
+          const speed = 0.3;
+          
+          for (let i = 0; i < 3; i++) {
+            const y = baseY - spacing + spacing * i;
+            const iValue = i === 0 ? valores.I1 : i === 1 ? valores.I2 : valores.I3;
+            const numElectrons = Math.max(3, Math.floor(iValue / 20));
+            
+            for (let j = 0; j < numElectrons; j++) {
+              const progress = ((t * speed * (iValue / 50) + j / numElectrons) % 1);
+              const x = startX + 70 + 160 * progress;
+              
+              ctx.fillStyle = '#3b82f6';
+              ctx.shadowColor = '#3b82f6';
+              ctx.shadowBlur = 8;
+              ctx.beginPath();
+              ctx.arc(x, y, 5, 0, 2 * Math.PI);
+              ctx.fill();
+              ctx.shadowBlur = 0;
+            }
+          }
+          
+          // Electrones en cables principales
+          const mainElectrons = 8;
+          for (let i = 0; i < mainElectrons; i++) {
+            const progress = ((t * speed + i / mainElectrons) % 1);
+            
+            // Cable izquierdo
+            const x1 = startX - 100 + 100 * progress;
+            ctx.fillStyle = '#3b82f6';
+            ctx.shadowColor = '#3b82f6';
+            ctx.shadowBlur = 8;
+            ctx.beginPath();
+            ctx.arc(x1, baseY, 5, 0, 2 * Math.PI);
+            ctx.fill();
+            
+            // Cable derecho
+            const x2 = startX + 300 + 100 * progress;
+            ctx.beginPath();
+            ctx.arc(x2, baseY, 5, 0, 2 * Math.PI);
+            ctx.fill();
+            ctx.shadowBlur = 0;
+          }
+          
+          // Flechas de corriente
+          ctx.strokeStyle = '#ef4444';
+          ctx.fillStyle = '#ef4444';
+          ctx.lineWidth = 2;
+          
+          for (let i = 0; i < 3; i++) {
+            const y = baseY - spacing + spacing * i;
+            const arrowX = startX + 40;
+            
+            ctx.beginPath();
+            ctx.moveTo(arrowX - 20, y);
+            ctx.lineTo(arrowX + 20, y);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(arrowX + 20, y);
+            ctx.lineTo(arrowX + 13, y - 5);
+            ctx.lineTo(arrowX + 13, y + 5);
+            ctx.closePath();
+            ctx.fill();
+          }
+          
+          // Flecha principal
+          ctx.lineWidth = 3;
+          const mainArrowX = startX - 50;
+          ctx.beginPath();
+          ctx.moveTo(mainArrowX - 20, baseY - 30);
+          ctx.lineTo(mainArrowX + 20, baseY - 30);
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.moveTo(mainArrowX + 20, baseY - 30);
+          ctx.lineTo(mainArrowX + 13, baseY - 35);
+          ctx.lineTo(mainArrowX + 13, baseY - 25);
+          ctx.closePath();
+          ctx.fill();
+          
+          ctx.fillStyle = '#ef4444';
+          ctx.font = '14px Arial';
+          ctx.fillText(`I total = ${valores.I.toFixed(1)} mA`, mainArrowX - 25, baseY - 40);
+          
+          // Información
+          ctx.fillStyle = '#1f2937';
+          ctx.font = '16px Arial';
+          ctx.fillText('PARALELO: 1/Req = 1/R1 + 1/R2 + 1/R3', 20, 30);
+          ctx.fillText(`Req = ${valores.Req.toFixed(1)} Ω`, 20, 55);
+          ctx.fillText(`Voltaje (mismo): ${params.voltaje} V`, 20, 80);
+          ctx.fillText(`Corriente total: ${valores.I.toFixed(1)} mA`, 20, 105);
+          ctx.fillText(`Potencia total: ${valores.P.toFixed(2)} W`, 20, 130);
+          
+          if (t > 10) shouldContinue = false;
+        }
+        
+        ctx.fillStyle = '#1f2937';
+        ctx.font = '14px Arial';
+        ctx.fillText('Tiempo: ' + t.toFixed(2) + ' s', canvas.width - 150, canvas.height - 20);
+
+        timeRef.current += 0.05;
+
+        if (shouldContinue) {
+          animationRef.current = requestAnimationFrame(animate);
+        } else {
+          setIsRunning(false);
+        }
+      };
+
+      animate();
+    }
+
+    return () => {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
+    };
+  }, [isRunning, simType, params]);
+
+  return (
+    <div className="p-8 max-w-6xl mx-auto">
+      <h2 className="text-3xl font-bold text-gray-800 mb-6">Simulacion de Corriente Eléctrica y Ley de Ohm</h2>
+
+      <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6">
+        <p className="text-sm text-gray-700">Visualiza circuitos eléctricos, calcula corriente, resistencia y observa el efecto Joule en tiempo real.</p>
+      </div>
+
+      <div className="mb-6">
+        <label className="block text-sm font-semibold text-gray-700 mb-2">Tipo de Simulación</label>
+        <select value={simType} onChange={(e) => { setSimType(e.target.value); setIsRunning(false); }} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+          <option value="ohm">Ley de Ohm y Corriente Eléctrica</option>
+          <option value="joule">Efecto Joule y Potencia Disipada</option>
+          <option value="resistividad">Resistividad de Materiales</option>
+          <option value="serie">Resistencias en Serie</option>
+          <option value="paralelo">Resistencias en Paralelo</option>
+        </select>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        {(simType === 'ohm' || simType === 'joule') && (
+          <>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Voltaje: {params.voltaje} V</label>
+              <input type="range" min="3" max="24" value={params.voltaje} onChange={(e) => setParams({...params, voltaje: Number(e.target.value)})} className="w-full" disabled={isRunning} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Resistencia: {params.resistencia} Ω</label>
+              <input type="range" min="10" max="500" value={params.resistencia} onChange={(e) => setParams({...params, resistencia: Number(e.target.value)})} className="w-full" disabled={isRunning} />
+            </div>
+          </>
+        )}
+        {simType === 'resistividad' && (
+          <>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Voltaje: {params.voltaje} V</label>
+              <input type="range" min="3" max="24" value={params.voltaje} onChange={(e) => setParams({...params, voltaje: Number(e.target.value)})} className="w-full" disabled={isRunning} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Longitud: {params.longitud} m</label>
+              <input type="range" min="0.5" max="5" step="0.5" value={params.longitud} onChange={(e) => setParams({...params, longitud: Number(e.target.value)})} className="w-full" disabled={isRunning} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Área: {params.area} mm²</label>
+              <input type="range" min="0.5" max="5" step="0.5" value={params.area} onChange={(e) => setParams({...params, area: Number(e.target.value)})} className="w-full" disabled={isRunning} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Resistividad: {params.resistividad} × 10⁻⁸</label>
+              <input type="range" min="1" max="20" step="0.5" value={params.resistividad} onChange={(e) => setParams({...params, resistividad: Number(e.target.value)})} className="w-full" disabled={isRunning} />
+            </div>
+          </>
+        )}
+        {(simType === 'serie' || simType === 'paralelo') && (
+          <>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Voltaje: {params.voltaje} V</label>
+              <input type="range" min="3" max="24" value={params.voltaje} onChange={(e) => setParams({...params, voltaje: Number(e.target.value)})} className="w-full" disabled={isRunning} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">R1: {params.r1} Ω</label>
+              <input type="range" min="50" max="300" value={params.r1} onChange={(e) => setParams({...params, r1: Number(e.target.value)})} className="w-full" disabled={isRunning} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">R2: {params.r2} Ω</label>
+              <input type="range" min="50" max="300" value={params.r2} onChange={(e) => setParams({...params, r2: Number(e.target.value)})} className="w-full" disabled={isRunning} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">R3: {params.r3} Ω</label>
+              <input type="range" min="50" max="300" value={params.r3} onChange={(e) => setParams({...params, r3: Number(e.target.value)})} className="w-full" disabled={isRunning} />
+            </div>
+          </>
+        )}
+        <div className="flex items-end">
+          <button onClick={() => setIsRunning(!isRunning)} className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors">
+            {isRunning ? 'Detener' : 'Iniciar'}
+          </button>
+        </div>
+      </div>
+
+      <div className="bg-white border-2 border-gray-300 rounded-lg overflow-hidden mb-6">
+        <canvas ref={canvasRef} width={800} height={400} className="w-full" />
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-lg border border-blue-200">
+          <h3 className="font-bold text-gray-800 mb-2">📚 Conceptos Clave</h3>
+          <ul className="text-sm text-gray-700 space-y-1">
+            {simType === 'ohm' && (
+              <>
+                <li>• <strong>Corriente eléctrica:</strong> Flujo de cargas (I = Q/t)</li>
+                <li>• <strong>Sentido convencional:</strong> Del polo + al polo -</li>
+                <li>• <strong>Ley de Ohm:</strong> V = I × R</li>
+                <li>• Los electrones van en sentido opuesto</li>
+              </>
+            )}
+            {simType === 'joule' && (
+              <>
+                <li>• <strong>Efecto Joule:</strong> Calor por resistencia eléctrica</li>
+                <li>• <strong>Potencia disipada:</strong> P = I² × R = V² / R</li>
+                <li>• <strong>Energía:</strong> E = P × t (Joules)</li>
+                <li>• El calor genera aumento de temperatura</li>
+              </>
+            )}
+            {simType === 'resistividad' && (
+              <>
+                <li>• <strong>Resistividad (ρ):</strong> Propiedad del material</li>
+                <li>• <strong>Resistencia:</strong> R = ρ × L / A</li>
+                <li>• L = longitud, A = área transversal</li>
+                <li>• Depende de temperatura y material</li>
+              </>
+            )}
+            {simType === 'serie' && (
+              <>
+                <li>• <strong>Serie:</strong> Req = R1 + R2 + R3 + ...</li>
+                <li>• <strong>Corriente:</strong> Misma en todas (I constante)</li>
+                <li>• <strong>Voltaje:</strong> Se divide (V = V1 + V2 + V3)</li>
+                <li>• Req es mayor que cualquier resistencia</li>
+              </>
+            )}
+            {simType === 'paralelo' && (
+              <>
+                <li>• <strong>Paralelo:</strong> 1/Req = 1/R1 + 1/R2 + 1/R3</li>
+                <li>• <strong>Voltaje:</strong> Mismo en todas (V constante)</li>
+                <li>• <strong>Corriente:</strong> Se divide (I = I1 + I2 + I3)</li>
+                <li>• Req es menor que la menor resistencia</li>
+              </>
+            )}
+          </ul>
+        </div>
+
+        <div className="bg-gradient-to-r from-green-50 to-emerald-50 p-4 rounded-lg border border-green-200">
+          <h3 className="font-bold text-gray-800 mb-2">💡 Aplicaciones Prácticas</h3>
+          <ul className="text-sm text-gray-700 space-y-1">
+            <li>• <strong>Circuitos domésticos:</strong> Conexión de lámparas y electrodomésticos</li>
+            <li>• <strong>Calefacción:</strong> Estufas eléctricas, secadores de pelo</li>
+            <li>• <strong>Fusibles:</strong> Protección contra sobrecorriente</li>
+            <li>• <strong>Sensores:</strong> Termistores, fotorresistencias</li>
+            <li>• <strong>Control de velocidad:</strong> Ventiladores, motores</li>
+            <li>• <strong>División de voltaje:</strong> Sensores y circuitos analógicos</li>
+          </ul>
+        </div>
+      </div>
+
+      <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-lg">
+          <h4 className="font-bold text-gray-800 mb-2">🔌 Ley de Ohm</h4>
+          <p className="text-sm text-gray-700 mb-2">La relación fundamental entre voltaje, corriente y resistencia:</p>
+          <p className="text-center text-xl font-bold text-blue-600">V = I × R</p>
+        </div>
+
+        <div className="bg-orange-50 border border-orange-200 p-4 rounded-lg">
+          <h4 className="font-bold text-gray-800 mb-2">🔥 Potencia Eléctrica</h4>
+          <p className="text-sm text-gray-700 mb-2">La energía disipada por unidad de tiempo:</p>
+          <p className="text-center text-xl font-bold text-orange-600">P = V × I</p>
+        </div>
+
+        <div className="bg-red-50 border border-red-200 p-4 rounded-lg">
+          <h4 className="font-bold text-gray-800 mb-2">⚡ Efecto Joule</h4>
+          <p className="text-sm text-gray-700 mb-2">Calor generado por corriente eléctrica:</p>
+          <p className="text-center text-xl font-bold text-red-600">Q = I² × R × t</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+function CalculadoraKirchhoff() {
+  const [calcType, setCalcType] = useState('ley-corrientes');
+  const [inputs, setInputs] = useState({});
+  const [result, setResult] = useState(null);
+
+  const calculateLeyCorrientes = () => {
+    const corrientes = inputs.corrientes ? inputs.corrientes.split(',').map(c => {
+      const val = c.trim();
+      return parseFloat(val);
+    }).filter(c => !isNaN(c)) : [];
+    
+    if (corrientes.length > 0) {
+      const sumaEntrantes = corrientes.filter(c => c > 0).reduce((sum, c) => sum + c, 0);
+      const sumaSalientes = corrientes.filter(c => c < 0).reduce((sum, c) => sum + Math.abs(c), 0);
+      const balance = corrientes.reduce((sum, c) => sum + c, 0);
+      
+      setResult({ 
+        corrientesEntrantes: sumaEntrantes.toFixed(3) + ' A',
+        corrientesSalientes: sumaSalientes.toFixed(3) + ' A',
+        balance: balance.toFixed(6) + ' A',
+        cumpleLey: Math.abs(balance) < 0.001 ? '✅ Sí cumple (ΣI ≈ 0)' : '❌ No cumple perfectamente',
+        interpretacion: Math.abs(balance) < 0.001 ? 'El nodo está en equilibrio' : 'Revisa los valores ingresados'
+      });
+    }
+  };
+
+  const calculateLeyTensiones = () => {
+    const tensiones = inputs.tensiones ? inputs.tensiones.split(',').map(v => {
+      const val = v.trim();
+      return parseFloat(val);
+    }).filter(v => !isNaN(v)) : [];
+    
+    if (tensiones.length > 0) {
+      const sumaSubidas = tensiones.filter(v => v > 0).reduce((sum, v) => sum + v, 0);
+      const sumaCaidas = tensiones.filter(v => v < 0).reduce((sum, v) => sum + Math.abs(v), 0);
+      const balance = tensiones.reduce((sum, v) => sum + v, 0);
+      
+      setResult({ 
+        subidasTension: sumaSubidas.toFixed(3) + ' V',
+        caidasTension: sumaCaidas.toFixed(3) + ' V',
+        balance: balance.toFixed(6) + ' V',
+        cumpleLey: Math.abs(balance) < 0.001 ? '✅ Sí cumple (ΣV ≈ 0)' : '❌ No cumple perfectamente',
+        interpretacion: Math.abs(balance) < 0.001 ? 'La malla está equilibrada' : 'Revisa los valores y signos'
+      });
+    }
+  };
+
+  const calculateCircuitoSerie = () => {
+    const { Vtotal, R1, R2, R3 } = inputs;
+    const resistencias = [R1, R2, R3].filter(r => r && !isNaN(parseFloat(r))).map(r => parseFloat(r));
+    
+    if (Vtotal && resistencias.length > 0) {
+      const Req = resistencias.reduce((sum, r) => sum + r, 0);
+      const I = parseFloat(Vtotal) / Req;
+      
+      const caidas = resistencias.map((r, idx) => ({
+        resistencia: `R${idx + 1}`,
+        valor: r.toFixed(2) + ' Ω',
+        caida: (I * r).toFixed(3) + ' V',
+        potencia: (I * I * r).toFixed(3) + ' W'
+      }));
+      
+      setResult({
+        resistenciaEquivalente: Req.toFixed(3) + ' Ω',
+        corrienteCircuito: I.toFixed(3) + ' A',
+        caidas: caidas,
+        potenciaTotal: (parseFloat(Vtotal) * I).toFixed(3) + ' W'
+      });
+    }
+  };
+
+  const calculateCircuitoParalelo = () => {
+    const { Vtotal, R1, R2, R3 } = inputs;
+    const resistencias = [R1, R2, R3].filter(r => r && !isNaN(parseFloat(r))).map(r => parseFloat(r));
+    
+    if (Vtotal && resistencias.length > 0) {
+      const sumaInversos = resistencias.reduce((sum, r) => sum + (1/r), 0);
+      const Req = 1 / sumaInversos;
+      const Itotal = parseFloat(Vtotal) / Req;
+      
+      const ramas = resistencias.map((r, idx) => ({
+        resistencia: `R${idx + 1}`,
+        valor: r.toFixed(2) + ' Ω',
+        corriente: (parseFloat(Vtotal) / r).toFixed(3) + ' A',
+        potencia: (Math.pow(parseFloat(Vtotal), 2) / r).toFixed(3) + ' W'
+      }));
+      
+      setResult({
+        resistenciaEquivalente: Req.toFixed(3) + ' Ω',
+        corrienteTotal: Itotal.toFixed(3) + ' A',
+        ramas: ramas,
+        potenciaTotal: (parseFloat(Vtotal) * Itotal).toFixed(3) + ' W'
+      });
+    }
+  };
+
+  const calculateDivisorTension = () => {
+    const { Vin, R1, R2 } = inputs;
+    
+    if (Vin && R1 && R2) {
+      const Vout = (parseFloat(Vin) * parseFloat(R2)) / (parseFloat(R1) + parseFloat(R2));
+      const I = parseFloat(Vin) / (parseFloat(R1) + parseFloat(R2));
+      const V_R1 = I * parseFloat(R1);
+      const V_R2 = I * parseFloat(R2);
+      
+      setResult({
+        tensionSalida: Vout.toFixed(3) + ' V',
+        corriente: I.toFixed(3) + ' A',
+        tension_R1: V_R1.toFixed(3) + ' V',
+        tension_R2: V_R2.toFixed(3) + ' V',
+        verificacion: 'V_R1 + V_R2 = ' + (V_R1 + V_R2).toFixed(3) + ' V ≈ Vin'
+      });
+    }
+  };
+
+  const calculateDivisorCorriente = () => {
+    const { Itotal, R1, R2 } = inputs;
+    
+    if (Itotal && R1 && R2) {
+      const Req = (parseFloat(R1) * parseFloat(R2)) / (parseFloat(R1) + parseFloat(R2));
+      const I1 = (parseFloat(Itotal) * parseFloat(R2)) / (parseFloat(R1) + parseFloat(R2));
+      const I2 = (parseFloat(Itotal) * parseFloat(R1)) / (parseFloat(R1) + parseFloat(R2));
+      
+      setResult({
+        corriente_R1: I1.toFixed(3) + ' A',
+        corriente_R2: I2.toFixed(3) + ' A',
+        resistenciaEquivalente: Req.toFixed(3) + ' Ω',
+        verificacion: 'I1 + I2 = ' + (I1 + I2).toFixed(3) + ' A ≈ Itotal',
+        nota: 'La corriente se divide inversamente a las resistencias'
+      });
+    }
+  };
+
+  const handleCalculate = () => {
+    setResult(null);
+    if (calcType === 'ley-corrientes') calculateLeyCorrientes();
+    else if (calcType === 'ley-tensiones') calculateLeyTensiones();
+    else if (calcType === 'circuito-serie') calculateCircuitoSerie();
+    else if (calcType === 'circuito-paralelo') calculateCircuitoParalelo();
+    else if (calcType === 'divisor-tension') calculateDivisorTension();
+    else if (calcType === 'divisor-corriente') calculateDivisorCorriente();
+  };
+
+  return (
+    <div className="p-8 max-w-5xl mx-auto bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-50 min-h-screen">
+      <div className="text-center mb-8">
+        <h2 className="text-5xl font-bold text-indigo-900 mb-3">⚡ Leyes de Kirchhoff</h2>
+        <p className="text-xl text-gray-700">Análisis de Circuitos Eléctricos</p>
+      </div>
+
+      <div className="bg-gradient-to-r from-yellow-100 to-orange-100 border-l-4 border-orange-500 p-5 mb-6 rounded-r-lg shadow-md">
+        <h3 className="font-bold text-orange-900 mb-2">📖 Recordatorio de las Leyes de Kirchhoff</h3>
+        <div className="text-sm text-gray-800 space-y-2">
+          <p><strong>• 1ª Ley (Corrientes - Nodos):</strong> La suma algebraica de corrientes en un nodo es cero: ΣI = 0</p>
+          <p><strong>• 2ª Ley (Tensiones - Mallas):</strong> La suma algebraica de tensiones en una malla es cero: ΣV = 0</p>
+        </div>
+      </div>
+
+      <div className="mb-6 bg-white rounded-xl shadow-lg p-6 border-2 border-indigo-200">
+        <label className="block text-lg font-bold text-indigo-900 mb-3">🔧 Tipo de Análisis</label>
+        <select
+          value={calcType}
+          onChange={(e) => { setCalcType(e.target.value); setInputs({}); setResult(null); }}
+          className="w-full p-4 border-2 border-indigo-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-lg"
+        >
+          <option value="ley-corrientes">1ª Ley: Análisis de Nodo (Corrientes)</option>
+          <option value="ley-tensiones">2ª Ley: Análisis de Malla (Tensiones)</option>
+          <option value="circuito-serie">Circuito en Serie</option>
+          <option value="circuito-paralelo">Circuito en Paralelo</option>
+          <option value="divisor-tension">Divisor de Tensión</option>
+          <option value="divisor-corriente">Divisor de Corriente</option>
+        </select>
+      </div>
+
+      <div className="bg-white border-2 border-indigo-200 rounded-xl shadow-xl p-6 mb-6">
+        <h3 className="text-xl font-bold text-indigo-900 mb-5">📊 Datos de Entrada</h3>
+        
+        {calcType === 'ley-corrientes' && (
+          <div className="space-y-4">
+            <div className="bg-blue-50 border border-blue-300 rounded-lg p-4 mb-4">
+              <p className="text-sm text-gray-800">
+                <strong>Instrucciones:</strong> Ingresa las corrientes en el nodo separadas por comas.
+                <br/>• Corrientes <strong>entrantes</strong>: valores positivos (+)
+                <br/>• Corrientes <strong>salientes</strong>: valores negativos (-)
+                <br/>Ejemplo: 5, -3, -2 (5A entra, 3A y 2A salen)
+              </p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Corrientes en el nodo (A)</label>
+              <input 
+                type="text" 
+                value={inputs.corrientes || ''} 
+                onChange={(e) => setInputs({...inputs, corrientes: e.target.value})} 
+                className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" 
+                placeholder="Ej: 5, -3, -2"
+              />
+            </div>
+          </div>
+        )}
+
+        {calcType === 'ley-tensiones' && (
+          <div className="space-y-4">
+            <div className="bg-green-50 border border-green-300 rounded-lg p-4 mb-4">
+              <p className="text-sm text-gray-800">
+                <strong>Instrucciones:</strong> Ingresa las tensiones en la malla separadas por comas.
+                <br/>• <strong>Fuentes de voltaje</strong> (subidas): valores positivos (+)
+                <br/>• <strong>Caídas de voltaje</strong> en resistencias: valores negativos (-)
+                <br/>Ejemplo: 12, -5, -7 (12V fuente, 5V y 7V caídas)
+              </p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Tensiones en la malla (V)</label>
+              <input 
+                type="text" 
+                value={inputs.tensiones || ''} 
+                onChange={(e) => setInputs({...inputs, tensiones: e.target.value})} 
+                className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" 
+                placeholder="Ej: 12, -5, -7"
+              />
+            </div>
+          </div>
+        )}
+
+        {calcType === 'circuito-serie' && (
+          <div className="space-y-4">
+            <div className="bg-purple-50 border border-purple-300 rounded-lg p-4 mb-4">
+              <p className="text-sm text-gray-800">
+                <strong>Circuito Serie:</strong> Los elementos están en secuencia. La corriente es la misma en todos.
+              </p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Voltaje Total (V)</label>
+              <input type="number" step="any" value={inputs.Vtotal || ''} onChange={(e) => setInputs({...inputs, Vtotal: e.target.value})} className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="Ej: 12" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Resistencia R1 (Ω)</label>
+              <input type="number" step="any" value={inputs.R1 || ''} onChange={(e) => setInputs({...inputs, R1: e.target.value})} className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="Ej: 100" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Resistencia R2 (Ω) - Opcional</label>
+              <input type="number" step="any" value={inputs.R2 || ''} onChange={(e) => setInputs({...inputs, R2: e.target.value})} className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="Ej: 200" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Resistencia R3 (Ω) - Opcional</label>
+              <input type="number" step="any" value={inputs.R3 || ''} onChange={(e) => setInputs({...inputs, R3: e.target.value})} className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="Ej: 300" />
+            </div>
+          </div>
+        )}
+
+        {calcType === 'circuito-paralelo' && (
+          <div className="space-y-4">
+            <div className="bg-teal-50 border border-teal-300 rounded-lg p-4 mb-4">
+              <p className="text-sm text-gray-800">
+                <strong>Circuito Paralelo:</strong> Los elementos comparten los mismos nodos. El voltaje es el mismo en todos.
+              </p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Voltaje Total (V)</label>
+              <input type="number" step="any" value={inputs.Vtotal || ''} onChange={(e) => setInputs({...inputs, Vtotal: e.target.value})} className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="Ej: 12" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Resistencia R1 (Ω)</label>
+              <input type="number" step="any" value={inputs.R1 || ''} onChange={(e) => setInputs({...inputs, R1: e.target.value})} className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="Ej: 100" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Resistencia R2 (Ω) - Opcional</label>
+              <input type="number" step="any" value={inputs.R2 || ''} onChange={(e) => setInputs({...inputs, R2: e.target.value})} className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="Ej: 200" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Resistencia R3 (Ω) - Opcional</label>
+              <input type="number" step="any" value={inputs.R3 || ''} onChange={(e) => setInputs({...inputs, R3: e.target.value})} className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="Ej: 300" />
+            </div>
+          </div>
+        )}
+
+        {calcType === 'divisor-tension' && (
+          <div className="space-y-4">
+            <div className="bg-pink-50 border border-pink-300 rounded-lg p-4 mb-4">
+              <p className="text-sm text-gray-800">
+                <strong>Divisor de Tensión:</strong> Vout = Vin × (R2 / (R1 + R2))
+                <br/>Aplicación: Ajustar niveles de voltaje en sensores y circuitos.
+              </p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Voltaje de Entrada Vin (V)</label>
+              <input type="number" step="any" value={inputs.Vin || ''} onChange={(e) => setInputs({...inputs, Vin: e.target.value})} className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="Ej: 12" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Resistencia R1 (Ω)</label>
+              <input type="number" step="any" value={inputs.R1 || ''} onChange={(e) => setInputs({...inputs, R1: e.target.value})} className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="Ej: 1000" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Resistencia R2 (Ω)</label>
+              <input type="number" step="any" value={inputs.R2 || ''} onChange={(e) => setInputs({...inputs, R2: e.target.value})} className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="Ej: 2000" />
+            </div>
+          </div>
+        )}
+
+        {calcType === 'divisor-corriente' && (
+          <div className="space-y-4">
+            <div className="bg-orange-50 border border-orange-300 rounded-lg p-4 mb-4">
+              <p className="text-sm text-gray-800">
+                <strong>Divisor de Corriente:</strong> I1 = Itotal × (R2 / (R1 + R2))
+                <br/>La corriente se divide inversamente proporcional a las resistencias.
+              </p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Corriente Total (A)</label>
+              <input type="number" step="any" value={inputs.Itotal || ''} onChange={(e) => setInputs({...inputs, Itotal: e.target.value})} className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="Ej: 10" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Resistencia R1 (Ω)</label>
+              <input type="number" step="any" value={inputs.R1 || ''} onChange={(e) => setInputs({...inputs, R1: e.target.value})} className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="Ej: 100" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Resistencia R2 (Ω)</label>
+              <input type="number" step="any" value={inputs.R2 || ''} onChange={(e) => setInputs({...inputs, R2: e.target.value})} className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="Ej: 200" />
+            </div>
+          </div>
+        )}
+
+        <button 
+          onClick={handleCalculate} 
+          className="mt-6 w-full bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white py-4 rounded-lg font-bold text-lg hover:from-indigo-700 hover:via-purple-700 hover:to-pink-700 transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-1"
+        >
+          🧮 Calcular y Analizar
+        </button>
+      </div>
+
+      {result && (
+        <div className="bg-gradient-to-br from-green-50 to-emerald-100 border-2 border-green-400 rounded-xl shadow-2xl p-6 mb-6">
+          <h3 className="text-3xl font-bold text-green-800 mb-5">✅ Resultados del Análisis</h3>
+          <div className="space-y-3">
+            {result.caidas && (
+              <div className="bg-white rounded-lg p-4 mb-4 border-2 border-green-200">
+                <h4 className="font-bold text-lg text-gray-800 mb-3">Análisis por Resistencia:</h4>
+                {result.caidas.map((item, idx) => (
+                  <div key={idx} className="bg-gray-50 p-3 rounded mb-2">
+                    <p className="font-semibold text-indigo-700">{item.resistencia}: {item.valor}</p>
+                    <p className="text-sm text-gray-700">• Caída de tensión: {item.caida}</p>
+                    <p className="text-sm text-gray-700">• Potencia disipada: {item.potencia}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+            {result.ramas && (
+              <div className="bg-white rounded-lg p-4 mb-4 border-2 border-green-200">
+                <h4 className="font-bold text-lg text-gray-800 mb-3">Análisis por Rama:</h4>
+                {result.ramas.map((item, idx) => (
+                  <div key={idx} className="bg-gray-50 p-3 rounded mb-2">
+                    <p className="font-semibold text-indigo-700">{item.resistencia}: {item.valor}</p>
+                    <p className="text-sm text-gray-700">• Corriente: {item.corriente}</p>
+                    <p className="text-sm text-gray-700">• Potencia: {item.potencia}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+            {Object.entries(result).filter(([key]) => key !== 'caidas' && key !== 'ramas').map(([key, value]) => (
+              <div key={key} className="flex justify-between items-center py-3 px-5 bg-white rounded-lg shadow-md border-l-4 border-green-500">
+                <span className="font-semibold text-gray-700 capitalize text-lg">
+                  {key.replace(/([A-Z])/g, ' $1').replace(/_/g, ' ').trim()}:
+                </span>
+                <span className="text-xl font-bold text-green-700">{value}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="grid md:grid-cols-2 gap-6 mt-8">
+        <div className="bg-white rounded-xl shadow-lg p-6 border-2 border-blue-200">
+          <h3 className="text-2xl font-bold text-blue-900 mb-4">🔵 Conceptos: Nodos y Mallas</h3>
+          <div className="space-y-3 text-sm text-gray-700">
+            <div className="bg-blue-50 p-3 rounded-lg border-l-4 border-blue-500">
+              <strong>Nodo:</strong> Punto donde se conectan tres o más conductores. Aquí se aplica la 1ª Ley (corrientes).
+            </div>
+            <div className="bg-blue-50 p-3 rounded-lg border-l-4 border-blue-500">
+              <strong>Malla:</strong> Camino cerrado en un circuito que no contiene otras mallas. Aquí se aplica la 2ª Ley (tensiones).
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl shadow-lg p-6 border-2 border-purple-200">
+          <h3 className="text-2xl font-bold text-purple-900 mb-4">🔮 Métodos de Resolución</h3>
+          <div className="space-y-3 text-sm text-gray-700">
+            <div className="bg-purple-50 p-3 rounded-lg border-l-4 border-purple-500">
+              <strong>Método de Mallas:</strong> Se escriben ecuaciones para cada malla usando la 2ª Ley de Kirchhoff.
+            </div>
+            <div className="bg-purple-50 p-3 rounded-lg border-l-4 border-purple-500">
+              <strong>Método de Nodos:</strong> Se escriben ecuaciones para cada nodo usando la 1ª Ley de Kirchhoff.
+            </div>
+            <div className="bg-purple-50 p-3 rounded-lg border-l-4 border-purple-500">
+              <strong>Superposición:</strong> Se analiza el efecto de cada fuente independiente por separado.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-6 bg-gradient-to-r from-indigo-100 to-purple-100 rounded-xl shadow-lg p-6 border-2 border-indigo-300">
+        <h3 className="text-2xl font-bold text-indigo-900 mb-4">⚙️ Aplicaciones Prácticas</h3>
+        <div className="grid md:grid-cols-3 gap-4 text-sm">
+          <div className="bg-white p-4 rounded-lg shadow">
+            <p className="font-bold text-indigo-700 mb-2">🔌 Fuentes de Alimentación</p>
+            <p className="text-gray-600">Diseño de reguladores y divisores de tensión.</p>
+          </div>
+          <div className="bg-white p-4 rounded-lg shadow">
+            <p className="font-bold text-indigo-700 mb-2">📱 Electrónica Digital</p>
+            <p className="text-gray-600">Análisis de circuitos lógicos y microcontroladores.</p>
+          </div>
+          <div className="bg-white p-4 rounded-lg shadow">
+            <p className="font-bold text-indigo-700 mb-2">🎸 Audio y Amplificadores</p>
+            <p className="text-gray-600">Diseño de filtros y etapas de amplificación.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+function KirchhoffSimulation() {
+  const canvasRef = useRef(null);
+  const [isRunning, setIsRunning] = useState(false);
+  const [simType, setSimType] = useState('nodos');
+  const [params, setParams] = useState({ 
+    v1: 12, 
+    v2: 9,
+    r1: 100, 
+    r2: 150, 
+    r3: 200,
+    r4: 120,
+    r5: 180
+  });
+  const animationRef = useRef(null);
+  const timeRef = useRef(0);
+
+  // Cálculos para Ley de Corrientes (Nodo)
+  const calcularNodo = () => {
+    const V = params.v1;
+    const R1 = params.r1;
+    const R2 = params.r2;
+    const R3 = params.r3;
+    
+    // Circuito: batería conectada a 3 resistencias en paralelo
+    const I1 = V / R1;
+    const I2 = V / R2;
+    const I3 = V / R3;
+    const Itotal = I1 + I2 + I3;
+    
+    return { I1: I1 * 1000, I2: I2 * 1000, I3: I3 * 1000, Itotal: Itotal * 1000 };
+  };
+
+  // Cálculos para Ley de Tensiones (Malla)
+  const calcularMalla = () => {
+    const V = params.v1;
+    const R1 = params.r1;
+    const R2 = params.r2;
+    const R3 = params.r3;
+    
+    // Circuito serie
+    const Rtotal = R1 + R2 + R3;
+    const I = V / Rtotal;
+    const V1 = I * R1;
+    const V2 = I * R2;
+    const V3 = I * R3;
+    
+    return { I: I * 1000, V1, V2, V3, Vtotal: V1 + V2 + V3 };
+  };
+
+  // Cálculos para circuito mixto
+  const calcularMixto = () => {
+    const V = params.v1;
+    const R1 = params.r1;
+    const R2 = params.r2;
+    const R3 = params.r3;
+    const R4 = params.r4;
+    
+    // R2 y R3 en paralelo
+    const R23 = (R2 * R3) / (R2 + R3);
+    // R1, R23 y R4 en serie
+    const Rtotal = R1 + R23 + R4;
+    const Itotal = V / Rtotal;
+    
+    const V1 = Itotal * R1;
+    const V23 = Itotal * R23;
+    const V4 = Itotal * R4;
+    
+    const I2 = V23 / R2;
+    const I3 = V23 / R3;
+    
+    return { 
+      Itotal: Itotal * 1000, 
+      I2: I2 * 1000, 
+      I3: I3 * 1000,
+      V1, V23, V4, R23 
+    };
+  };
+
+  // Cálculos para método de mallas (2 mallas)
+  const calcularDosMallas = () => {
+    const V1 = params.v1;
+    const V2 = params.v2;
+    const R1 = params.r1;
+    const R2 = params.r2;
+    const R3 = params.r3;
+    
+    // Sistema de ecuaciones para 2 mallas
+    // Malla 1: V1 = I1*R1 + (I1-I2)*R3
+    // Malla 2: -V2 = I2*R2 + (I2-I1)*R3
+    
+    // Resolviendo:
+    const det = (R1 + R3) * (R2 + R3) - R3 * R3;
+    const I1 = ((R2 + R3) * V1 + R3 * V2) / det;
+    const I2 = (R3 * V1 + (R1 + R3) * V2) / det;
+    const I3 = I1 - I2; // Corriente en R3
+    
+    return { 
+      I1: I1 * 1000, 
+      I2: I2 * 1000, 
+      I3: I3 * 1000,
+      V1, V2
+    };
+  };
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+
+    if (isRunning) {
+      timeRef.current = 0;
+      
+      const animate = () => {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        const t = timeRef.current;
+        let shouldContinue = true;
+
+        if (simType === 'nodos') {
+          // Primera Ley de Kirchhoff - Nodos
+          const centerX = 400;
+          const centerY = 200;
+          const valores = calcularNodo();
+          
+          // Título
+          ctx.fillStyle = '#1f2937';
+          ctx.font = 'bold 20px Arial';
+          ctx.fillText('Primera Ley de Kirchhoff - Ley de Corrientes', 20, 30);
+          ctx.font = '16px Arial';
+          ctx.fillText('En un nodo: ΣI_entrada = ΣI_salida', 20, 55);
+          
+          // Cable principal desde batería
+          ctx.strokeStyle = '#374151';
+          ctx.lineWidth = 5;
+          ctx.beginPath();
+          ctx.moveTo(150, centerY);
+          ctx.lineTo(centerX, centerY);
+          ctx.stroke();
+          
+          // Batería
+          ctx.fillStyle = '#ef4444';
+          ctx.fillRect(145, centerY - 30, 10, 60);
+          ctx.fillStyle = '#1f2937';
+          ctx.font = 'bold 18px Arial';
+          ctx.fillText('+', 120, centerY - 5);
+          ctx.fillText('-', 120, centerY + 20);
+          ctx.fillText(`${params.v1}V`, 115, centerY + 50);
+          
+          // NODO central (punto destacado)
+          ctx.fillStyle = '#ef4444';
+          ctx.shadowColor = '#ef4444';
+          ctx.shadowBlur = 20;
+          ctx.beginPath();
+          ctx.arc(centerX, centerY, 15, 0, 2 * Math.PI);
+          ctx.fill();
+          ctx.shadowBlur = 0;
+          
+          ctx.fillStyle = '#fff';
+          ctx.font = 'bold 14px Arial';
+          ctx.fillText('N', centerX - 6, centerY + 5);
+          
+          // Etiqueta del nodo
+          ctx.fillStyle = '#ef4444';
+          ctx.font = 'bold 16px Arial';
+          ctx.fillText('NODO', centerX - 25, centerY - 25);
+          
+          // Tres ramas saliendo del nodo
+          const branches = [
+            { angle: -60, R: params.r1, I: valores.I1, label: 'I₁' },
+            { angle: 0, R: params.r2, I: valores.I2, label: 'I₂' },
+            { angle: 60, R: params.r3, I: valores.I3, label: 'I₃' }
+          ];
+          
+          branches.forEach((branch, idx) => {
+            const angle = (branch.angle * Math.PI) / 180;
+            const endX = centerX + 250 * Math.cos(angle);
+            const endY = centerY + 250 * Math.sin(angle);
+            
+            // Cable
+            ctx.strokeStyle = '#374151';
+            ctx.lineWidth = 5;
+            ctx.beginPath();
+            ctx.moveTo(centerX, centerY);
+            ctx.lineTo(endX, endY);
+            ctx.stroke();
+            
+            // Resistencia (rectángulo)
+            const resX = centerX + 120 * Math.cos(angle);
+            const resY = centerY + 120 * Math.sin(angle);
+            
+            ctx.save();
+            ctx.translate(resX, resY);
+            ctx.rotate(angle);
+            ctx.fillStyle = '#f59e0b';
+            ctx.fillRect(-30, -12, 60, 24);
+            ctx.strokeStyle = '#d97706';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(-30, -12, 60, 24);
+            
+            // Etiqueta resistencia
+            ctx.fillStyle = '#1f2937';
+            ctx.font = '12px Arial';
+            ctx.fillText(`${branch.R}Ω`, -15, -20);
+            ctx.restore();
+            
+            // Flecha de corriente
+            const arrowX = centerX + 80 * Math.cos(angle);
+            const arrowY = centerY + 80 * Math.sin(angle);
+            
+            ctx.save();
+            ctx.translate(arrowX, arrowY);
+            ctx.rotate(angle);
+            ctx.fillStyle = '#3b82f6';
+            ctx.beginPath();
+            ctx.moveTo(20, 0);
+            ctx.lineTo(10, -6);
+            ctx.lineTo(10, 6);
+            ctx.closePath();
+            ctx.fill();
+            ctx.restore();
+            
+            // Etiqueta de corriente
+            const labelX = centerX + 180 * Math.cos(angle);
+            const labelY = centerY + 180 * Math.sin(angle);
+            ctx.fillStyle = '#3b82f6';
+            ctx.font = 'bold 16px Arial';
+            ctx.fillText(`${branch.label} = ${branch.I.toFixed(1)} mA`, labelX - 40, labelY);
+            
+            // Electrones animados
+            const numElectrons = 5;
+            for (let i = 0; i < numElectrons; i++) {
+              const progress = ((t * 0.5 * branch.I / 50 + i / numElectrons) % 1);
+              const ex = centerX + 250 * progress * Math.cos(angle);
+              const ey = centerY + 250 * progress * Math.sin(angle);
+              
+              ctx.fillStyle = '#3b82f6';
+              ctx.shadowColor = '#3b82f6';
+              ctx.shadowBlur = 8;
+              ctx.beginPath();
+              ctx.arc(ex, ey, 5, 0, 2 * Math.PI);
+              ctx.fill();
+              ctx.shadowBlur = 0;
+            }
+          });
+          
+          // Ecuación de Kirchhoff
+          ctx.fillStyle = '#ef4444';
+          ctx.font = 'bold 18px Arial';
+          ctx.fillText(`Itotal = I₁ + I₂ + I₃`, 20, canvas.height - 60);
+          ctx.fillText(`${valores.Itotal.toFixed(1)} = ${valores.I1.toFixed(1)} + ${valores.I2.toFixed(1)} + ${valores.I3.toFixed(1)} mA`, 20, canvas.height - 35);
+          
+          // Verificación
+          const suma = valores.I1 + valores.I2 + valores.I3;
+          const error = Math.abs(suma - valores.Itotal);
+          ctx.fillStyle = error < 0.1 ? '#10b981' : '#ef4444';
+          ctx.fillText(`✓ Verificado: ${suma.toFixed(1)} mA`, 20, canvas.height - 10);
+          
+          if (t > 8) shouldContinue = false;
+          
+        } else if (simType === 'mallas') {
+          // Segunda Ley de Kirchhoff - Mallas
+          const startX = 200;
+          const startY = 200;
+          const width = 400;
+          const height = 150;
+          
+          const valores = calcularMalla();
+          
+          // Título
+          ctx.fillStyle = '#1f2937';
+          ctx.font = 'bold 20px Arial';
+          ctx.fillText('Segunda Ley de Kirchhoff - Ley de Tensiones', 20, 30);
+          ctx.font = '16px Arial';
+          ctx.fillText('En una malla: ΣV = 0', 20, 55);
+          
+          // Dibujar malla rectangular
+          ctx.strokeStyle = '#374151';
+          ctx.lineWidth = 5;
+          ctx.strokeRect(startX, startY - height/2, width, height);
+          
+          // Batería (lado izquierdo)
+          ctx.fillStyle = '#ef4444';
+          ctx.fillRect(startX - 5, startY - 30, 10, 60);
+          ctx.fillStyle = '#1f2937';
+          ctx.font = 'bold 18px Arial';
+          ctx.fillText('+', startX - 35, startY - 5);
+          ctx.fillText('-', startX - 35, startY + 20);
+          ctx.fillText(`${params.v1}V`, startX - 45, startY + 50);
+          
+          // Resistencia 1 (arriba)
+          const r1X = startX + width / 4;
+          const r1Y = startY - height/2;
+          ctx.fillStyle = '#f59e0b';
+          ctx.fillRect(r1X - 40, r1Y - 15, 80, 30);
+          ctx.strokeStyle = '#d97706';
+          ctx.lineWidth = 2;
+          ctx.strokeRect(r1X - 40, r1Y - 15, 80, 30);
+          ctx.fillStyle = '#1f2937';
+          ctx.font = '14px Arial';
+          ctx.fillText(`R1=${params.r1}Ω`, r1X - 35, r1Y - 25);
+          ctx.fillStyle = '#3b82f6';
+          ctx.font = 'bold 16px Arial';
+          ctx.fillText(`V1=${valores.V1.toFixed(2)}V`, r1X - 35, r1Y + 50);
+          
+          // Resistencia 2 (medio)
+          const r2X = startX + width / 2;
+          const r2Y = startY - height/2;
+          ctx.fillStyle = '#f59e0b';
+          ctx.fillRect(r2X - 40, r2Y - 15, 80, 30);
+          ctx.strokeStyle = '#d97706';
+          ctx.lineWidth = 2;
+          ctx.strokeRect(r2X - 40, r2Y - 15, 80, 30);
+          ctx.fillStyle = '#1f2937';
+          ctx.font = '14px Arial';
+          ctx.fillText(`R2=${params.r2}Ω`, r2X - 35, r2Y - 25);
+          ctx.fillStyle = '#3b82f6';
+          ctx.font = 'bold 16px Arial';
+          ctx.fillText(`V2=${valores.V2.toFixed(2)}V`, r2X - 35, r2Y + 50);
+          
+          // Resistencia 3 (derecha)
+          const r3X = startX + 3 * width / 4;
+          const r3Y = startY - height/2;
+          ctx.fillStyle = '#f59e0b';
+          ctx.fillRect(r3X - 40, r3Y - 15, 80, 30);
+          ctx.strokeStyle = '#d97706';
+          ctx.lineWidth = 2;
+          ctx.strokeRect(r3X - 40, r3Y - 15, 80, 30);
+          ctx.fillStyle = '#1f2937';
+          ctx.font = '14px Arial';
+          ctx.fillText(`R3=${params.r3}Ω`, r3X - 35, r3Y - 25);
+          ctx.fillStyle = '#3b82f6';
+          ctx.font = 'bold 16px Arial';
+          ctx.fillText(`V3=${valores.V3.toFixed(2)}V`, r3X - 35, r3Y + 50);
+          
+          // Flecha indicando sentido de la malla
+          const centerMallaX = startX + width/2;
+          const centerMallaY = startY;
+          const radius = 60;
+          
+          ctx.strokeStyle = '#10b981';
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.arc(centerMallaX, centerMallaY, radius, 0, 1.5 * Math.PI);
+          ctx.stroke();
+          
+          // Punta de flecha
+          ctx.fillStyle = '#10b981';
+          ctx.beginPath();
+          ctx.moveTo(centerMallaX, centerMallaY - radius);
+          ctx.lineTo(centerMallaX - 8, centerMallaY - radius - 10);
+          ctx.lineTo(centerMallaX + 8, centerMallaY - radius - 10);
+          ctx.closePath();
+          ctx.fill();
+          
+          ctx.fillStyle = '#10b981';
+          ctx.font = 'bold 16px Arial';
+          ctx.fillText('Malla', centerMallaX - 25, centerMallaY + 5);
+          
+          // Electrones circulando
+          const perimeter = 2 * (width + height);
+          const numElectrons = 15;
+          
+          for (let i = 0; i < numElectrons; i++) {
+            const progress = ((t * 0.3 + i / numElectrons) % 1);
+            const dist = progress * perimeter;
+            let ex, ey;
+            
+            if (dist < width) {
+              ex = startX + dist;
+              ey = startY - height/2;
+            } else if (dist < width + height) {
+              ex = startX + width;
+              ey = startY - height/2 + (dist - width);
+            } else if (dist < 2 * width + height) {
+              ex = startX + width - (dist - width - height);
+              ey = startY + height/2;
+            } else {
+              ex = startX;
+              ey = startY + height/2 - (dist - 2 * width - height);
+            }
+            
+            ctx.fillStyle = '#3b82f6';
+            ctx.shadowColor = '#3b82f6';
+            ctx.shadowBlur = 8;
+            ctx.beginPath();
+            ctx.arc(ex, ey, 5, 0, 2 * Math.PI);
+            ctx.fill();
+            ctx.shadowBlur = 0;
+          }
+          
+          // Ecuación de Kirchhoff
+          ctx.fillStyle = '#10b981';
+          ctx.font = 'bold 18px Arial';
+          ctx.fillText(`V - V1 - V2 - V3 = 0`, 20, canvas.height - 60);
+          ctx.fillText(`${params.v1} - ${valores.V1.toFixed(2)} - ${valores.V2.toFixed(2)} - ${valores.V3.toFixed(2)} = ${(params.v1 - valores.Vtotal).toFixed(2)} V`, 20, canvas.height - 35);
+          
+          ctx.fillStyle = '#10b981';
+          ctx.fillText(`✓ Corriente constante: I = ${valores.I.toFixed(1)} mA`, 20, canvas.height - 10);
+          
+          if (t > 8) shouldContinue = false;
+          
+        } else if (simType === 'mixto') {
+          // Circuito Mixto
+          const valores = calcularMixto();
+          
+          // Título
+          ctx.fillStyle = '#1f2937';
+          ctx.font = 'bold 20px Arial';
+          ctx.fillText('Análisis de Circuito Mixto', 20, 30);
+          ctx.font = '14px Arial';
+          ctx.fillText('Combinación de serie y paralelo', 20, 50);
+          
+          const startX = 150;
+          const centerY = 200;
+          
+          // Batería
+          ctx.fillStyle = '#ef4444';
+          ctx.fillRect(145, centerY - 30, 10, 60);
+          ctx.fillStyle = '#1f2937';
+          ctx.font = 'bold 16px Arial';
+          ctx.fillText('+', 120, centerY - 5);
+          ctx.fillText('-', 120, centerY + 15);
+          ctx.fillText(`${params.v1}V`, 115, centerY + 45);
+          
+          // Cable inicial
+          ctx.strokeStyle = '#374151';
+          ctx.lineWidth = 5;
+          ctx.beginPath();
+          ctx.moveTo(startX, centerY);
+          ctx.lineTo(startX + 100, centerY);
+          ctx.stroke();
+          
+          // R1 (serie)
+          ctx.fillStyle = '#f59e0b';
+          ctx.fillRect(startX + 100, centerY - 15, 80, 30);
+          ctx.strokeStyle = '#d97706';
+          ctx.lineWidth = 2;
+          ctx.strokeRect(startX + 100, centerY - 15, 80, 30);
+          ctx.fillStyle = '#1f2937';
+          ctx.font = '12px Arial';
+          ctx.fillText(`R1=${params.r1}Ω`, startX + 115, centerY - 20);
+          ctx.fillStyle = '#3b82f6';
+          ctx.font = 'bold 14px Arial';
+          ctx.fillText(`${valores.V1.toFixed(2)}V`, startX + 115, centerY + 45);
+          
+          // Cable después de R1
+          ctx.strokeStyle = '#374151';
+          ctx.lineWidth = 5;
+          ctx.beginPath();
+          ctx.moveTo(startX + 180, centerY);
+          ctx.lineTo(startX + 220, centerY);
+          ctx.stroke();
+          
+          // Nodo división
+          ctx.fillStyle = '#ef4444';
+          ctx.shadowColor = '#ef4444';
+          ctx.shadowBlur = 15;
+          ctx.beginPath();
+          ctx.arc(startX + 220, centerY, 12, 0, 2 * Math.PI);
+          ctx.fill();
+          ctx.shadowBlur = 0;
+          
+          // Ramas paralelas
+          // R2 (arriba)
+          ctx.strokeStyle = '#374151';
+          ctx.lineWidth = 5;
+          ctx.beginPath();
+          ctx.moveTo(startX + 220, centerY);
+          ctx.lineTo(startX + 220, centerY - 60);
+          ctx.lineTo(startX + 380, centerY - 60);
+          ctx.lineTo(startX + 380, centerY);
+          ctx.stroke();
+          
+          ctx.fillStyle = '#f59e0b';
+          ctx.fillRect(startX + 260, centerY - 75, 80, 30);
+          ctx.strokeStyle = '#d97706';
+          ctx.lineWidth = 2;
+          ctx.strokeRect(startX + 260, centerY - 75, 80, 30);
+          ctx.fillStyle = '#1f2937';
+          ctx.font = '12px Arial';
+          ctx.fillText(`R2=${params.r2}Ω`, startX + 275, centerY - 80);
+          ctx.fillStyle = '#3b82f6';
+          ctx.font = 'bold 14px Arial';
+          ctx.fillText(`I2=${valores.I2.toFixed(1)}mA`, startX + 265, centerY - 30);
+          
+          // R3 (abajo)
+          ctx.strokeStyle = '#374151';
+          ctx.lineWidth = 5;
+          ctx.beginPath();
+          ctx.moveTo(startX + 220, centerY);
+          ctx.lineTo(startX + 220, centerY + 60);
+          ctx.lineTo(startX + 380, centerY + 60);
+          ctx.lineTo(startX + 380, centerY);
+          ctx.stroke();
+          
+          ctx.fillStyle = '#f59e0b';
+          ctx.fillRect(startX + 260, centerY + 45, 80, 30);
+          ctx.strokeStyle = '#d97706';
+          ctx.lineWidth = 2;
+          ctx.strokeRect(startX + 260, centerY + 45, 80, 30);
+          ctx.fillStyle = '#1f2937';
+          ctx.font = '12px Arial';
+          ctx.fillText(`R3=${params.r3}Ω`, startX + 275, centerY + 40);
+          ctx.fillStyle = '#3b82f6';
+          ctx.font = 'bold 14px Arial';
+          ctx.fillText(`I3=${valores.I3.toFixed(1)}mA`, startX + 265, centerY + 90);
+          
+          // Nodo reunión
+          ctx.fillStyle = '#ef4444';
+          ctx.shadowColor = '#ef4444';
+          ctx.shadowBlur = 15;
+          ctx.beginPath();
+          ctx.arc(startX + 380, centerY, 12, 0, 2 * Math.PI);
+          ctx.fill();
+          ctx.shadowBlur = 0;
+          
+          // Cable después nodo
+          ctx.strokeStyle = '#374151';
+          ctx.lineWidth = 5;
+          ctx.beginPath();
+          ctx.moveTo(startX + 380, centerY);
+          ctx.lineTo(startX + 420, centerY);
+          ctx.stroke();
+          
+          // R4 (serie)
+          ctx.fillStyle = '#f59e0b';
+          ctx.fillRect(startX + 420, centerY - 15, 80, 30);
+          ctx.strokeStyle = '#d97706';
+          ctx.lineWidth = 2;
+          ctx.strokeRect(startX + 420, centerY - 15, 80, 30);
+          ctx.fillStyle = '#1f2937';
+          ctx.font = '12px Arial';
+          ctx.fillText(`R4=${params.r4}Ω`, startX + 435, centerY - 20);
+          ctx.fillStyle = '#3b82f6';
+          ctx.font = 'bold 14px Arial';
+          ctx.fillText(`${valores.V4.toFixed(2)}V`, startX + 435, centerY + 45);
+          
+          // Cable de retorno
+          ctx.strokeStyle = '#374151';
+          ctx.lineWidth = 5;
+          ctx.beginPath();
+          ctx.moveTo(startX + 500, centerY);
+          ctx.lineTo(startX + 550, centerY);
+          ctx.lineTo(startX + 550, centerY + 120);
+          ctx.lineTo(startX, centerY + 120);
+          ctx.lineTo(startX, centerY);
+          ctx.stroke();
+          
+          // Electrones animados
+          const segments = [
+            { x1: startX, y1: centerY, x2: startX + 180, y2: centerY },
+            { x1: startX + 220, y1: centerY, x2: startX + 220, y2: centerY - 60 },
+            { x1: startX + 220, y1: centerY - 60, x2: startX + 380, y2: centerY - 60 },
+            { x1: startX + 220, y1: centerY, x2: startX + 220, y2: centerY + 60 },
+            { x1: startX + 220, y1: centerY + 60, x2: startX + 380, y2: centerY + 60 }
+          ];
+          
+          segments.forEach((seg, idx) => {
+            const numE = idx < 1 ? 8 : 4;
+            for (let i = 0; i < numE; i++) {
+              const progress = ((t * 0.4 + i / numE) % 1);
+              const ex = seg.x1 + (seg.x2 - seg.x1) * progress;
+              const ey = seg.y1 + (seg.y2 - seg.y1) * progress;
+              
+              ctx.fillStyle = '#3b82f6';
+              ctx.shadowColor = '#3b82f6';
+              ctx.shadowBlur = 6;
+              ctx.beginPath();
+              ctx.arc(ex, ey, 4, 0, 2 * Math.PI);
+              ctx.fill();
+              ctx.shadowBlur = 0;
+            }
+          });
+          
+          // Información
+          ctx.fillStyle = '#1f2937';
+          ctx.font = '14px Arial';
+          ctx.fillText(`Itotal = ${valores.Itotal.toFixed(1)} mA`, 20, canvas.height - 80);
+          ctx.fillText(`R23 equivalente = ${valores.R23.toFixed(1)} Ω`, 20, canvas.height - 60);
+          ctx.fillText(`V en paralelo = ${valores.V23.toFixed(2)} V`, 20, canvas.height - 40);
+          ctx.fillText(`I2 + I3 = ${(valores.I2 + valores.I3).toFixed(1)} mA ✓`, 20, canvas.height - 20);
+          
+          if (t > 10) shouldContinue = false;
+          
+        } else if (simType === 'dos_mallas') {
+          // Método de Mallas (2 mallas)
+          const valores = calcularDosMallas();
+          
+          // Título
+          ctx.fillStyle = '#1f2937';
+          ctx.font = 'bold 20px Arial';
+          ctx.fillText('Método de Análisis por Mallas', 20, 30);
+          ctx.font = '14px Arial';
+          ctx.fillText('Circuito con 2 fuentes y 3 resistencias', 20, 50);
+          
+          const baseX = 250;
+          const baseY = 200;
+          const mallaWidth = 200;
+          
+          // Batería 1 (izquierda)
+          ctx.fillStyle = '#ef4444';
+          ctx.fillRect(baseX - 5, baseY - 30, 10, 60);
+          ctx.fillStyle = '#1f2937';
+          ctx.font = 'bold 16px Arial';
+          ctx.fillText('+', baseX - 30, baseY - 5);
+          ctx.fillText('-', baseX - 30, baseY + 15);
+          ctx.fillText(`V1=${params.v1}V`, baseX - 50, baseY + 45);
+          
+          // Malla 1 (izquierda)
+          ctx.strokeStyle = '#374151';
+          ctx.lineWidth = 5;
+          ctx.beginPath();
+          ctx.moveTo(baseX, baseY - 80);
+          ctx.lineTo(baseX + mallaWidth, baseY - 80);
+          ctx.lineTo(baseX + mallaWidth, baseY + 80);
+          ctx.lineTo(baseX, baseY + 80);
+          ctx.closePath();
+          ctx.stroke();
+          
+          // R1 (arriba izquierda)
+          ctx.fillStyle = '#f59e0b';
+          ctx.fillRect(baseX + 50, baseY - 95, 80, 30);
+          ctx.strokeStyle = '#d97706';
+          ctx.lineWidth = 2;
+          ctx.strokeRect(baseX + 50, baseY - 95, 80, 30);
+          ctx.fillStyle = '#1f2937';
+          ctx.font = '12px Arial';
+          ctx.fillText(`R1=${params.r1}Ω`, baseX + 65, baseY - 100);
+          
+          // R3 (vertical compartida)
+          ctx.fillStyle = '#10b981';
+          ctx.fillRect(baseX + mallaWidth - 15, baseY - 40, 30, 80);
+          ctx.strokeStyle = '#059669';
+          ctx.lineWidth = 2;
+          ctx.strokeRect(baseX + mallaWidth - 15, baseY - 40, 30, 80);
+          ctx.fillStyle = '#1f2937';
+          ctx.font = '12px Arial';
+          ctx.fillText(`R3`, baseX + mallaWidth + 20, baseY - 5);
+          ctx.fillText(`${params.r3}Ω`, baseX + mallaWidth + 20, baseY + 10);
+          ctx.fillStyle = '#10b981';
+          ctx.font = 'bold 14px Arial';
+          ctx.fillText(`I3=${valores.I3.toFixed(1)}mA`, baseX + mallaWidth + 20, baseY + 30);
+          
+          // Batería 2 (derecha)
+          ctx.fillStyle = '#ef4444';
+          ctx.fillRect(baseX + mallaWidth * 2 - 5, baseY - 30, 10, 60);
+          ctx.fillStyle = '#1f2937';
+          ctx.font = 'bold 16px Arial';
+          ctx.fillText('+', baseX + mallaWidth * 2 + 20, baseY - 5);
+          ctx.fillText('-', baseX + mallaWidth * 2 + 20, baseY + 15);
+          ctx.fillText(`V2=${params.v2}V`, baseX + mallaWidth * 2 + 15, baseY + 45);
+          
+          // Malla 2 (derecha)
+          ctx.strokeStyle = '#374151';
+          ctx.lineWidth = 5;
+          ctx.beginPath();
+          ctx.moveTo(baseX + mallaWidth, baseY - 80);
+          ctx.lineTo(baseX + mallaWidth * 2, baseY - 80);
+          ctx.lineTo(baseX + mallaWidth * 2, baseY + 80);
+          ctx.lineTo(baseX + mallaWidth, baseY + 80);
+          ctx.closePath();
+          ctx.stroke();
+          
+          // R2 (arriba derecha)
+          ctx.fillStyle = '#f59e0b';
+          ctx.fillRect(baseX + mallaWidth + 50, baseY - 95, 80, 30);
+          ctx.strokeStyle = '#d97706';
+          ctx.lineWidth = 2;
+          ctx.strokeRect(baseX + mallaWidth + 50, baseY - 95, 80, 30);
+          ctx.fillStyle = '#1f2937';
+          ctx.font = '12px Arial';
+          ctx.fillText(`R2=${params.r2}Ω`, baseX + mallaWidth + 65, baseY - 100);
+          
+          // Flechas indicando sentido de corrientes en mallas
+          // Malla 1
+          ctx.strokeStyle = '#3b82f6';
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.arc(baseX + mallaWidth/2, baseY, 50, 0, 1.5 * Math.PI);
+          ctx.stroke();
+          ctx.fillStyle = '#3b82f6';
+          ctx.beginPath();
+          ctx.moveTo(baseX + mallaWidth/2, baseY - 50);
+          ctx.lineTo(baseX + mallaWidth/2 - 7, baseY - 60);
+          ctx.lineTo(baseX + mallaWidth/2 + 7, baseY - 60);
+          ctx.closePath();
+          ctx.fill();
+          ctx.font = 'bold 16px Arial';
+          ctx.fillText(`I1=${valores.I1.toFixed(1)}mA`, baseX + mallaWidth/2 - 50, baseY + 10);
+          
+          // Malla 2
+          ctx.strokeStyle = '#ec4899';
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.arc(baseX + mallaWidth * 1.5, baseY, 50, 0, 1.5 * Math.PI);
+          ctx.stroke();
+          ctx.fillStyle = '#ec4899';
+          ctx.beginPath();
+          ctx.moveTo(baseX + mallaWidth * 1.5, baseY - 50);
+          ctx.lineTo(baseX + mallaWidth * 1.5 - 7, baseY - 60);
+          ctx.lineTo(baseX + mallaWidth * 1.5 + 7, baseY - 60);
+          ctx.closePath();
+          ctx.fill();
+          ctx.font = 'bold 16px Arial';
+          ctx.fillText(`I2=${valores.I2.toFixed(1)}mA`, baseX + mallaWidth * 1.5 - 50, baseY + 10);
+          
+          // Etiquetas de mallas
+          ctx.fillStyle = '#1f2937';
+          ctx.font = 'bold 18px Arial';
+          ctx.fillText('Malla 1', baseX + 40, baseY - 110);
+          ctx.fillText('Malla 2', baseX + mallaWidth + 40, baseY - 110);
+          
+          // Ecuaciones del sistema
+          ctx.fillStyle = '#1f2937';
+          ctx.font = '14px Arial';
+          ctx.fillText('Sistema de ecuaciones:', 20, canvas.height - 100);
+          ctx.fillText(`Malla 1: ${params.v1} = I1·${params.r1} + (I1-I2)·${params.r3}`, 20, canvas.height - 80);
+          ctx.fillText(`Malla 2: -${params.v2} = I2·${params.r2} + (I2-I1)·${params.r3}`, 20, canvas.height - 60);
+          ctx.fillStyle = '#10b981';
+          ctx.fillText(`✓ Solución: I1=${valores.I1.toFixed(2)}mA, I2=${valores.I2.toFixed(2)}mA`, 20, canvas.height - 35);
+          ctx.fillText(`✓ Corriente en R3: I3=I1-I2=${valores.I3.toFixed(2)}mA`, 20, canvas.height - 15);
+          
+          if (t > 10) shouldContinue = false;
+          
+        } else if (simType === 'superposicion') {
+          // Principio de Superposición
+          ctx.fillStyle = '#1f2937';
+          ctx.font = 'bold 20px Arial';
+          ctx.fillText('Método de Superposición', canvas.width/2 - 120, 30);
+          ctx.font = '14px Arial';
+          ctx.fillText('Análisis con una fuente a la vez', canvas.width/2 - 120, 50);
+          
+          const phase = Math.floor(t / 3) % 3;
+          
+          if (phase === 0) {
+            // Circuito completo
+            ctx.fillStyle = '#3b82f6';
+            ctx.font = 'bold 16px Arial';
+            ctx.fillText('PASO 1: Circuito Original con ambas fuentes', 50, 80);
+            
+            const baseX = 200;
+            const baseY = 220;
+            
+            // Fuente V1
+            ctx.fillStyle = '#ef4444';
+            ctx.fillRect(baseX - 5, baseY - 25, 10, 50);
+            ctx.fillStyle = '#1f2937';
+            ctx.font = 'bold 14px Arial';
+            ctx.fillText(`V1`, baseX - 30, baseY);
+            
+            // Fuente V2
+            ctx.fillStyle = '#ef4444';
+            ctx.fillRect(baseX + 400 - 5, baseY - 25, 10, 50);
+            ctx.fillStyle = '#1f2937';
+            ctx.fillText(`V2`, baseX + 420, baseY);
+            
+            // Circuito básico
+            ctx.strokeStyle = '#374151';
+            ctx.lineWidth = 4;
+            ctx.strokeRect(baseX, baseY - 60, 400, 120);
+            
+            // Resistencias
+            const resistencias = [
+              { x: baseX + 80, y: baseY - 75, label: 'R1' },
+              { x: baseX + 200, y: baseY - 75, label: 'R2' },
+              { x: baseX + 320, y: baseY - 75, label: 'R3' }
+            ];
+            
+            resistencias.forEach(r => {
+              ctx.fillStyle = '#f59e0b';
+              ctx.fillRect(r.x, r.y, 60, 25);
+              ctx.strokeStyle = '#d97706';
+              ctx.lineWidth = 2;
+              ctx.strokeRect(r.x, r.y, 60, 25);
+              ctx.fillStyle = '#1f2937';
+              ctx.font = '12px Arial';
+              ctx.fillText(r.label, r.x + 20, r.y - 5);
+            });
+            
+          } else if (phase === 1) {
+            // Solo V1 activa
+            ctx.fillStyle = '#10b981';
+            ctx.font = 'bold 16px Arial';
+            ctx.fillText('PASO 2: Solo V1 activa (V2 = cortocircuito)', 50, 80);
+            
+            const baseX = 200;
+            const baseY = 220;
+            
+            // Fuente V1
+            ctx.fillStyle = '#ef4444';
+            ctx.fillRect(baseX - 5, baseY - 25, 10, 50);
+            ctx.fillStyle = '#1f2937';
+            ctx.font = 'bold 14px Arial';
+            ctx.fillText(`V1`, baseX - 30, baseY);
+            ctx.fillText('✓', baseX - 30, baseY + 20);
+            
+            // V2 como cortocircuito
+            ctx.strokeStyle = '#9ca3af';
+            ctx.lineWidth = 4;
+            ctx.beginPath();
+            ctx.moveTo(baseX + 395, baseY - 30);
+            ctx.lineTo(baseX + 405, baseY + 30);
+            ctx.stroke();
+            ctx.fillStyle = '#6b7280';
+            ctx.font = '12px Arial';
+            ctx.fillText('corto', baseX + 410, baseY);
+            
+            // Circuito
+            ctx.strokeStyle = '#374151';
+            ctx.lineWidth = 4;
+            ctx.strokeRect(baseX, baseY - 60, 400, 120);
+            
+            // Resistencias
+            const resistencias = [
+              { x: baseX + 80, y: baseY - 75, label: 'R1' },
+              { x: baseX + 200, y: baseY - 75, label: 'R2' },
+              { x: baseX + 320, y: baseY - 75, label: 'R3' }
+            ];
+            
+            resistencias.forEach(r => {
+              ctx.fillStyle = '#f59e0b';
+              ctx.fillRect(r.x, r.y, 60, 25);
+              ctx.strokeStyle = '#d97706';
+              ctx.lineWidth = 2;
+              ctx.strokeRect(r.x, r.y, 60, 25);
+              ctx.fillStyle = '#1f2937';
+              ctx.font = '12px Arial';
+              ctx.fillText(r.label, r.x + 20, r.y - 5);
+            });
+            
+            // Corrientes parciales
+            ctx.fillStyle = '#10b981';
+            ctx.font = 'bold 14px Arial';
+            ctx.fillText(`I1' = contribución de V1`, baseX + 50, baseY + 90);
+            
+          } else {
+            // Solo V2 activa
+            ctx.fillStyle = '#ec4899';
+            ctx.font = 'bold 16px Arial';
+            ctx.fillText('PASO 3: Solo V2 activa (V1 = cortocircuito)', 50, 80);
+            
+            const baseX = 200;
+            const baseY = 220;
+            
+            // V1 como cortocircuito
+            ctx.strokeStyle = '#9ca3af';
+            ctx.lineWidth = 4;
+            ctx.beginPath();
+            ctx.moveTo(baseX - 5, baseY - 30);
+            ctx.lineTo(baseX + 5, baseY + 30);
+            ctx.stroke();
+            ctx.fillStyle = '#6b7280';
+            ctx.font = '12px Arial';
+            ctx.fillText('corto', baseX - 40, baseY);
+            
+            // Fuente V2
+            ctx.fillStyle = '#ef4444';
+            ctx.fillRect(baseX + 400 - 5, baseY - 25, 10, 50);
+            ctx.fillStyle = '#1f2937';
+            ctx.font = 'bold 14px Arial';
+            ctx.fillText(`V2`, baseX + 420, baseY);
+            ctx.fillText('✓', baseX + 420, baseY + 20);
+            
+            // Circuito
+            ctx.strokeStyle = '#374151';
+            ctx.lineWidth = 4;
+            ctx.strokeRect(baseX, baseY - 60, 400, 120);
+            
+            // Resistencias
+            const resistencias = [
+              { x: baseX + 80, y: baseY - 75, label: 'R1' },
+              { x: baseX + 200, y: baseY - 75, label: 'R2' },
+              { x: baseX + 320, y: baseY - 75, label: 'R3' }
+            ];
+            
+            resistencias.forEach(r => {
+              ctx.fillStyle = '#f59e0b';
+              ctx.fillRect(r.x, r.y, 60, 25);
+              ctx.strokeStyle = '#d97706';
+              ctx.lineWidth = 2;
+              ctx.strokeRect(r.x, r.y, 60, 25);
+              ctx.fillStyle = '#1f2937';
+              ctx.font = '12px Arial';
+              ctx.fillText(r.label, r.x + 20, r.y - 5);
+            });
+            
+            // Corrientes parciales
+            ctx.fillStyle = '#ec4899';
+            ctx.font = 'bold 14px Arial';
+            ctx.fillText(`I2'' = contribución de V2`, baseX + 50, baseY + 90);
+          }
+          
+          // Explicación del método
+          ctx.fillStyle = '#1f2937';
+          ctx.font = '14px Arial';
+          ctx.fillText('Principio de Superposición:', 20, canvas.height - 80);
+          ctx.fillText('1. Analiza cada fuente independientemente', 20, canvas.height - 60);
+          ctx.fillText('2. Las demás fuentes se reemplazan:', 20, canvas.height - 40);
+          ctx.fillText('   • Fuentes de voltaje → cortocircuito', 30, canvas.height - 20);
+          ctx.fillText('3. Suma algebraica de todas las contribuciones', 20, canvas.height);
+          
+          ctx.fillStyle = '#3b82f6';
+          ctx.font = 'bold 16px Arial';
+          ctx.fillText(`Itotal = I' + I''`, canvas.width - 200, canvas.height - 30);
+          
+          if (t > 11) shouldContinue = false;
+        }
+        
+        ctx.fillStyle = '#1f2937';
+        ctx.font = '14px Arial';
+        ctx.fillText('Tiempo: ' + t.toFixed(2) + ' s', canvas.width - 150, canvas.height - 20);
+
+        timeRef.current += 0.05;
+
+        if (shouldContinue) {
+          animationRef.current = requestAnimationFrame(animate);
+        } else {
+          setIsRunning(false);
+        }
+      };
+
+      animate();
+    }
+
+    return () => {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
+    };
+  }, [isRunning, simType, params]);
+
+  return (
+    <div className="p-8 max-w-6xl mx-auto">
+      <h2 className="text-3xl font-bold text-gray-800 mb-6">Simulacion de Leyes de Kirchhoff</h2>
+
+      <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6">
+        <p className="text-sm text-gray-700">Analiza circuitos eléctricos usando las leyes de Kirchhoff y diferentes métodos de resolución.</p>
+      </div>
+
+      <div className="mb-6">
+        <label className="block text-sm font-semibold text-gray-700 mb-2">Tipo de Análisis</label>
+        <select value={simType} onChange={(e) => { setSimType(e.target.value); setIsRunning(false); }} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+          <option value="nodos">Primera Ley - Ley de Corrientes (Nodos)</option>
+          <option value="mallas">Segunda Ley - Ley de Tensiones (Mallas)</option>
+          <option value="mixto">Análisis de Circuito Mixto</option>
+          <option value="dos_mallas">Método de Mallas (2 fuentes)</option>
+          <option value="superposicion">Método de Superposición</option>
+        </select>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Voltaje V1: {params.v1} V</label>
+          <input type="range" min="3" max="24" value={params.v1} onChange={(e) => setParams({...params, v1: Number(e.target.value)})} className="w-full" disabled={isRunning} />
+        </div>
+        {(simType === 'dos_mallas' || simType === 'superposicion') && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Voltaje V2: {params.v2} V</label>
+            <input type="range" min="3" max="24" value={params.v2} onChange={(e) => setParams({...params, v2: Number(e.target.value)})} className="w-full" disabled={isRunning} />
+          </div>
+        )}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">R1: {params.r1} Ω</label>
+          <input type="range" min="50" max="300" value={params.r1} onChange={(e) => setParams({...params, r1: Number(e.target.value)})} className="w-full" disabled={isRunning} />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">R2: {params.r2} Ω</label>
+          <input type="range" min="50" max="300" value={params.r2} onChange={(e) => setParams({...params, r2: Number(e.target.value)})} className="w-full" disabled={isRunning} />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">R3: {params.r3} Ω</label>
+          <input type="range" min="50" max="300" value={params.r3} onChange={(e) => setParams({...params, r3: Number(e.target.value)})} className="w-full" disabled={isRunning} />
+        </div>
+        {simType === 'mixto' && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">R4: {params.r4} Ω</label>
+            <input type="range" min="50" max="300" value={params.r4} onChange={(e) => setParams({...params, r4: Number(e.target.value)})} className="w-full" disabled={isRunning} />
+          </div>
+        )}
+        <div className="flex items-end">
+          <button onClick={() => setIsRunning(!isRunning)} className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors">
+            {isRunning ? 'Detener' : 'Iniciar'}
+          </button>
+        </div>
+      </div>
+
+      <div className="bg-white border-2 border-gray-300 rounded-lg overflow-hidden mb-6">
+        <canvas ref={canvasRef} width={800} height={400} className="w-full" />
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-lg border border-blue-200">
+          <h3 className="font-bold text-gray-800 mb-2">📚 Leyes de Kirchhoff</h3>
+          <ul className="text-sm text-gray-700 space-y-1">
+            <li>• <strong>Primera Ley (Corrientes):</strong> ΣI_entrada = ΣI_salida</li>
+            <li>• En un nodo, la suma de corrientes es cero</li>
+            <li>• <strong>Segunda Ley (Tensiones):</strong> ΣV = 0</li>
+            <li>• En una malla, la suma algebraica de voltajes es cero</li>
+            <li>• <strong>Nodo:</strong> Punto de unión de 3 o más ramas</li>
+            <li>• <strong>Malla:</strong> Camino cerrado en el circuito</li>
+          </ul>
+        </div>
+
+        <div className="bg-gradient-to-r from-green-50 to-emerald-50 p-4 rounded-lg border border-green-200">
+          <h3 className="font-bold text-gray-800 mb-2">🔧 Métodos de Resolución</h3>
+          <ul className="text-sm text-gray-700 space-y-1">
+            <li>• <strong>Método de Nodos:</strong> Aplica ley de corrientes</li>
+            <li>• <strong>Método de Mallas:</strong> Aplica ley de tensiones</li>
+            <li>• <strong>Superposición:</strong> Analiza cada fuente por separado</li>
+            <li>• <strong>Thévenin:</strong> Simplifica a fuente equivalente</li>
+            <li>• <strong>Norton:</strong> Fuente de corriente equivalente</li>
+            <li>• Útil para circuitos complejos con múltiples fuentes</li>
+          </ul>
+        </div>
+      </div>
+
+      <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="bg-red-50 border border-red-200 p-4 rounded-lg">
+          <h4 className="font-bold text-gray-800 mb-2">⚡ Primera Ley</h4>
+          <p className="text-sm text-gray-700 mb-2">Ley de Corrientes de Kirchhoff (LCK):</p>
+          <p className="text-center text-xl font-bold text-red-600">ΣI = 0</p>
+          <p className="text-xs text-gray-600 mt-2 text-center">En cualquier nodo</p>
+        </div>
+
+        <div className="bg-green-50 border border-green-200 p-4 rounded-lg">
+          <h4 className="font-bold text-gray-800 mb-2">🔄 Segunda Ley</h4>
+          <p className="text-sm text-gray-700 mb-2">Ley de Tensiones de Kirchhoff (LTK):</p>
+          <p className="text-center text-xl font-bold text-green-600">ΣV = 0</p>
+          <p className="text-xs text-gray-600 mt-2 text-center">En cualquier malla</p>
+        </div>
+
+        <div className="bg-purple-50 border border-purple-200 p-4 rounded-lg">
+          <h4 className="font-bold text-gray-800 mb-2">💡 Aplicaciones</h4>
+          <ul className="text-xs text-gray-700 space-y-1">
+            <li>• Diseño de circuitos</li>
+            <li>• Análisis de redes</li>
+            <li>• Sistemas de potencia</li>
+            <li>• Electrónica analógica</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  );
+}
+function MagnetismCalculator() {
+  const [calcType, setCalcType] = useState('lorentzForce');
+  const [inputs, setInputs] = useState({});
+  const [result, setResult] = useState(null);
+  const [findVariable, setFindVariable] = useState('F');
+
+  // Constante de permeabilidad magnética del vacío (μ₀)
+  const MU_0 = 4 * Math.PI * 1e-7; // T·m/A
+
+  const calculateLorentzForce = () => {
+    const { q, v, B, theta, F } = inputs;
+    const angleRad = parseFloat(theta || 90) * (Math.PI / 180); // Ángulo por defecto a 90° si no se especifica
+
+    try {
+      if (findVariable === 'F') {
+        const force = parseFloat(q) * parseFloat(v) * parseFloat(B) * Math.sin(angleRad);
+        setResult({ fuerzaMagnetica: `${force.toExponential(4)} N` });
+      } else if (findVariable === 'q') {
+        const charge = parseFloat(F) / (parseFloat(v) * parseFloat(B) * Math.sin(angleRad));
+        setResult({ cargaElectrica: `${charge.toExponential(4)} C` });
+      } else if (findVariable === 'v') {
+        const velocity = parseFloat(F) / (parseFloat(q) * parseFloat(B) * Math.sin(angleRad));
+        setResult({ velocidad: `${velocity.toExponential(4)} m/s` });
+      } else if (findVariable === 'B') {
+        const magneticField = parseFloat(F) / (parseFloat(q) * parseFloat(v) * Math.sin(angleRad));
+        setResult({ campoMagnetico: `${magneticField.toExponential(4)} T` });
+      }
+    } catch (e) {
+      setResult({ error: 'Valores inválidos o insuficientes.' });
+    }
+  };
+
+  const calculateConductorForce = () => {
+    const { I, L, B, theta, F } = inputs;
+    const angleRad = parseFloat(theta || 90) * (Math.PI / 180);
+
+    try {
+      if (findVariable === 'F') {
+        const force = parseFloat(I) * parseFloat(L) * parseFloat(B) * Math.sin(angleRad);
+        setResult({ fuerzaMagnetica: `${force.toExponential(4)} N` });
+      } else if (findVariable === 'I') {
+        const current = parseFloat(F) / (parseFloat(L) * parseFloat(B) * Math.sin(angleRad));
+        setResult({ corriente: `${current.toExponential(4)} A` });
+      } else if (findVariable === 'L') {
+        const length = parseFloat(F) / (parseFloat(I) * parseFloat(B) * Math.sin(angleRad));
+        setResult({ longitud: `${length.toExponential(4)} m` });
+      } else if (findVariable === 'B') {
+        const magneticField = parseFloat(F) / (parseFloat(I) * parseFloat(L) * Math.sin(angleRad));
+        setResult({ campoMagnetico: `${magneticField.toExponential(4)} T` });
+      }
+    } catch (e) {
+      setResult({ error: 'Valores inválidos o insuficientes.' });
+    }
+  };
+  
+  const calculateBiotSavartWire = () => {
+    const { I, r, B } = inputs;
+    try {
+      if (findVariable === 'B') {
+        const magneticField = (MU_0 * parseFloat(I)) / (2 * Math.PI * parseFloat(r));
+        setResult({ campoMagnetico: `${magneticField.toExponential(4)} T` });
+      } else if (findVariable === 'I') {
+        const current = (parseFloat(B) * 2 * Math.PI * parseFloat(r)) / MU_0;
+        setResult({ corriente: `${current.toExponential(4)} A` });
+      } else if (findVariable === 'r') {
+        const distance = (MU_0 * parseFloat(I)) / (2 * Math.PI * parseFloat(B));
+        setResult({ distancia: `${distance.toExponential(4)} m` });
+      }
+    } catch (e) {
+      setResult({ error: 'Valores inválidos o insuficientes.' });
+    }
+  };
+
+  const calculateSolenoidField = () => {
+    const { n, I, B } = inputs;
+    try {
+      if (findVariable === 'B') {
+        const magneticField = MU_0 * parseFloat(n) * parseFloat(I);
+        setResult({ campoMagnetico: `${magneticField.toExponential(4)} T` });
+      } else if (findVariable === 'n') {
+        const turnDensity = parseFloat(B) / (MU_0 * parseFloat(I));
+        setResult({ densidadDeEspiras: `${turnDensity.toExponential(4)} espiras/m` });
+      } else if (findVariable === 'I') {
+        const current = parseFloat(B) / (MU_0 * parseFloat(n));
+        setResult({ corriente: `${current.toExponential(4)} A` });
+      }
+    } catch (e) {
+      setResult({ error: 'Valores inválidos o insuficientes.' });
+    }
+  };
+
+  const handleCalculate = () => {
+    if (calcType === 'lorentzForce') calculateLorentzForce();
+    else if (calcType === 'conductorForce') calculateConductorForce();
+    else if (calcType === 'biotSavartWire') calculateBiotSavartWire();
+    else if (calcType === 'solenoidField') calculateSolenoidField();
+  };
+
+  const handleCalcTypeChange = (e) => {
+    const newType = e.target.value;
+    setCalcType(newType);
+    setInputs({});
+    setResult(null);
+
+    // Asignar una variable a encontrar por defecto para el nuevo tipo de cálculo
+    switch (newType) {
+      case 'lorentzForce':
+      case 'conductorForce':
+        setFindVariable('F');
+        break;
+      case 'biotSavartWire':
+      case 'solenoidField':
+        setFindVariable('B');
+        break;
+      default:
+        setFindVariable('');
+    }
+  };
+
+  return (
+    <div className="p-8 max-w-4xl mx-auto">
+      <h2 className="text-3xl font-bold text-gray-800 mb-6">Calculadora de Magnetismo</h2>
+
+      <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6">
+        <p className="text-sm text-gray-700">
+          Selecciona el tipo de cálculo y la variable que deseas encontrar. Luego, completa los campos restantes.
+        </p>
+      </div>
+
+      <div className="grid md:grid-cols-2 gap-6 mb-6">
+        <div>
+          <label className="block text-sm font-semibold text-gray-700 mb-2">Tipo de Cálculo</label>
+          <select
+            value={calcType}
+            onChange={handleCalcTypeChange}
+            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="lorentzForce">Fuerza de Lorentz (Carga)</option>
+            <option value="conductorForce">Fuerza sobre Conductor</option>
+            <option value="biotSavartWire">Campo de un Conductor Recto</option>
+            <option value="solenoidField">Campo en un Solenoide</option>
+          </select>
+        </div>
+        <div>
+          <label className="block text-sm font-semibold text-gray-700 mb-2">Variable a Encontrar</label>
+          <select
+            value={findVariable}
+            onChange={(e) => { setFindVariable(e.target.value); setInputs({}); setResult(null); }}
+            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+          >
+            {(calcType === 'lorentzForce' || calcType === 'conductorForce') && (
+              <>
+                <option value="F">Fuerza (F)</option>
+                <option value="B">Campo Magnético (B)</option>
+                {calcType === 'lorentzForce' && (
+                  <>
+                    <option value="q">Carga (q)</option>
+                    <option value="v">Velocidad (v)</option>
+                  </>
+                )}
+                {calcType === 'conductorForce' && (
+                  <>
+                    <option value="I">Corriente (I)</option>
+                    <option value="L">Longitud (L)</option>
+                  </>
+                )}
+              </>
+            )}
+            {calcType === 'biotSavartWire' && (
+              <>
+                <option value="B">Campo Magnético (B)</option>
+                <option value="I">Corriente (I)</option>
+                <option value="r">Distancia (r)</option>
+              </>
+            )}
+            {calcType === 'solenoidField' && (
+              <>
+                <option value="B">Campo Magnético (B)</option>
+                <option value="I">Corriente (I)</option>
+                <option value="n">Densidad de Espiras (n)</option>
+              </>
+            )}
+          </select>
+        </div>
+      </div>
+
+      <div className="bg-white border border-gray-200 rounded-lg p-6 mb-6">
+        <div className="grid md:grid-cols-2 gap-4">
+          {/* --- Campos para Fuerza de Lorentz --- */}
+          {calcType === 'lorentzForce' && (
+            <>
+              {findVariable !== 'F' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Fuerza F (N)</label>
+                  <input type="number" step="any" value={inputs.F || ''} onChange={(e) => setInputs({...inputs, F: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+                </div>
+              )}
+              {findVariable !== 'q' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Carga q (C)</label>
+                  <input type="number" step="any" value={inputs.q || ''} onChange={(e) => setInputs({...inputs, q: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+                </div>
+              )}
+              {findVariable !== 'v' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Velocidad v (m/s)</label>
+                  <input type="number" step="any" value={inputs.v || ''} onChange={(e) => setInputs({...inputs, v: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+                </div>
+              )}
+              {findVariable !== 'B' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Campo Magnético B (T)</label>
+                  <input type="number" step="any" value={inputs.B || ''} onChange={(e) => setInputs({...inputs, B: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+                </div>
+              )}
+              <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Ángulo θ (°)</label>
+                  <input type="number" step="any" value={inputs.theta || ''} onChange={(e) => setInputs({...inputs, theta: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" placeholder="90" />
+              </div>
+            </>
+          )}
+
+          {/* --- Campos para Fuerza sobre Conductor --- */}
+          {calcType === 'conductorForce' && (
+             <>
+              {findVariable !== 'F' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Fuerza F (N)</label>
+                  <input type="number" step="any" value={inputs.F || ''} onChange={(e) => setInputs({...inputs, F: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+                </div>
+              )}
+              {findVariable !== 'I' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Corriente I (A)</label>
+                  <input type="number" step="any" value={inputs.I || ''} onChange={(e) => setInputs({...inputs, I: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+                </div>
+              )}
+              {findVariable !== 'L' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Longitud L (m)</label>
+                  <input type="number" step="any" value={inputs.L || ''} onChange={(e) => setInputs({...inputs, L: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+                </div>
+              )}
+              {findVariable !== 'B' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Campo Magnético B (T)</label>
+                  <input type="number" step="any" value={inputs.B || ''} onChange={(e) => setInputs({...inputs, B: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+                </div>
+              )}
+              <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Ángulo θ (°)</label>
+                  <input type="number" step="any" value={inputs.theta || ''} onChange={(e) => setInputs({...inputs, theta: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" placeholder="90" />
+              </div>
+            </>
+          )}
+
+          {/* --- Campos para Ley de Biot-Savart --- */}
+          {calcType === 'biotSavartWire' && (
+             <>
+              {findVariable !== 'B' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Campo Magnético B (T)</label>
+                  <input type="number" step="any" value={inputs.B || ''} onChange={(e) => setInputs({...inputs, B: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+                </div>
+              )}
+              {findVariable !== 'I' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Corriente I (A)</label>
+                  <input type="number" step="any" value={inputs.I || ''} onChange={(e) => setInputs({...inputs, I: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+                </div>
+              )}
+              {findVariable !== 'r' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Distancia r (m)</label>
+                  <input type="number" step="any" value={inputs.r || ''} onChange={(e) => setInputs({...inputs, r: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+                </div>
+              )}
+            </>
+          )}
+
+           {/* --- Campos para Solenoide --- */}
+           {calcType === 'solenoidField' && (
+             <>
+              {findVariable !== 'B' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Campo Magnético B (T)</label>
+                  <input type="number" step="any" value={inputs.B || ''} onChange={(e) => setInputs({...inputs, B: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+                </div>
+              )}
+               {findVariable !== 'n' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Densidad de espiras n (espiras/m)</label>
+                  <input type="number" step="any" value={inputs.n || ''} onChange={(e) => setInputs({...inputs, n: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+                </div>
+              )}
+              {findVariable !== 'I' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Corriente I (A)</label>
+                  <input type="number" step="any" value={inputs.I || ''} onChange={(e) => setInputs({...inputs, I: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" />
+                </div>
+              )}
+            </>
+          )}
+        </div>
+        
+        <button onClick={handleCalculate} className="mt-6 w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors">
+          Calcular
+        </button>
+      </div>
+
+      {result && (
+        <div className="bg-green-50 border border-green-200 rounded-lg p-6">
+          <h3 className="text-xl font-bold text-gray-800 mb-4">Resultados</h3>
+          <div className="space-y-2">
+            {Object.entries(result).map(([key, value]) => (
+              <div key={key} className="flex justify-between items-center py-2 border-b border-green-100">
+                <span className="font-medium text-gray-700 capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}:</span>
+                <span className="text-lg font-semibold text-gray-900">{value}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+function MagnetismSimulation() {
+  const canvasRef = useRef(null);
+  const [isRunning, setIsRunning] = useState(false);
+  const [simType, setSimType] = useState('chargeInField');
+  const [params, setParams] = useState({
+    q: 1, // 1 for positive, -1 for negative
+    v: 30, // Initial velocity
+    B: 5, // Magnetic field strength
+    I1: 5, // Current in wire 1
+    I2: 5, // Current in wire 2
+    direction: 1, // 1 for same, -1 for opposite
+  });
+
+  const animationRef = useRef(null);
+  const timeRef = useRef(0);
+  const particlePathRef = useRef([]);
+
+  // Helper function to draw the magnetic field symbols
+  const drawMagneticField = (ctx, width, height) => {
+    ctx.strokeStyle = '#a5b4fc';
+    ctx.lineWidth = 1;
+    const spacing = 40;
+    for (let x = spacing / 2; x < width; x += spacing) {
+      for (let y = spacing / 2; y < height; y += spacing) {
+        // 'X' symbol for field going INTO the page
+        ctx.beginPath();
+        ctx.moveTo(x - 5, y - 5);
+        ctx.lineTo(x + 5, y + 5);
+        ctx.moveTo(x + 5, y - 5);
+        ctx.lineTo(x - 5, y + 5);
+        ctx.stroke();
+      }
+    }
+  };
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const { width, height } = canvas;
+    
+    // Clear canvas when params change and simulation is not running
+    if (!isRunning) {
+        ctx.clearRect(0, 0, width, height);
+        if(simType === 'chargeInField') {
+            drawMagneticField(ctx, width, height);
+        }
+    }
+
+    if (isRunning) {
+      timeRef.current = 0;
+      particlePathRef.current = [];
+      let lastTimestamp = 0;
+      
+      const animate = (timestamp) => {
+        if (lastTimestamp === 0) {
+          lastTimestamp = timestamp;
+        }
+        const deltaTime = (timestamp - lastTimestamp) * 0.001; // Time in seconds
+        timeRef.current += deltaTime;
+        lastTimestamp = timestamp;
+
+        ctx.clearRect(0, 0, width, height);
+        
+        let shouldContinue = true;
+
+        if (simType === 'chargeInField') {
+          drawMagneticField(ctx, width, height);
+
+          // Simplified physics: assuming mass m=1
+          const m = 1; 
+          const radius = (m * params.v) / (Math.abs(params.q) * params.B);
+          const omega = params.v / radius; // Angular velocity
+          
+          const centerX = width / 2;
+          const initialY = height / 2;
+          
+          // Angle depends on time and charge direction
+          const angle = params.q * omega * timeRef.current; 
+
+          const x = centerX + radius * Math.sin(angle);
+          const y = initialY - radius * (1 - Math.cos(angle));
+
+          // Store path for drawing the trail
+          particlePathRef.current.push({ x, y });
+
+          // Draw the trail
+          ctx.strokeStyle = '#f87171';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          particlePathRef.current.forEach((pos, index) => {
+            if (index === 0) ctx.moveTo(pos.x, pos.y);
+            else ctx.lineTo(pos.x, pos.y);
+          });
+          ctx.stroke();
+
+          // Draw the particle
+          ctx.fillStyle = params.q > 0 ? '#3b82f6' : '#ef4444';
+          ctx.shadowColor = params.q > 0 ? '#3b82f6' : '#ef4444';
+          ctx.shadowBlur = 10;
+          ctx.beginPath();
+          ctx.arc(x, y, 8, 0, 2 * Math.PI);
+          ctx.fill();
+          ctx.shadowBlur = 0;
+
+          // Stop after one revolution
+          if (Math.abs(angle) >= 2 * Math.PI) {
+            shouldContinue = false;
+          }
+
+        } else if (simType === 'parallelWires') {
+          const initialDist = width / 3;
+          // Simplified motion: move wires at a constant speed for visualization
+          const speed = 20;
+          const displacement = params.direction * speed * timeRef.current;
+          
+          const x1 = width / 2 - initialDist / 2 - displacement;
+          const x2 = width / 2 + initialDist / 2 + displacement;
+
+          ctx.fillStyle = '#4b5563';
+          ctx.font = '16px Arial';
+
+          // Draw Wire 1
+          ctx.beginPath();
+          ctx.arc(x1, height/2, 10, 0, 2 * Math.PI);
+          ctx.fill();
+          ctx.fillText('I₁', x1 - 5, height/2 - 20);
+
+          // Draw Wire 2
+          ctx.beginPath();
+          ctx.arc(x2, height/2, 10, 0, 2 * Math.PI);
+          ctx.fill();
+          ctx.fillText('I₂', x2 - 5, height/2 - 20);
+
+          // Draw force arrows
+          ctx.strokeStyle = '#16a34a';
+          ctx.lineWidth = 3;
+          // Arrow on wire 1
+          ctx.beginPath();
+          ctx.moveTo(x1 + (params.direction > 0 ? 15 : -15), height/2);
+          ctx.lineTo(x1 + (params.direction > 0 ? 35 : -35), height/2);
+          ctx.stroke();
+          // Arrow on wire 2
+          ctx.beginPath();
+          ctx.moveTo(x2 - (params.direction > 0 ? 15 : -15), height/2);
+          ctx.lineTo(x2 - (params.direction > 0 ? 35 : -35), height/2);
+          ctx.stroke();
+
+          if (timeRef.current > 3) {
+            shouldContinue = false;
+          }
+        }
+        
+        ctx.fillStyle = '#1f2937';
+        ctx.font = '14px Arial';
+        ctx.fillText('Tiempo: ' + timeRef.current.toFixed(2) + ' s', 10, 20);
+
+        if (shouldContinue) {
+          animationRef.current = requestAnimationFrame(animate);
+        } else {
+          setIsRunning(false);
+        }
+      };
+
+      animationRef.current = requestAnimationFrame(animate);
+    }
+
+    return () => {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
+    };
+  }, [isRunning, simType, params]);
+
+  return (
+    <div className="p-8 max-w-6xl mx-auto">
+      <h2 className="text-3xl font-bold text-gray-800 mb-6">Simulación de Magnetismo</h2>
+
+      <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6">
+        <p className="text-sm text-gray-700">Visualiza la dinámica de partículas cargadas y conductores bajo la influencia de campos magnéticos.</p>
+      </div>
+
+      <div className="mb-6">
+        <label className="block text-sm font-semibold text-gray-700 mb-2">Tipo de Simulación</label>
+        <select value={simType} onChange={(e) => { setSimType(e.target.value); setIsRunning(false); }} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+          <option value="chargeInField">Carga en Campo Magnético</option>
+          <option value="parallelWires">Interacción entre Conductores</option>
+        </select>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6 p-4 border rounded-lg">
+        {simType === 'chargeInField' && (
+          <>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Velocidad (v): {params.v} m/s</label>
+              <input type="range" min="10" max="50" value={params.v} onChange={(e) => setParams({...params, v: Number(e.target.value)})} className="w-full" disabled={isRunning} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Campo (B): {params.B} T</label>
+              <input type="range" min="1" max="10" value={params.B} onChange={(e) => setParams({...params, B: Number(e.target.value)})} className="w-full" disabled={isRunning} />
+            </div>
+             <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Tipo de Carga</label>
+              <div className="flex gap-4">
+                  <button onClick={() => setParams({...params, q: 1})} className={`w-full p-2 rounded ${params.q > 0 ? 'bg-blue-500 text-white' : 'bg-gray-200'}`} disabled={isRunning}>Positiva (+)</button>
+                  <button onClick={() => setParams({...params, q: -1})} className={`w-full p-2 rounded ${params.q < 0 ? 'bg-red-500 text-white' : 'bg-gray-200'}`} disabled={isRunning}>Negativa (-)</button>
+              </div>
+            </div>
+          </>
+        )}
+
+        {simType === 'parallelWires' && (
+          <>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Corriente I₁: {params.I1} A</label>
+              <input type="range" min="1" max="10" value={params.I1} onChange={(e) => setParams({...params, I1: Number(e.target.value)})} className="w-full" disabled={isRunning} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Corriente I₂: {params.I2} A</label>
+              <input type="range" min="1" max="10" value={params.I2} onChange={(e) => setParams({...params, I2: Number(e.target.value)})} className="w-full" disabled={isRunning} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Dirección de Corriente</label>
+              <div className="flex gap-4">
+                  <button onClick={() => setParams({...params, direction: 1})} className={`w-full p-2 rounded ${params.direction > 0 ? 'bg-green-500 text-white' : 'bg-gray-200'}`} disabled={isRunning}>Atraen</button>
+                  <button onClick={() => setParams({...params, direction: -1})} className={`w-full p-2 rounded ${params.direction < 0 ? 'bg-orange-500 text-white' : 'bg-gray-200'}`} disabled={isRunning}>Repelen</button>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+      
+      <div className="flex justify-center mb-6">
+         <button onClick={() => setIsRunning(!isRunning)} className="w-1/2 bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors text-lg">
+          {isRunning ? 'Detener' : 'Iniciar Simulación'}
+        </button>
+      </div>
+
+      <div className="bg-gray-800 border-2 border-gray-600 rounded-lg overflow-hidden shadow-2xl">
+        <canvas ref={canvasRef} width={800} height={400} className="w-full" />
+      </div>
+    </div>
+  );
+}
+function InductionCalculator() {
+  const [calcType, setCalcType] = useState('magneticFlux');
+  const [inputs, setInputs] = useState({});
+  const [result, setResult] = useState(null);
+  const [findVariable, setFindVariable] = useState('phi');
+
+  const calculateMagneticFlux = () => {
+    const { B, A, theta, phi } = inputs;
+    // Convert angle from degrees to radians for Math.cos
+    const angleRad = parseFloat(theta || 0) * (Math.PI / 180);
+
+    try {
+      if (findVariable === 'phi') {
+        const flux = parseFloat(B) * parseFloat(A) * Math.cos(angleRad);
+        setResult({ flujoMagnetico: `${flux.toExponential(4)} Wb` });
+      } else if (findVariable === 'B') {
+        const field = parseFloat(phi) / (parseFloat(A) * Math.cos(angleRad));
+        setResult({ campoMagnetico: `${field.toExponential(4)} T` });
+      } else if (findVariable === 'A') {
+        const area = parseFloat(phi) / (parseFloat(B) * Math.cos(angleRad));
+        setResult({ area: `${area.toExponential(4)} m²` });
+      } else if (findVariable === 'theta') {
+        const angleDeg = Math.acos(parseFloat(phi) / (parseFloat(B) * parseFloat(A))) * (180 / Math.PI);
+        setResult({ angulo: `${angleDeg.toFixed(2)}°` });
+      }
+    } catch (e) {
+      setResult({ error: 'Valores inválidos o insuficientes.' });
+    }
+  };
+
+  const calculateFaradayLaw = () => {
+    const { N, deltaPhi, deltaTime, fem } = inputs;
+    
+    try {
+      if (findVariable === 'fem') {
+        // Calculating the magnitude of the induced FEM. The negative sign relates to Lenz's Law (direction).
+        const inducedFem = Math.abs(parseFloat(N) * (parseFloat(deltaPhi) / parseFloat(deltaTime)));
+        setResult({ femInducida: `${inducedFem.toExponential(4)} V` });
+      } else if (findVariable === 'N') {
+        const turns = Math.abs((parseFloat(fem) * parseFloat(deltaTime)) / parseFloat(deltaPhi));
+        setResult({ numeroDeEspiras: `${turns.toFixed(0)}` });
+      } else if (findVariable === 'deltaPhi') {
+        const fluxChange = Math.abs((parseFloat(fem) * parseFloat(deltaTime)) / parseFloat(N));
+        setResult({ cambioDeFlujo: `${fluxChange.toExponential(4)} Wb` });
+      } else if (findVariable === 'deltaTime') {
+        const timeInterval = Math.abs((parseFloat(N) * parseFloat(deltaPhi)) / parseFloat(fem));
+        setResult({ intervaloDeTiempo: `${timeInterval.toExponential(4)} s` });
+      }
+    } catch (e) {
+      setResult({ error: 'Valores inválidos o insuficientes.' });
+    }
+  };
+
+  const calculateTransformer = () => {
+    const { Vp, Np, Vs, Ns, Ip, Is } = inputs;
+
+    try {
+        let res = {};
+        if (findVariable === 'Vs') {
+            res = { voltajeSecundario: `${(parseFloat(Vp) * parseFloat(Ns) / parseFloat(Np)).toFixed(2)} V` };
+        } else if (findVariable === 'Vp') {
+            res = { voltajePrimario: `${(parseFloat(Vs) * parseFloat(Np) / parseFloat(Ns)).toFixed(2)} V` };
+        } else if (findVariable === 'Ns') {
+            res = { espirasSecundarias: `${Math.round(parseFloat(Np) * parseFloat(Vs) / parseFloat(Vp))}` };
+        } else if (findVariable === 'Np') {
+            res = { espirasPrimarias: `${Math.round(parseFloat(Ns) * parseFloat(Vp) / parseFloat(Vs))}` };
+        } else if (findVariable === 'Is') {
+             res = { corrienteSecundaria: `${(parseFloat(Ip) * parseFloat(Np) / parseFloat(Ns)).toFixed(3)} A` };
+        } else if (findVariable === 'Ip') {
+             res = { corrientePrimaria: `${(parseFloat(Is) * parseFloat(Ns) / parseFloat(Np)).toFixed(3)} A` };
+        }
+        setResult(res);
+    } catch (e) {
+      setResult({ error: 'Valores inválidos o insuficientes.' });
+    }
+  };
+
+  const handleCalculate = () => {
+    if (calcType === 'magneticFlux') calculateMagneticFlux();
+    else if (calcType === 'faradayLaw') calculateFaradayLaw();
+    else if (calcType === 'transformer') calculateTransformer();
+  };
+
+  const handleCalcTypeChange = (e) => {
+    const newType = e.target.value;
+    setCalcType(newType);
+    setInputs({});
+    setResult(null);
+
+    switch (newType) {
+      case 'magneticFlux':
+        setFindVariable('phi');
+        break;
+      case 'faradayLaw':
+        setFindVariable('fem');
+        break;
+      case 'transformer':
+        setFindVariable('Vs');
+        break;
+      default:
+        setFindVariable('');
+    }
+  };
+  
+  const getRequiredInputsForTransformer = (variable) => {
+    switch(variable) {
+        case 'Vs': return ['Vp', 'Np', 'Ns'];
+        case 'Vp': return ['Vs', 'Np', 'Ns'];
+        case 'Ns': return ['Vp', 'Np', 'Vs'];
+        case 'Np': return ['Vp', 'Ns', 'Vs'];
+        case 'Is': return ['Ip', 'Np', 'Ns'];
+        case 'Ip': return ['Is', 'Np', 'Ns'];
+        default: return [];
+    }
+  }
+
+  const requiredInputs = calcType === 'transformer' ? getRequiredInputsForTransformer(findVariable) : [];
+
+  return (
+    <div className="p-8 max-w-4xl mx-auto">
+      <h2 className="text-3xl font-bold text-gray-800 mb-6">Calculadora de Inducción Electromagnética</h2>
+
+      <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6">
+        <p className="text-sm text-gray-700">
+          Selecciona un cálculo, elige la variable a encontrar y completa los campos con los datos conocidos.
+        </p>
+      </div>
+
+      <div className="grid md:grid-cols-2 gap-6 mb-6">
+        <div>
+          <label className="block text-sm font-semibold text-gray-700 mb-2">Tipo de Cálculo</label>
+          <select value={calcType} onChange={handleCalcTypeChange} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+            <option value="magneticFlux">Flujo Magnético (Φ)</option>
+            <option value="faradayLaw">Ley de Faraday (FEM inducida)</option>
+            <option value="transformer">Transformadores</option>
+          </select>
+        </div>
+        <div>
+          <label className="block text-sm font-semibold text-gray-700 mb-2">Variable a Encontrar</label>
+          <select value={findVariable} onChange={(e) => { setFindVariable(e.target.value); setInputs({}); setResult(null); }} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+            {calcType === 'magneticFlux' && (
+              <>
+                <option value="phi">Flujo Magnético (Φ)</option>
+                <option value="B">Campo Magnético (B)</option>
+                <option value="A">Área (A)</option>
+                <option value="theta">Ángulo (θ)</option>
+              </>
+            )}
+            {calcType === 'faradayLaw' && (
+              <>
+                <option value="fem">FEM Inducida (ε)</option>
+                <option value="N">Número de Espiras (N)</option>
+                <option value="deltaPhi">Cambio de Flujo (ΔΦ)</option>
+                <option value="deltaTime">Intervalo de Tiempo (Δt)</option>
+              </>
+            )}
+            {calcType === 'transformer' && (
+              <>
+                <option value="Vs">Voltaje Secundario (Vs)</option>
+                <option value="Vp">Voltaje Primario (Vp)</option>
+                <option value="Ns">Espiras Secundarias (Ns)</option>
+                <option value="Np">Espiras Primarias (Np)</option>
+                <option value="Is">Corriente Secundaria (Is)</option>
+                <option value="Ip">Corriente Primaria (Ip)</option>
+              </>
+            )}
+          </select>
+        </div>
+      </div>
+      
+      {calcType === 'faradayLaw' && (
+         <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6 text-sm text-yellow-800">
+         <p><b>Nota sobre la Ley de Lenz:</b> 
+Esta calculadora determina la <b>magnitud</b> de la FEM (voltaje) inducida. 
+El signo negativo en la Ley de Faraday 
+(<span style={{ fontFamily: "'Times New Roman', serif" }}>ε = −N ΔΦ<sub>B</sub> / Δt</span>)
+indica la dirección de la corriente inducida, que se opone al cambio de flujo que la crea.
+</p>
+        </div>
+      )}
+
+      <div className="bg-white border border-gray-200 rounded-lg p-6 mb-6">
+        <div className="grid md:grid-cols-2 gap-4">
+          {calcType === 'magneticFlux' && (
+            <>
+              {findVariable !== 'phi' && <div><label className="block text-sm font-medium text-gray-700 mb-2">Flujo Magnético Φ (Wb)</label><input type="number" step="any" value={inputs.phi || ''} onChange={(e) => setInputs({...inputs, phi: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" /></div>}
+              {findVariable !== 'B' && <div><label className="block text-sm font-medium text-gray-700 mb-2">Campo Magnético B (T)</label><input type="number" step="any" value={inputs.B || ''} onChange={(e) => setInputs({...inputs, B: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" /></div>}
+              {findVariable !== 'A' && <div><label className="block text-sm font-medium text-gray-700 mb-2">Área A (m²)</label><input type="number" step="any" value={inputs.A || ''} onChange={(e) => setInputs({...inputs, A: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" /></div>}
+              {findVariable !== 'theta' && <div><label className="block text-sm font-medium text-gray-700 mb-2">Ángulo θ (°)</label><input type="number" step="any" value={inputs.theta || ''} onChange={(e) => setInputs({...inputs, theta: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" placeholder="0" /></div>}
+            </>
+          )}
+
+          {calcType === 'faradayLaw' && (
+            <>
+              {findVariable !== 'fem' && <div><label className="block text-sm font-medium text-gray-700 mb-2">FEM Inducida ε (V)</label><input type="number" step="any" value={inputs.fem || ''} onChange={(e) => setInputs({...inputs, fem: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" /></div>}
+              {findVariable !== 'N' && <div><label className="block text-sm font-medium text-gray-700 mb-2">Número de Espiras N</label><input type="number" step="any" value={inputs.N || ''} onChange={(e) => setInputs({...inputs, N: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" /></div>}
+              {findVariable !== 'deltaPhi' && <div><label className="block text-sm font-medium text-gray-700 mb-2">Cambio de Flujo ΔΦ (Wb)</label><input type="number" step="any" value={inputs.deltaPhi || ''} onChange={(e) => setInputs({...inputs, deltaPhi: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" /></div>}
+              {findVariable !== 'deltaTime' && <div><label className="block text-sm font-medium text-gray-700 mb-2">Intervalo de Tiempo Δt (s)</label><input type="number" step="any" value={inputs.deltaTime || ''} onChange={(e) => setInputs({...inputs, deltaTime: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" /></div>}
+            </>
+          )}
+
+          {calcType === 'transformer' && (
+            <>
+              {requiredInputs.includes('Vp') && findVariable !== 'Vp' && <div><label className="block text-sm font-medium text-gray-700 mb-2">Voltaje Primario Vp (V)</label><input type="number" step="any" value={inputs.Vp || ''} onChange={(e) => setInputs({...inputs, Vp: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" /></div>}
+              {requiredInputs.includes('Np') && findVariable !== 'Np' && <div><label className="block text-sm font-medium text-gray-700 mb-2">Espiras Primarias Np</label><input type="number" step="any" value={inputs.Np || ''} onChange={(e) => setInputs({...inputs, Np: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" /></div>}
+              {requiredInputs.includes('Vs') && findVariable !== 'Vs' && <div><label className="block text-sm font-medium text-gray-700 mb-2">Voltaje Secundario Vs (V)</label><input type="number" step="any" value={inputs.Vs || ''} onChange={(e) => setInputs({...inputs, Vs: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" /></div>}
+              {requiredInputs.includes('Ns') && findVariable !== 'Ns' && <div><label className="block text-sm font-medium text-gray-700 mb-2">Espiras Secundarias Ns</label><input type="number" step="any" value={inputs.Ns || ''} onChange={(e) => setInputs({...inputs, Ns: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" /></div>}
+              {requiredInputs.includes('Ip') && findVariable !== 'Ip' && <div><label className="block text-sm font-medium text-gray-700 mb-2">Corriente Primaria Ip (A)</label><input type="number" step="any" value={inputs.Ip || ''} onChange={(e) => setInputs({...inputs, Ip: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" /></div>}
+              {requiredInputs.includes('Is') && findVariable !== 'Is' && <div><label className="block text-sm font-medium text-gray-700 mb-2">Corriente Secundaria Is (A)</label><input type="number" step="any" value={inputs.Is || ''} onChange={(e) => setInputs({...inputs, Is: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" /></div>}
+            </>
+          )}
+        </div>
+        
+        <button onClick={handleCalculate} className="mt-6 w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors">
+          Calcular
+        </button>
+      </div>
+
+      {result && (
+        <div className="bg-green-50 border border-green-200 rounded-lg p-6">
+          <h3 className="text-xl font-bold text-gray-800 mb-4">Resultados</h3>
+          <div className="space-y-2">
+            {Object.entries(result).map(([key, value]) => (
+              <div key={key} className="flex justify-between items-center py-2 border-b border-green-100">
+                <span className="font-medium text-gray-700 capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}:</span>
+                <span className="text-lg font-semibold text-gray-900">{value}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+function InductionSimulation() {
+  const canvasRef = useRef(null);
+  const graphRef = useRef(null); // Separate canvas for the graph
+  const [isRunning, setIsRunning] = useState(false);
+  const [simType, setSimType] = useState('movingMagnet');
+  const [params, setParams] = useState({
+    speed: 2, // Used for both magnet speed and rotation speed
+    fieldStrength: 5,
+  });
+
+  const animationRef = useRef(null);
+  const timeRef = useRef(0);
+  const pathRef = useRef([]); // For drawing the sine wave
+
+  // Helper function to draw a bar magnet
+  const drawMagnet = (ctx, x, y) => {
+    const magnetWidth = 80;
+    const magnetHeight = 40;
+    // North pole (red)
+    ctx.fillStyle = '#ef4444';
+    ctx.fillRect(x, y, magnetWidth / 2, magnetHeight);
+    ctx.fillStyle = 'white';
+    ctx.font = 'bold 16px Arial';
+    ctx.fillText('N', x + 15, y + 25);
+    // South pole (blue)
+    ctx.fillStyle = '#3b82f6';
+    ctx.fillRect(x + magnetWidth / 2, y, magnetWidth / 2, magnetHeight);
+    ctx.fillStyle = 'white';
+    ctx.fillText('S', x + magnetWidth / 2 + 15, y + 25);
+  };
+  
+  // Helper function to draw a coil/solenoid
+  const drawCoil = (ctx, x, y, width, height) => {
+    ctx.strokeStyle = '#6b7280';
+    ctx.lineWidth = 3;
+    const turns = 10;
+    for (let i = 0; i <= turns; i++) {
+      const turnX = x + (i * width / turns);
+      ctx.beginPath();
+      ctx.ellipse(turnX, y, 8, height / 2, 0, 0, 2 * Math.PI);
+      ctx.stroke();
+    }
+  };
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    const graphCanvas = graphRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const gCtx = graphCanvas ? graphCanvas.getContext('2d') : null;
+
+    if (isRunning) {
+      timeRef.current = 0;
+      pathRef.current = [];
+      let lastTimestamp = 0;
+
+      const animate = (timestamp) => {
+        if (lastTimestamp === 0) lastTimestamp = timestamp;
+        const deltaTime = (timestamp - lastTimestamp) / 1000;
+        timeRef.current += deltaTime;
+        lastTimestamp = timestamp;
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        if (gCtx) gCtx.clearRect(0, 0, graphCanvas.width, graphCanvas.height);
+
+        let shouldContinue = true;
+
+        if (simType === 'movingMagnet') {
+          const coilX = canvas.width / 2 - 50;
+          const coilY = canvas.height / 2;
+          const pathLength = canvas.width - 150;
+          
+          // Move magnet back and forth
+          const period = 5 / params.speed;
+          const magnetX = 50 + pathLength * Math.abs(Math.sin(timeRef.current * Math.PI / period));
+          
+          drawMagnet(ctx, magnetX, coilY - 20);
+          drawCoil(ctx, coilX, coilY, 100, 60);
+
+          // Calculate induced current (simplified)
+          const magnetCenter = magnetX + 40;
+          const coilCenter = coilX + 50;
+          const distance = magnetCenter - coilCenter;
+          const velocity = (pathLength * Math.PI / period) * Math.cos(timeRef.current * Math.PI / period);
+          
+          // Induced current is proportional to velocity and inverse square of distance
+          let current = 0;
+          if (Math.abs(distance) < 150) {
+              current = (velocity * 5000) / (distance * distance + 2500);
+          }
+          
+          // Draw light bulb and wires
+          const bulbX = coilX + 50;
+          const bulbY = coilY + 80;
+          ctx.strokeStyle = '#4b5563';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(coilX, coilY + 30);
+          ctx.lineTo(bulbX - 15, bulbY);
+          ctx.moveTo(coilX + 100, coilY + 30);
+          ctx.lineTo(bulbX + 15, bulbY);
+          ctx.stroke();
+
+          ctx.fillStyle = `rgba(250, 204, 21, ${Math.abs(current)})`; // Yellow with opacity based on current
+          ctx.beginPath();
+          ctx.arc(bulbX, bulbY, 15, 0, 2 * Math.PI);
+          ctx.fill();
+          ctx.stroke(); // border for the bulb
+
+        } else if (simType === 'acGenerator') {
+          const centerX = canvas.width / 2;
+          const centerY = canvas.height / 2;
+          const loopHeight = 150;
+          
+          const angle = timeRef.current * params.speed;
+          const loopWidth = 100 * Math.cos(angle); // Perspective effect
+          const fem = -params.fieldStrength * params.speed * Math.sin(angle);
+
+          // Draw magnetic poles
+          ctx.fillStyle = '#ef4444';
+          ctx.fillRect(centerX - 200, centerY - 100, 100, 200);
+          ctx.fillStyle = '#3b82f6';
+          ctx.fillRect(centerX + 100, centerY - 100, 100, 200);
+          ctx.fillStyle = 'white';
+          ctx.font = 'bold 24px Arial';
+          ctx.fillText('N', centerX - 165, centerY + 10);
+          ctx.fillText('S', centerX + 135, centerY + 10);
+
+          // Draw rotating loop
+          ctx.strokeStyle = '#1f2937';
+          ctx.lineWidth = 5;
+          ctx.beginPath();
+          ctx.ellipse(centerX, centerY, Math.abs(loopWidth / 2), loopHeight / 2, 0, 0, 2 * Math.PI);
+          ctx.stroke();
+
+          // Draw graph
+          if(gCtx) {
+            pathRef.current.push(fem);
+            if (pathRef.current.length > graphCanvas.width) pathRef.current.shift();
+
+            gCtx.strokeStyle = '#16a34a';
+            gCtx.lineWidth = 2;
+            gCtx.beginPath();
+            pathRef.current.forEach((val, i) => {
+                const x = i;
+                const y = graphCanvas.height / 2 - val * 2; // Scale the FEM value for display
+                if (i === 0) gCtx.moveTo(x, y);
+                else gCtx.lineTo(x, y);
+            });
+            gCtx.stroke();
+            
+            // Axis line
+            gCtx.strokeStyle = '#d1d5db';
+            gCtx.lineWidth = 1;
+            gCtx.beginPath();
+            gCtx.moveTo(0, graphCanvas.height / 2);
+            gCtx.lineTo(graphCanvas.width, graphCanvas.height / 2);
+            gCtx.stroke();
+          }
+        }
+        
+        if (timeRef.current > 30) shouldContinue = false; // Stop after 30s
+        
+        if (shouldContinue) {
+          animationRef.current = requestAnimationFrame(animate);
+        } else {
+          setIsRunning(false);
+        }
+      };
+
+      animationRef.current = requestAnimationFrame(animate);
+    }
+
+    return () => cancelAnimationFrame(animationRef.current);
+  }, [isRunning, simType, params]);
+
+  return (
+    <div className="p-8 max-w-6xl mx-auto">
+      <h2 className="text-3xl font-bold text-gray-800 mb-6">Simulación de Inducción Electromagnética</h2>
+
+      <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6">
+        <p className="text-sm text-gray-700">Observa cómo un cambio en el flujo magnético puede generar una corriente eléctrica.</p>
+      </div>
+
+      <div className="grid md:grid-cols-3 gap-6 mb-6 p-4 border rounded-lg items-end">
+        <div className="md:col-span-1">
+          <label className="block text-sm font-semibold text-gray-700 mb-2">Tipo de Simulación</label>
+          <select value={simType} onChange={(e) => { setSimType(e.target.value); setIsRunning(false); }} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+            <option value="movingMagnet">Imán y Espira</option>
+            <option value="acGenerator">Generador de CA</option>
+          </select>
+        </div>
+
+        {simType === 'movingMagnet' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Velocidad del Imán: {params.speed.toFixed(1)}x</label>
+              <input type="range" min="0.5" max="5" step="0.1" value={params.speed} onChange={(e) => setParams({...params, speed: Number(e.target.value)})} className="w-full" disabled={isRunning} />
+            </div>
+        )}
+        {simType === 'acGenerator' && (
+            <>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Velocidad de Rotación: {params.speed.toFixed(1)} rad/s</label>
+              <input type="range" min="0.5" max="5" step="0.1" value={params.speed} onChange={(e) => setParams({...params, speed: Number(e.target.value)})} className="w-full" disabled={isRunning} />
+            </div>
+             <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Intensidad del Campo B: {params.fieldStrength}</label>
+              <input type="range" min="1" max="10" value={params.fieldStrength} onChange={(e) => setParams({...params, fieldStrength: Number(e.target.value)})} className="w-full" disabled={isRunning} />
+            </div>
+            </>
+        )}
+        
+        <div className="flex items-end">
+          <button onClick={() => setIsRunning(!isRunning)} className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors">
+            {isRunning ? 'Detener' : 'Iniciar'}
+          </button>
+        </div>
+      </div>
+
+      <div className="bg-gray-800 border-2 border-gray-600 rounded-lg overflow-hidden shadow-2xl">
+        <canvas ref={canvasRef} width={800} height={300} className="w-full" />
+      </div>
+      
+      {simType === 'acGenerator' && (
+        <div className="mt-6">
+            <h3 className="text-lg font-semibold text-gray-700 mb-2">Gráfico de FEM (Voltaje) Inducida vs. Tiempo</h3>
+            <div className="bg-white border-2 border-gray-300 rounded-lg overflow-hidden">
+                <canvas ref={graphRef} width={800} height={150} className="w-full" />
+            </div>
+        </div>
+      )}
+    </div>
+  );
+}
+function RLCCircuitCalculator() {
+  const [calcType, setCalcType] = useState('inductorEnergy');
+  const [inputs, setInputs] = useState({});
+  const [result, setResult] = useState(null);
+  const [findVariable, setFindVariable] = useState('UL');
+
+  const calculateInductorEnergy = () => {
+    const { L, I, UL } = inputs;
+    try {
+      if (findVariable === 'UL') {
+        const energy = 0.5 * parseFloat(L) * Math.pow(parseFloat(I), 2);
+        setResult({ energiaAlmacenada: `${energy.toExponential(4)} J` });
+      } else if (findVariable === 'L') {
+        const inductance = (2 * parseFloat(UL)) / Math.pow(parseFloat(I), 2);
+        setResult({ inductancia: `${inductance.toExponential(4)} H` });
+      } else if (findVariable === 'I') {
+        const current = Math.sqrt((2 * parseFloat(UL)) / parseFloat(L));
+        setResult({ corriente: `${current.toExponential(4)} A` });
+      }
+    } catch (e) {
+      setResult({ error: 'Valores inválidos o insuficientes.' });
+    }
+  };
+
+  const calculateRLTimeConstant = () => {
+    const { L, R, tau } = inputs;
+    try {
+      if (findVariable === 'tau') {
+        const timeConstant = parseFloat(L) / parseFloat(R);
+        setResult({ constanteDeTiempo: `${timeConstant.toExponential(4)} s` });
+      } else if (findVariable === 'L') {
+        const inductance = parseFloat(tau) * parseFloat(R);
+        setResult({ inductancia: `${inductance.toExponential(4)} H` });
+      } else if (findVariable === 'R') {
+        const resistance = parseFloat(L) / parseFloat(tau);
+        setResult({ resistencia: `${resistance.toExponential(4)} Ω` });
+      }
+    } catch (e) {
+      setResult({ error: 'Valores inválidos o insuficientes.' });
+    }
+  };
+
+  const calculateRCTimeConstant = () => {
+    const { R, C, tau } = inputs;
+    try {
+      if (findVariable === 'tau') {
+        const timeConstant = parseFloat(R) * parseFloat(C);
+        setResult({ constanteDeTiempo: `${timeConstant.toExponential(4)} s` });
+      } else if (findVariable === 'R') {
+        const resistance = parseFloat(tau) / parseFloat(C);
+        setResult({ resistencia: `${resistance.toExponential(4)} Ω` });
+      } else if (findVariable === 'C') {
+        const capacitance = parseFloat(tau) / parseFloat(R);
+        setResult({ capacitancia: `${capacitance.toExponential(4)} F` });
+      }
+    } catch (e) {
+      setResult({ error: 'Valores inválidos o insuficientes.' });
+    }
+  };
+
+  const calculateRLCResonance = () => {
+    const { L, C, f0 } = inputs;
+    try {
+      if (findVariable === 'f0') {
+        const angFreq = 1 / Math.sqrt(parseFloat(L) * parseFloat(C));
+        const freq = angFreq / (2 * Math.PI);
+        setResult({
+          frecuenciaDeResonancia: `${freq.toExponential(4)} Hz`,
+          frecuenciaAngular: `${angFreq.toExponential(4)} rad/s`
+        });
+      } else if (findVariable === 'L') {
+        const angFreq = parseFloat(f0) * 2 * Math.PI;
+        const inductance = 1 / (Math.pow(angFreq, 2) * parseFloat(C));
+        setResult({ inductancia: `${inductance.toExponential(4)} H` });
+      } else if (findVariable === 'C') {
+        const angFreq = parseFloat(f0) * 2 * Math.PI;
+        const capacitance = 1 / (Math.pow(angFreq, 2) * parseFloat(L));
+        setResult({ capacitancia: `${capacitance.toExponential(4)} F` });
+      }
+    } catch (e) {
+      setResult({ error: 'Valores inválidos o insuficientes.' });
+    }
+  };
+
+  const handleCalculate = () => {
+    if (calcType === 'inductorEnergy') calculateInductorEnergy();
+    else if (calcType === 'rlTimeConstant') calculateRLTimeConstant();
+    else if (calcType === 'rcTimeConstant') calculateRCTimeConstant();
+    else if (calcType === 'rlcResonance') calculateRLCResonance();
+  };
+
+  const handleCalcTypeChange = (e) => {
+    const newType = e.target.value;
+    setCalcType(newType);
+    setInputs({});
+    setResult(null);
+
+    switch (newType) {
+      case 'inductorEnergy': setFindVariable('UL'); break;
+      case 'rlTimeConstant': setFindVariable('tau'); break;
+      case 'rcTimeConstant': setFindVariable('tau'); break;
+      case 'rlcResonance': setFindVariable('f0'); break;
+      default: setFindVariable('');
+    }
+  };
+
+  return (
+    <div className="p-8 max-w-4xl mx-auto">
+      <h2 className="text-3xl font-bold text-gray-800 mb-6">Calculadora de Circuitos RL, RC y RLC</h2>
+
+      <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6">
+        <p className="text-sm text-gray-700">
+          Analiza las propiedades de los circuitos con inductores, capacitores y resistencias.
+        </p>
+      </div>
+
+      <div className="grid md:grid-cols-2 gap-6 mb-6">
+        <div>
+          <label className="block text-sm font-semibold text-gray-700 mb-2">Tipo de Cálculo</label>
+          <select value={calcType} onChange={handleCalcTypeChange} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+            <option value="inductorEnergy">Energía en Inductor</option>
+            <option value="rlTimeConstant">Constante de Tiempo (RL)</option>
+            <option value="rcTimeConstant">Constante de Tiempo (RC)</option>
+            <option value="rlcResonance">Resonancia (RLC)</option>
+          </select>
+        </div>
+        <div>
+          <label className="block text-sm font-semibold text-gray-700 mb-2">Variable a Encontrar</label>
+          <select value={findVariable} onChange={(e) => { setFindVariable(e.target.value); setInputs({}); setResult(null); }} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+            {calcType === 'inductorEnergy' && (
+              <> <option value="UL">Energía (U_L)</option> <option value="L">Inductancia (L)</option> <option value="I">Corriente (I)</option> </>
+            )}
+            {calcType === 'rlTimeConstant' && (
+              <> <option value="tau">Constante de Tiempo (τ)</option> <option value="L">Inductancia (L)</option> <option value="R">Resistencia (R)</option> </>
+            )}
+            {calcType === 'rcTimeConstant' && (
+              <> <option value="tau">Constante de Tiempo (τ)</option> <option value="R">Resistencia (R)</option> <option value="C">Capacitancia (C)</option> </>
+            )}
+            {calcType === 'rlcResonance' && (
+              <> <option value="f0">Frecuencia de Resonancia (f₀)</option> <option value="L">Inductancia (L)</option> <option value="C">Capacitancia (C)</option> </>
+            )}
+          </select>
+        </div>
+      </div>
+      
+      {calcType === 'rlcResonance' && (
+         <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6 text-sm text-yellow-800">
+            <b>Resonancia:</b> Es la frecuencia a la cual la impedancia del circuito es mínima (en serie) o máxima (en paralelo), permitiendo la máxima transferencia de energía. Es fundamental para sintonizar radios y en filtros de frecuencia.
+        </div>
+      )}
+
+      <div className="bg-white border border-gray-200 rounded-lg p-6 mb-6">
+        <div className="grid md:grid-cols-2 gap-4">
+          {calcType === 'inductorEnergy' && (
+            <>
+              {findVariable !== 'UL' && <div><label className="block text-sm font-medium text-gray-700 mb-2">Energía U_L (J)</label><input type="number" step="any" value={inputs.UL || ''} onChange={(e) => setInputs({...inputs, UL: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" /></div>}
+              {findVariable !== 'L' && <div><label className="block text-sm font-medium text-gray-700 mb-2">Inductancia L (H)</label><input type="number" step="any" value={inputs.L || ''} onChange={(e) => setInputs({...inputs, L: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" /></div>}
+              {findVariable !== 'I' && <div><label className="block text-sm font-medium text-gray-700 mb-2">Corriente I (A)</label><input type="number" step="any" value={inputs.I || ''} onChange={(e) => setInputs({...inputs, I: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" /></div>}
+            </>
+          )}
+
+          {calcType === 'rlTimeConstant' && (
+            <>
+              {findVariable !== 'tau' && <div><label className="block text-sm font-medium text-gray-700 mb-2">Constante de Tiempo τ (s)</label><input type="number" step="any" value={inputs.tau || ''} onChange={(e) => setInputs({...inputs, tau: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" /></div>}
+              {findVariable !== 'L' && <div><label className="block text-sm font-medium text-gray-700 mb-2">Inductancia L (H)</label><input type="number" step="any" value={inputs.L || ''} onChange={(e) => setInputs({...inputs, L: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" /></div>}
+              {findVariable !== 'R' && <div><label className="block text-sm font-medium text-gray-700 mb-2">Resistencia R (Ω)</label><input type="number" step="any" value={inputs.R || ''} onChange={(e) => setInputs({...inputs, R: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" /></div>}
+            </>
+          )}
+
+          {calcType === 'rcTimeConstant' && (
+            <>
+              {findVariable !== 'tau' && <div><label className="block text-sm font-medium text-gray-700 mb-2">Constante de Tiempo τ (s)</label><input type="number" step="any" value={inputs.tau || ''} onChange={(e) => setInputs({...inputs, tau: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" /></div>}
+              {findVariable !== 'R' && <div><label className="block text-sm font-medium text-gray-700 mb-2">Resistencia R (Ω)</label><input type="number" step="any" value={inputs.R || ''} onChange={(e) => setInputs({...inputs, R: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" /></div>}
+              {findVariable !== 'C' && <div><label className="block text-sm font-medium text-gray-700 mb-2">Capacitancia C (F)</label><input type="number" step="any" value={inputs.C || ''} onChange={(e) => setInputs({...inputs, C: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" /></div>}
+            </>
+          )}
+
+          {calcType === 'rlcResonance' && (
+            <>
+              {findVariable !== 'f0' && <div><label className="block text-sm font-medium text-gray-700 mb-2">Frecuencia de Resonancia f₀ (Hz)</label><input type="number" step="any" value={inputs.f0 || ''} onChange={(e) => setInputs({...inputs, f0: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" /></div>}
+              {findVariable !== 'L' && <div><label className="block text-sm font-medium text-gray-700 mb-2">Inductancia L (H)</label><input type="number" step="any" value={inputs.L || ''} onChange={(e) => setInputs({...inputs, L: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" /></div>}
+              {findVariable !== 'C' && <div><label className="block text-sm font-medium text-gray-700 mb-2">Capacitancia C (F)</label><input type="number" step="any" value={inputs.C || ''} onChange={(e) => setInputs({...inputs, C: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" /></div>}
+            </>
+          )}
+        </div>
+        
+        <button onClick={handleCalculate} className="mt-6 w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors">
+          Calcular
+        </button>
+      </div>
+
+      {result && (
+        <div className="bg-green-50 border border-green-200 rounded-lg p-6">
+          <h3 className="text-xl font-bold text-gray-800 mb-4">Resultados</h3>
+          <div className="space-y-2">
+            {Object.entries(result).map(([key, value]) => (
+              <div key={key} className="flex justify-between items-center py-2 border-b border-green-100">
+                <span className="font-medium text-gray-700 capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}:</span>
+                <span className="text-lg font-semibold text-gray-900">{value}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+function CircuitosRLCSimulation() {
+  const canvasRef = useRef(null);
+  const [isRunning, setIsRunning] = useState(false);
+  const [simType, setSimType] = useState('rl');
+  const [params, setParams] = useState({ R: 100, L: 0.5, C: 0.001, V0: 10, R_rlc: 10 });
+  const animationRef = useRef(null);
+  const timeRef = useRef(0);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+
+    if (isRunning) {
+      timeRef.current = 0;
+      
+      const animate = () => {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        // Ejes de coordenadas
+        ctx.strokeStyle = '#374151';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(50, canvas.height - 50);
+        ctx.lineTo(canvas.width - 20, canvas.height - 50);
+        ctx.moveTo(50, 20);
+        ctx.lineTo(50, canvas.height - 50);
+        ctx.stroke();
+
+        // Etiquetas de ejes
+        ctx.fillStyle = '#1f2937';
+        ctx.font = '12px Arial';
+        ctx.fillText('t (s)', canvas.width - 40, canvas.height - 30);
+        ctx.fillText('I/V', 20, 15);
+
+        const t = timeRef.current;
+        let shouldContinue = true;
+
+        // Dibujar la curva completa
+        ctx.strokeStyle = '#3b82f6';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+
+        if (simType === 'rl') {
+          // Circuito RL: I(t) = (V0/R)(1 - e^(-Rt/L))
+          const tau = params.L / params.R;
+          const Imax = params.V0 / params.R;
+          
+          for (let i = 0; i < 300; i++) {
+            const ti = i * 0.02;
+            const current = Imax * (1 - Math.exp(-ti / tau));
+            const x = 50 + ti * 80;
+            const y = canvas.height - 50 - current * 150;
+            
+            if (i === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+          }
+          ctx.stroke();
+          
+          // Línea asintótica
+          ctx.strokeStyle = '#93c5fd';
+          ctx.lineWidth = 1;
+          ctx.setLineDash([5, 5]);
+          ctx.beginPath();
+          const yAsymptote = canvas.height - 50 - Imax * 150;
+          ctx.moveTo(50, yAsymptote);
+          ctx.lineTo(canvas.width - 20, yAsymptote);
+          ctx.stroke();
+          ctx.setLineDash([]);
+          
+          // Punto móvil
+          const currentAtT = Imax * (1 - Math.exp(-t / tau));
+          const xPoint = 50 + t * 80;
+          const yPoint = canvas.height - 50 - currentAtT * 150;
+          
+          ctx.fillStyle = '#ef4444';
+          ctx.shadowColor = '#ef4444';
+          ctx.shadowBlur = 10;
+          ctx.beginPath();
+          ctx.arc(xPoint, yPoint, 6, 0, 2 * Math.PI);
+          ctx.fill();
+          ctx.shadowBlur = 0;
+          
+          // Mostrar energía almacenada
+          const energy = 0.5 * params.L * currentAtT * currentAtT;
+          ctx.fillStyle = '#1f2937';
+          ctx.font = '14px Arial';
+          ctx.fillText(`Corriente: ${currentAtT.toFixed(3)} A`, 10, canvas.height - 10);
+          ctx.fillText(`Energía: ${energy.toFixed(4)} J`, 200, canvas.height - 10);
+          ctx.fillText(`τ = L/R = ${tau.toFixed(3)} s`, 400, canvas.height - 10);
+          
+          if (t > 6) shouldContinue = false;
+          
+        } else if (simType === 'rc') {
+          // Circuito RC: V(t) = V0(1 - e^(-t/RC))
+          const tau = params.R * params.C;
+          
+          for (let i = 0; i < 300; i++) {
+            const ti = i * 0.02;
+            const voltage = params.V0 * (1 - Math.exp(-ti / tau));
+            const x = 50 + ti * 80;
+            const y = canvas.height - 50 - voltage * 15;
+            
+            if (i === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+          }
+          ctx.stroke();
+          
+          // Línea asintótica
+          ctx.strokeStyle = '#93c5fd';
+          ctx.lineWidth = 1;
+          ctx.setLineDash([5, 5]);
+          ctx.beginPath();
+          const yAsymptote = canvas.height - 50 - params.V0 * 15;
+          ctx.moveTo(50, yAsymptote);
+          ctx.lineTo(canvas.width - 20, yAsymptote);
+          ctx.stroke();
+          ctx.setLineDash([]);
+          
+          // Punto móvil
+          const voltageAtT = params.V0 * (1 - Math.exp(-t / tau));
+          const xPoint = 50 + t * 80;
+          const yPoint = canvas.height - 50 - voltageAtT * 15;
+          
+          ctx.fillStyle = '#ef4444';
+          ctx.shadowColor = '#ef4444';
+          ctx.shadowBlur = 10;
+          ctx.beginPath();
+          ctx.arc(xPoint, yPoint, 6, 0, 2 * Math.PI);
+          ctx.fill();
+          ctx.shadowBlur = 0;
+          
+          // Mostrar energía almacenada
+          const energy = 0.5 * params.C * voltageAtT * voltageAtT;
+          ctx.fillStyle = '#1f2937';
+          ctx.font = '14px Arial';
+          ctx.fillText(`Voltaje: ${voltageAtT.toFixed(3)} V`, 10, canvas.height - 10);
+          ctx.fillText(`Energía: ${energy.toFixed(6)} J`, 200, canvas.height - 10);
+          ctx.fillText(`τ = RC = ${tau.toFixed(4)} s`, 400, canvas.height - 10);
+          
+          if (t > 6) shouldContinue = false;
+          
+        } else if (simType === 'rlc_subamortiguado') {
+          // Circuito RLC subamortiguado: oscilación con decaimiento
+          const R_use = params.R_rlc;
+          const omega0 = 1 / Math.sqrt(params.L * params.C);
+          const gamma = R_use / (2 * params.L);
+          const omegaD = Math.sqrt(omega0 * omega0 - gamma * gamma);
+          const I0 = params.V0 / (R_use * 10);
+          
+          for (let i = 0; i < 600; i++) {
+            const ti = i * 0.01;
+            const current = I0 * Math.exp(-gamma * ti) * Math.cos(omegaD * ti);
+            const x = 50 + ti * 120;
+            const y = canvas.height / 2 - current * 80;
+            
+            if (i === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+          }
+          ctx.stroke();
+          
+          // Envolvente exponencial
+          ctx.strokeStyle = '#93c5fd';
+          ctx.lineWidth = 1;
+          ctx.setLineDash([5, 5]);
+          ctx.beginPath();
+          for (let i = 0; i < 600; i++) {
+            const ti = i * 0.01;
+            const envelope = I0 * Math.exp(-gamma * ti);
+            const x = 50 + ti * 120;
+            const y = canvas.height / 2 - envelope * 80;
+            if (i === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+          }
+          ctx.stroke();
+          ctx.beginPath();
+          for (let i = 0; i < 600; i++) {
+            const ti = i * 0.01;
+            const envelope = -I0 * Math.exp(-gamma * ti);
+            const x = 50 + ti * 120;
+            const y = canvas.height / 2 - envelope * 80;
+            if (i === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+          }
+          ctx.stroke();
+          ctx.setLineDash([]);
+          
+          // Línea central
+          ctx.strokeStyle = '#d1d5db';
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(50, canvas.height / 2);
+          ctx.lineTo(canvas.width - 20, canvas.height / 2);
+          ctx.stroke();
+          
+          // Punto móvil
+          const currentAtT = I0 * Math.exp(-gamma * t) * Math.cos(omegaD * t);
+          const xPoint = 50 + t * 120;
+          const yPoint = canvas.height / 2 - currentAtT * 80;
+          
+          ctx.fillStyle = '#ef4444';
+          ctx.shadowColor = '#ef4444';
+          ctx.shadowBlur = 10;
+          ctx.beginPath();
+          ctx.arc(xPoint, yPoint, 6, 0, 2 * Math.PI);
+          ctx.fill();
+          ctx.shadowBlur = 0;
+          
+          ctx.fillStyle = '#1f2937';
+          ctx.font = '14px Arial';
+          ctx.fillText(`Corriente: ${currentAtT.toFixed(4)} A`, 10, canvas.height - 10);
+          ctx.fillText(`f = ${(omegaD / (2 * Math.PI)).toFixed(2)} Hz`, 200, canvas.height - 10);
+          ctx.fillText(`Factor Q = ${(omega0 / (2 * gamma)).toFixed(2)}`, 400, canvas.height - 10);
+          
+          if (t > 5) shouldContinue = false;
+          
+        } else if (simType === 'resonancia') {
+          // Respuesta en frecuencia - Resonancia
+          const omega0 = 1 / Math.sqrt(params.L * params.C);
+          const f0 = omega0 / (2 * Math.PI);
+          const Q = omega0 * params.L / params.R;
+          
+          ctx.strokeStyle = '#3b82f6';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          
+          for (let i = 0; i < 400; i++) {
+            const f = (i / 400) * f0 * 3;
+            const omega = 2 * Math.PI * f;
+            const Z = Math.sqrt(params.R * params.R + Math.pow(omega * params.L - 1 / (omega * params.C), 2));
+            const current = params.V0 / Z;
+            const x = 50 + i * 1.8;
+            const y = canvas.height - 50 - current * 1500;
+            
+            if (i === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+          }
+          ctx.stroke();
+          
+          // Línea de resonancia
+          const xResonance = 50 + (f0 / (f0 * 3)) * 720;
+          ctx.strokeStyle = '#ef4444';
+          ctx.lineWidth = 2;
+          ctx.setLineDash([5, 5]);
+          ctx.beginPath();
+          ctx.moveTo(xResonance, 20);
+          ctx.lineTo(xResonance, canvas.height - 50);
+          ctx.stroke();
+          ctx.setLineDash([]);
+          
+          // Punto móvil que recorre la curva
+          const fAtT = (t / 6) * f0 * 3;
+          const omegaAtT = 2 * Math.PI * fAtT;
+          const ZAtT = Math.sqrt(params.R * params.R + Math.pow(omegaAtT * params.L - 1 / (omegaAtT * params.C), 2));
+          const currentAtT = params.V0 / ZAtT;
+          const xPoint = 50 + (fAtT / (f0 * 3)) * 720;
+          const yPoint = canvas.height - 50 - currentAtT * 1500;
+          
+          ctx.fillStyle = '#10b981';
+          ctx.shadowColor = '#10b981';
+          ctx.shadowBlur = 10;
+          ctx.beginPath();
+          ctx.arc(xPoint, yPoint, 6, 0, 2 * Math.PI);
+          ctx.fill();
+          ctx.shadowBlur = 0;
+          
+          ctx.fillStyle = '#1f2937';
+          ctx.font = '14px Arial';
+          ctx.fillText(`Frecuencia: ${fAtT.toFixed(2)} Hz`, 10, canvas.height - 10);
+          ctx.fillText(`f₀ = ${f0.toFixed(2)} Hz (Resonancia)`, 200, canvas.height - 10);
+          ctx.fillText(`Factor Q = ${Q.toFixed(2)}`, 500, canvas.height - 10);
+          
+          if (t > 6) shouldContinue = false;
+        }
+
+        ctx.fillStyle = '#1f2937';
+        ctx.font = '14px Arial';
+        ctx.fillText('Tiempo: ' + t.toFixed(2) + ' s', 10, 20);
+
+        timeRef.current += 0.05;
+
+        if (shouldContinue) {
+          animationRef.current = requestAnimationFrame(animate);
+        } else {
+          setIsRunning(false);
+        }
+      };
+
+      animate();
+    }
+
+    return () => {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
+    };
+  }, [isRunning, simType, params]);
+
+  return (
+    <div className="p-8 max-w-6xl mx-auto">
+      <h2 className="text-3xl font-bold text-gray-800 mb-6">Simulación de Circuitos RLC</h2>
+
+      <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6">
+        <p className="text-sm text-gray-700">Visualiza autoinducción, energía almacenada y oscilaciones eléctricas ajustando los parámetros.</p>
+      </div>
+
+      <div className="mb-6">
+        <label className="block text-sm font-semibold text-gray-700 mb-2">Tipo de Simulación</label>
+        <select value={simType} onChange={(e) => { setSimType(e.target.value); setIsRunning(false); }} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+          <option value="rl">Circuito RL - Autoinducción</option>
+          <option value="rc">Circuito RC - Carga del Capacitor</option>
+          <option value="rlc_subamortiguado">Circuito RLC - Oscilaciones Amortiguadas</option>
+          <option value="resonancia">Resonancia - Respuesta en Frecuencia</option>
+        </select>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        {(simType === 'rlc_subamortiguado') && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Resistencia RLC: {params.R_rlc} Ω</label>
+            <input type="range" min="5" max="100" value={params.R_rlc} onChange={(e) => setParams({...params, R_rlc: Number(e.target.value)})} className="w-full" disabled={isRunning} />
+          </div>
+        )}
+        {(simType === 'rl' || simType === 'rc' || simType === 'resonancia') && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Resistencia: {params.R} Ω</label>
+            <input type="range" min="10" max="500" value={params.R} onChange={(e) => setParams({...params, R: Number(e.target.value)})} className="w-full" disabled={isRunning} />
+          </div>
+        )}
+        {(simType === 'rl' || simType === 'rlc_subamortiguado' || simType === 'resonancia') && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Inductancia: {params.L} H</label>
+            <input type="range" min="0.1" max="2" step="0.1" value={params.L} onChange={(e) => setParams({...params, L: Number(e.target.value)})} className="w-full" disabled={isRunning} />
+          </div>
+        )}
+        {(simType === 'rc' || simType === 'rlc_subamortiguado' || simType === 'resonancia') && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Capacitancia: {params.C * 1000} mF</label>
+            <input type="range" min="0.1" max="5" step="0.1" value={params.C * 1000} onChange={(e) => setParams({...params, C: Number(e.target.value) / 1000})} className="w-full" disabled={isRunning} />
+          </div>
+        )}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Voltaje: {params.V0} V</label>
+          <input type="range" min="5" max="20" value={params.V0} onChange={(e) => setParams({...params, V0: Number(e.target.value)})} className="w-full" disabled={isRunning} />
+        </div>
+        <div className="flex items-end">
+          <button onClick={() => setIsRunning(!isRunning)} className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors">
+            {isRunning ? 'Detener' : 'Iniciar'}
+          </button>
+        </div>
+      </div>
+
+      <div className="bg-white border-2 border-gray-300 rounded-lg overflow-hidden">
+        <canvas ref={canvasRef} width={800} height={400} className="w-full" />
+      </div>
+
+      <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="bg-gray-50 p-4 rounded-lg">
+          <h3 className="font-semibold text-gray-800 mb-2">Conceptos Clave</h3>
+          <ul className="text-sm text-gray-600 space-y-1">
+            <li>• <strong>Autoinducción:</strong> Generación de fem por cambio de corriente</li>
+            <li>• <strong>Inductancia (L):</strong> Oposición al cambio de corriente</li>
+            <li>• <strong>Energía inductor:</strong> E = ½LI²</li>
+            <li>• <strong>Energía capacitor:</strong> E = ½CV²</li>
+          </ul>
+        </div>
+        <div className="bg-gray-50 p-4 rounded-lg">
+          <h3 className="font-semibold text-gray-800 mb-2">Aplicaciones</h3>
+          <ul className="text-sm text-gray-600 space-y-1">
+            <li>• Filtros de radiofrecuencia</li>
+            <li>• Circuitos resonantes LC</li>
+            <li>• Transformadores y bobinas</li>
+            <li>• Electrónica analógica y comunicaciones</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  );
+}
+function OndasMaxwellCalculator() {
+  const [calcType, setCalcType] = useState('velocidad');
+  const [inputs, setInputs] = useState({});
+  const [result, setResult] = useState(null);
+  const [findVariable, setFindVariable] = useState('c');
+
+  // Constantes físicas
+  const MU_0 = 4 * Math.PI * 1e-7; // Permeabilidad magnética del vacío (H/m)
+  const EPSILON_0 = 8.854187817e-12; // Permitividad eléctrica del vacío (F/m)
+  const C = 299792458; // Velocidad de la luz (m/s)
+
+  const calculateVelocidad = () => {
+    const { mu, epsilon, c, f, lambda } = inputs;
+    
+    if (findVariable === 'c') {
+      const muVal = parseFloat(mu) || MU_0;
+      const epsVal = parseFloat(epsilon) || EPSILON_0;
+      const vel = 1 / Math.sqrt(muVal * epsVal);
+      setResult({ 
+        velocidadPropagacion: vel.toFixed(2),
+        enNotacionCientifica: vel.toExponential(3)
+      });
+    } else if (findVariable === 'lambda') {
+      const cVal = parseFloat(c) || C;
+      const longitud = cVal / parseFloat(f);
+      setResult({ 
+        longitudOnda: longitud.toFixed(6),
+        enNotacionCientifica: longitud.toExponential(3)
+      });
+    } else if (findVariable === 'f') {
+      const cVal = parseFloat(c) || C;
+      const freq = cVal / parseFloat(lambda);
+      setResult({ 
+        frecuencia: freq.toFixed(2),
+        enNotacionCientifica: freq.toExponential(3)
+      });
+    }
+  };
+
+  const calculateGaussElectrico = () => {
+    const { q, epsilon, E, A } = inputs;
+    
+    if (findVariable === 'flujo') {
+      const carga = parseFloat(q);
+      const epsVal = parseFloat(epsilon) || EPSILON_0;
+      const flujo = carga / epsVal;
+      setResult({ 
+        flujoElectrico: flujo.toFixed(3),
+        unidades: 'N·m²/C'
+      });
+    } else if (findVariable === 'q') {
+      const campoE = parseFloat(E);
+      const area = parseFloat(A);
+      const epsVal = parseFloat(epsilon) || EPSILON_0;
+      const carga = campoE * area * epsVal;
+      setResult({ 
+        cargaEncerrada: carga.toFixed(6),
+        enNotacionCientifica: carga.toExponential(3),
+        unidades: 'C'
+      });
+    } else if (findVariable === 'E') {
+      const carga = parseFloat(q);
+      const area = parseFloat(A);
+      const epsVal = parseFloat(epsilon) || EPSILON_0;
+      const campo = carga / (epsVal * area);
+      setResult({ 
+        campoElectrico: campo.toFixed(3),
+        unidades: 'N/C'
+      });
+    }
+  };
+
+  const calculateFaraday = () => {
+    const { B, A, t, emf, deltaPhi } = inputs;
+    
+    if (findVariable === 'emf') {
+      const flujoChange = parseFloat(deltaPhi);
+      const tiempo = parseFloat(t);
+      const fem = -flujoChange / tiempo;
+      setResult({ 
+        fuerzaElectromotriz: fem.toFixed(6),
+        valorAbsoluto: Math.abs(fem).toFixed(6),
+        unidades: 'V'
+      });
+    } else if (findVariable === 'phi') {
+      const campoB = parseFloat(B);
+      const area = parseFloat(A);
+      const flujo = campoB * area;
+      setResult({ 
+        flujoMagnetico: flujo.toFixed(6),
+        enNotacionCientifica: flujo.toExponential(3),
+        unidades: 'Wb (Weber)'
+      });
+    } else if (findVariable === 'B') {
+      const fem = parseFloat(emf);
+      const area = parseFloat(A);
+      const tiempo = parseFloat(t);
+      const campo = (fem * tiempo) / area;
+      setResult({ 
+        campoMagnetico: Math.abs(campo).toFixed(6),
+        unidades: 'T (Tesla)'
+      });
+    }
+  };
+
+  const calculateAmpereMaxwell = () => {
+    const { I, Id, B, r, E, t } = inputs;
+    
+    if (findVariable === 'B') {
+      const corriente = parseFloat(I) || 0;
+      const corrienteDesp = parseFloat(Id) || 0;
+      const radio = parseFloat(r);
+      const corrienteTotal = corriente + corrienteDesp;
+      const campo = (MU_0 * corrienteTotal) / (2 * Math.PI * radio);
+      setResult({ 
+        campoMagnetico: campo.toFixed(9),
+        enNotacionCientifica: campo.toExponential(3),
+        unidades: 'T (Tesla)'
+      });
+    } else if (findVariable === 'Id') {
+      const campoE = parseFloat(E);
+      const tiempoChange = parseFloat(t);
+      const corriente = EPSILON_0 * (campoE / tiempoChange);
+      setResult({ 
+        corrienteDesplazamiento: corriente.toFixed(9),
+        enNotacionCientifica: corriente.toExponential(3),
+        unidades: 'A'
+      });
+    } else if (findVariable === 'I') {
+      const campo = parseFloat(B);
+      const radio = parseFloat(r);
+      const corriente = (campo * 2 * Math.PI * radio) / MU_0;
+      setResult({ 
+        corriente: corriente.toFixed(6),
+        unidades: 'A (Ampere)'
+      });
+    }
+  };
+
+  const calculateEspectro = () => {
+    const { f, lambda } = inputs;
+    
+    let frecuencia, longitud;
+    if (findVariable === 'tipo') {
+      if (f) {
+        frecuencia = parseFloat(f);
+        longitud = C / frecuencia;
+      } else {
+        longitud = parseFloat(lambda);
+        frecuencia = C / longitud;
+      }
+      
+      let tipo = '';
+      if (frecuencia < 3e9) tipo = 'Ondas de Radio';
+      else if (frecuencia < 3e11) tipo = 'Microondas';
+      else if (frecuencia < 4.3e14) tipo = 'Infrarrojo';
+      else if (frecuencia < 7.5e14) tipo = 'Luz Visible';
+      else if (frecuencia < 3e16) tipo = 'Ultravioleta';
+      else if (frecuencia < 3e19) tipo = 'Rayos X';
+      else tipo = 'Rayos Gamma';
+      
+      setResult({ 
+        tipoOnda: tipo,
+        frecuencia: frecuencia.toExponential(3) + ' Hz',
+        longitudOnda: longitud.toExponential(3) + ' m'
+      });
+    }
+  };
+
+  const handleCalculate = () => {
+    if (calcType === 'velocidad') calculateVelocidad();
+    else if (calcType === 'gaussE') calculateGaussElectrico();
+    else if (calcType === 'faraday') calculateFaraday();
+    else if (calcType === 'ampere') calculateAmpereMaxwell();
+    else if (calcType === 'espectro') calculateEspectro();
+  };
+
+  return (
+    <div className="p-8 max-w-4xl mx-auto bg-gradient-to-br from-blue-50 to-purple-50 min-h-screen">
+      <h2 className="text-3xl font-bold text-gray-800 mb-2">Calculadora de Ondas Electromagnéticas</h2>
+      <h3 className="text-xl text-gray-600 mb-6">Ecuaciones de Maxwell y Propagación</h3>
+
+      <div className="bg-blue-100 border-l-4 border-blue-600 p-4 mb-6 rounded">
+        <p className="text-sm text-gray-700">
+          Seleccione el tipo de cálculo y la variable a encontrar. Las constantes del vacío se usan por defecto.
+        </p>
+      </div>
+
+      <div className="mb-6">
+        <label className="block text-sm font-semibold text-gray-700 mb-2">Variable a encontrar</label>
+        <select
+          value={findVariable}
+          onChange={(e) => { setFindVariable(e.target.value); setInputs({}); setResult(null); }}
+          className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 mb-4 bg-white"
+        >
+          {calcType === 'velocidad' && (
+            <>
+              <option value="c">Velocidad de propagación (c)</option>
+              <option value="lambda">Longitud de onda (λ)</option>
+              <option value="f">Frecuencia (f)</option>
+            </>
+          )}
+          {calcType === 'gaussE' && (
+            <>
+              <option value="flujo">Flujo eléctrico (Φ)</option>
+              <option value="q">Carga encerrada (q)</option>
+              <option value="E">Campo eléctrico (E)</option>
+            </>
+          )}
+          {calcType === 'faraday' && (
+            <>
+              <option value="emf">Fuerza electromotriz (ε)</option>
+              <option value="phi">Flujo magnético (Φ)</option>
+              <option value="B">Campo magnético (B)</option>
+            </>
+          )}
+          {calcType === 'ampere' && (
+            <>
+              <option value="B">Campo magnético (B)</option>
+              <option value="Id">Corriente de desplazamiento (Id)</option>
+              <option value="I">Corriente (I)</option>
+            </>
+          )}
+          {calcType === 'espectro' && (
+            <>
+              <option value="tipo">Tipo de onda electromagnética</option>
+            </>
+          )}
+        </select>
+        
+        <label className="block text-sm font-semibold text-gray-700 mb-2">Tipo de Cálculo</label>
+        <select
+          value={calcType}
+          onChange={(e) => { setCalcType(e.target.value); setInputs({}); setResult(null); setFindVariable(
+            e.target.value === 'velocidad' ? 'c' :
+            e.target.value === 'gaussE' ? 'flujo' :
+            e.target.value === 'faraday' ? 'emf' :
+            e.target.value === 'ampere' ? 'B' : 'tipo'
+          ); }}
+          className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white"
+        >
+          <option value="velocidad">Velocidad de Propagación (c = 1/√(μ₀ε₀))</option>
+          <option value="gaussE">Ley de Gauss - Campo Eléctrico</option>
+          <option value="faraday">Ley de Faraday - Inducción</option>
+          <option value="ampere">Ley de Ampère-Maxwell</option>
+          <option value="espectro">Espectro Electromagnético</option>
+        </select>
+      </div>
+
+      <div className="bg-white border border-gray-200 rounded-lg p-6 mb-6 shadow-md">
+        {calcType === 'velocidad' && (
+          <div className="space-y-4">
+            <p className="text-sm text-gray-600 mb-4">Relación: c = λ·f y c = 1/√(μ·ε)</p>
+            {findVariable === 'c' && (
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Permeabilidad magnética μ (H/m)</label>
+                  <input type="number" step="any" value={inputs.mu || ''} onChange={(e) => setInputs({...inputs, mu: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" placeholder={`${MU_0.toExponential(3)} (vacío)`} />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Permitividad eléctrica ε (F/m)</label>
+                  <input type="number" step="any" value={inputs.epsilon || ''} onChange={(e) => setInputs({...inputs, epsilon: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" placeholder={`${EPSILON_0.toExponential(3)} (vacío)`} />
+                </div>
+              </>
+            )}
+            {findVariable === 'lambda' && (
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Velocidad c (m/s)</label>
+                  <input type="number" step="any" value={inputs.c || ''} onChange={(e) => setInputs({...inputs, c: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" placeholder={`${C} (luz)`} />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Frecuencia f (Hz)</label>
+                  <input type="number" step="any" value={inputs.f || ''} onChange={(e) => setInputs({...inputs, f: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" required />
+                </div>
+              </>
+            )}
+            {findVariable === 'f' && (
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Velocidad c (m/s)</label>
+                  <input type="number" step="any" value={inputs.c || ''} onChange={(e) => setInputs({...inputs, c: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" placeholder={`${C} (luz)`} />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Longitud de onda λ (m)</label>
+                  <input type="number" step="any" value={inputs.lambda || ''} onChange={(e) => setInputs({...inputs, lambda: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" required />
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {calcType === 'gaussE' && (
+          <div className="space-y-4">
+            <p className="text-sm text-gray-600 mb-4">∮E·dA = q/ε₀ (Flujo eléctrico)</p>
+            {findVariable === 'flujo' && (
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Carga encerrada q (C)</label>
+                  <input type="number" step="any" value={inputs.q || ''} onChange={(e) => setInputs({...inputs, q: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" required />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Permitividad ε (F/m)</label>
+                  <input type="number" step="any" value={inputs.epsilon || ''} onChange={(e) => setInputs({...inputs, epsilon: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" placeholder={`${EPSILON_0.toExponential(3)} (vacío)`} />
+                </div>
+              </>
+            )}
+            {findVariable === 'q' && (
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Campo eléctrico E (N/C)</label>
+                  <input type="number" step="any" value={inputs.E || ''} onChange={(e) => setInputs({...inputs, E: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" required />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Área A (m²)</label>
+                  <input type="number" step="any" value={inputs.A || ''} onChange={(e) => setInputs({...inputs, A: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" required />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Permitividad ε (F/m)</label>
+                  <input type="number" step="any" value={inputs.epsilon || ''} onChange={(e) => setInputs({...inputs, epsilon: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" placeholder={`${EPSILON_0.toExponential(3)} (vacío)`} />
+                </div>
+              </>
+            )}
+            {findVariable === 'E' && (
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Carga encerrada q (C)</label>
+                  <input type="number" step="any" value={inputs.q || ''} onChange={(e) => setInputs({...inputs, q: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" required />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Área A (m²)</label>
+                  <input type="number" step="any" value={inputs.A || ''} onChange={(e) => setInputs({...inputs, A: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" required />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Permitividad ε (F/m)</label>
+                  <input type="number" step="any" value={inputs.epsilon || ''} onChange={(e) => setInputs({...inputs, epsilon: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" placeholder={`${EPSILON_0.toExponential(3)} (vacío)`} />
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {calcType === 'faraday' && (
+          <div className="space-y-4">
+            <p className="text-sm text-gray-600 mb-4">ε = -dΦ/dt (Ley de Faraday)</p>
+            {findVariable === 'emf' && (
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Cambio de flujo ΔΦ (Wb)</label>
+                  <input type="number" step="any" value={inputs.deltaPhi || ''} onChange={(e) => setInputs({...inputs, deltaPhi: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" required />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Tiempo Δt (s)</label>
+                  <input type="number" step="any" value={inputs.t || ''} onChange={(e) => setInputs({...inputs, t: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" required />
+                </div>
+              </>
+            )}
+            {findVariable === 'phi' && (
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Campo magnético B (T)</label>
+                  <input type="number" step="any" value={inputs.B || ''} onChange={(e) => setInputs({...inputs, B: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" required />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Área A (m²)</label>
+                  <input type="number" step="any" value={inputs.A || ''} onChange={(e) => setInputs({...inputs, A: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" required />
+                </div>
+              </>
+            )}
+            {findVariable === 'B' && (
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">FEM inducida ε (V)</label>
+                  <input type="number" step="any" value={inputs.emf || ''} onChange={(e) => setInputs({...inputs, emf: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" required />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Área A (m²)</label>
+                  <input type="number" step="any" value={inputs.A || ''} onChange={(e) => setInputs({...inputs, A: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" required />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Tiempo Δt (s)</label>
+                  <input type="number" step="any" value={inputs.t || ''} onChange={(e) => setInputs({...inputs, t: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" required />
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {calcType === 'ampere' && (
+          <div className="space-y-4">
+            <p className="text-sm text-gray-600 mb-4">∮B·dl = μ₀(I + Id) (Ampère-Maxwell)</p>
+            {findVariable === 'B' && (
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Corriente I (A)</label>
+                  <input type="number" step="any" value={inputs.I || ''} onChange={(e) => setInputs({...inputs, I: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" placeholder="0" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Corriente desplazamiento Id (A)</label>
+                  <input type="number" step="any" value={inputs.Id || ''} onChange={(e) => setInputs({...inputs, Id: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" placeholder="0" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Radio r (m)</label>
+                  <input type="number" step="any" value={inputs.r || ''} onChange={(e) => setInputs({...inputs, r: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" required />
+                </div>
+              </>
+            )}
+            {findVariable === 'Id' && (
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Campo eléctrico E (N/C)</label>
+                  <input type="number" step="any" value={inputs.E || ''} onChange={(e) => setInputs({...inputs, E: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" required />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Cambio temporal Δt (s)</label>
+                  <input type="number" step="any" value={inputs.t || ''} onChange={(e) => setInputs({...inputs, t: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" required />
+                </div>
+              </>
+            )}
+            {findVariable === 'I' && (
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Campo magnético B (T)</label>
+                  <input type="number" step="any" value={inputs.B || ''} onChange={(e) => setInputs({...inputs, B: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" required />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Radio r (m)</label>
+                  <input type="number" step="any" value={inputs.r || ''} onChange={(e) => setInputs({...inputs, r: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg" required />
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {calcType === 'espectro' && (
+          <div className="space-y-4">
+            <p className="text-sm text-gray-600 mb-4">Clasificación del espectro electromagnético</p>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Frecuencia f (Hz) - opcional</label>
+              <input type="number" step="any" value={inputs.f || ''} onChange={(e) => setInputs({...inputs, f: e.target.value, lambda: ''})} className="w-full p-3 border border-gray-300 rounded-lg" />
+            </div>
+            <div className="text-center text-gray-500 font-semibold">O</div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Longitud de onda λ (m) - opcional</label>
+              <input type="number" step="any" value={inputs.lambda || ''} onChange={(e) => setInputs({...inputs, lambda: e.target.value, f: ''})} className="w-full p-3 border border-gray-300 rounded-lg" />
+            </div>
+          </div>
+        )}
+
+        <button onClick={handleCalculate} className="mt-6 w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3 rounded-lg font-semibold hover:from-blue-700 hover:to-purple-700 transition-all shadow-md">
+          Calcular
+        </button>
+      </div>
+
+      {result && (
+        <div className="bg-gradient-to-br from-green-50 to-emerald-50 border border-green-300 rounded-lg p-6 shadow-lg">
+          <h3 className="text-xl font-bold text-gray-800 mb-4">Resultados</h3>
+          <div className="space-y-2">
+            {Object.entries(result).map(([key, value]) => (
+              <div key={key} className="flex justify-between items-center py-2 border-b border-green-200">
+                <span className="font-medium text-gray-700 capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}:</span>
+                <span className="text-lg font-semibold text-gray-900">{value}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="mt-8 bg-white border border-gray-200 rounded-lg p-6 shadow-md">
+        <h3 className="text-lg font-bold text-gray-800 mb-3">Ecuaciones de Maxwell</h3>
+        <div className="space-y-2 text-sm text-gray-700">
+          <p><strong>1. Ley de Gauss (E):</strong> ∮E·dA = q/ε₀</p>
+          <p><strong>2. Ley de Gauss (B):</strong> ∮B·dA = 0</p>
+          <p><strong>3. Ley de Faraday:</strong> ∮E·dl = -dΦ/dt</p>
+          <p><strong>4. Ley de Ampère-Maxwell:</strong> ∮B·dl = μ₀(I + ε₀dΦ_E/dt)</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+function SimulacionOndasMaxwell() {
+  const [simType, setSimType] = useState('propagacion');
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [time, setTime] = useState(0);
+  const [speed, setSpeed] = useState(1);
+  const canvasRef = useRef(null);
+  const animationRef = useRef(null);
+
+  // Parámetros ajustables
+  const [params, setParams] = useState({
+    amplitud: 1,
+    frecuencia: 1,
+    longitud: 5,
+    intensidadCampo: 1,
+    radio: 2,
+    corriente: 1
+  });
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    const width = canvas.width;
+    const height = canvas.height;
+
+    ctx.clearRect(0, 0, width, height);
+
+    if (simType === 'propagacion') {
+      drawPropagacionOnda(ctx, width, height);
+    } else if (simType === 'gaussE') {
+      drawGaussElectrico(ctx, width, height);
+    } else if (simType === 'gaussB') {
+      drawGaussMagnetico(ctx, width, height);
+    } else if (simType === 'faraday') {
+      drawFaraday(ctx, width, height);
+    } else if (simType === 'ampere') {
+      drawAmpereMaxwell(ctx, width, height);
+    } else if (simType === 'espectro') {
+      drawEspectro(ctx, width, height);
+    }
+  }, [simType, time, params]);
+
+  useEffect(() => {
+    if (isPlaying) {
+      const animate = () => {
+        setTime(t => t + 0.05 * speed);
+        animationRef.current = requestAnimationFrame(animate);
+      };
+      animationRef.current = requestAnimationFrame(animate);
+    } else {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
+    }
+    return () => {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
+    };
+  }, [isPlaying, speed]);
+
+  const drawPropagacionOnda = (ctx, width, height) => {
+    const centerY = height / 2;
+    const amplitude = params.amplitud * 60;
+    const frequency = params.frecuencia;
+    const wavelength = params.longitud * 50;
+
+    // Título
+    ctx.fillStyle = '#1e40af';
+    ctx.font = 'bold 16px Arial';
+    ctx.fillText('Propagación de Onda Electromagnética', 20, 30);
+
+    // Onda del Campo Eléctrico (E) - Vertical
+    ctx.strokeStyle = '#3b82f6';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    for (let x = 0; x < width; x++) {
+      const y = centerY + amplitude * Math.sin((x / wavelength) * 2 * Math.PI * frequency - time);
+      if (x === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+
+    // Etiqueta E
+    ctx.fillStyle = '#3b82f6';
+    ctx.font = 'bold 14px Arial';
+    ctx.fillText('E (Campo Eléctrico)', width - 150, 30);
+
+    // Onda del Campo Magnético (B) - Perpendicular
+    ctx.strokeStyle = '#ef4444';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    for (let x = 0; x < width; x++) {
+      const offset = amplitude * Math.sin((x / wavelength) * 2 * Math.PI * frequency - time);
+      const y = centerY;
+      if (x === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y + offset * 0.3);
+    }
+    ctx.stroke();
+
+    // Etiqueta B
+    ctx.fillStyle = '#ef4444';
+    ctx.fillText('B (Campo Magnético)', width - 150, 50);
+
+    // Dirección de propagación
+    ctx.strokeStyle = '#10b981';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(50, height - 50);
+    ctx.lineTo(150, height - 50);
+    ctx.stroke();
+    
+    // Flecha
+    ctx.beginPath();
+    ctx.moveTo(150, height - 50);
+    ctx.lineTo(140, height - 55);
+    ctx.lineTo(140, height - 45);
+    ctx.closePath();
+    ctx.fillStyle = '#10b981';
+    ctx.fill();
+
+    ctx.fillText('c = 3×10⁸ m/s', 160, height - 45);
+
+    // Vectores dinámicos en un punto
+    const pointX = 300;
+    const eVector = amplitude * Math.sin((pointX / wavelength) * 2 * Math.PI * frequency - time);
+    const bVector = amplitude * 0.5 * Math.sin((pointX / wavelength) * 2 * Math.PI * frequency - time);
+
+    // Vector E (vertical)
+    ctx.strokeStyle = '#3b82f6';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(pointX, centerY);
+    ctx.lineTo(pointX, centerY - eVector);
+    ctx.stroke();
+    
+    // Flecha E
+    if (Math.abs(eVector) > 5) {
+      ctx.beginPath();
+      const dir = eVector > 0 ? -1 : 1;
+      ctx.moveTo(pointX, centerY - eVector);
+      ctx.lineTo(pointX - 5, centerY - eVector + dir * 10);
+      ctx.lineTo(pointX + 5, centerY - eVector + dir * 10);
+      ctx.closePath();
+      ctx.fillStyle = '#3b82f6';
+      ctx.fill();
+    }
+  };
+
+  const drawGaussElectrico = (ctx, width, height) => {
+    const centerX = width / 2;
+    const centerY = height / 2;
+    const intensity = params.intensidadCampo;
+
+    ctx.fillStyle = '#1e40af';
+    ctx.font = 'bold 16px Arial';
+    ctx.fillText('Ley de Gauss para el Campo Eléctrico', 20, 30);
+    ctx.font = '12px Arial';
+    ctx.fillText('∮E·dA = q/ε₀', 20, 50);
+
+    // Carga central (positiva)
+    const chargeRadius = 15;
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, chargeRadius, 0, 2 * Math.PI);
+    ctx.fillStyle = '#ef4444';
+    ctx.fill();
+    ctx.strokeStyle = '#991b1b';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 20px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('+', centerX, centerY + 7);
+
+    // Superficie gaussiana
+    const gaussRadius = 100 + Math.sin(time) * 10;
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, gaussRadius, 0, 2 * Math.PI);
+    ctx.strokeStyle = '#8b5cf6';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([5, 5]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Líneas de campo eléctrico radiales
+    const numLines = 16;
+    for (let i = 0; i < numLines; i++) {
+      const angle = (i / numLines) * 2 * Math.PI;
+      const startX = centerX + Math.cos(angle) * (chargeRadius + 5);
+      const startY = centerY + Math.sin(angle) * (chargeRadius + 5);
+      const endX = centerX + Math.cos(angle) * 150 * intensity;
+      const endY = centerY + Math.sin(angle) * 150 * intensity;
+
+      ctx.strokeStyle = '#3b82f6';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(startX, startY);
+      ctx.lineTo(endX, endY);
+      ctx.stroke();
+
+      // Flechas
+      const arrowX = centerX + Math.cos(angle) * 120;
+      const arrowY = centerY + Math.sin(angle) * 120;
+      ctx.save();
+      ctx.translate(arrowX, arrowY);
+      ctx.rotate(angle);
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(-8, -4);
+      ctx.lineTo(-8, 4);
+      ctx.closePath();
+      ctx.fillStyle = '#3b82f6';
+      ctx.fill();
+      ctx.restore();
+    }
+
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#6b7280';
+    ctx.font = '11px Arial';
+    ctx.fillText('Flujo eléctrico saliente', width - 150, height - 30);
+    ctx.fillText('proporcional a la carga', width - 150, height - 15);
+  };
+
+  const drawGaussMagnetico = (ctx, width, height) => {
+    const centerX = width / 2;
+    const centerY = height / 2;
+
+    ctx.fillStyle = '#1e40af';
+    ctx.font = 'bold 16px Arial';
+    ctx.fillText('Ley de Gauss para el Magnetismo', 20, 30);
+    ctx.font = '12px Arial';
+    ctx.fillText('∮B·dA = 0 (No existen monopolos magnéticos)', 20, 50);
+
+    // Dipolo magnético (barra imantada)
+    const barWidth = 80;
+    const barHeight = 30;
+    const barX = centerX - barWidth / 2;
+    const barY = centerY - barHeight / 2;
+
+    // Polo Norte (azul)
+    ctx.fillStyle = '#3b82f6';
+    ctx.fillRect(barX, barY, barWidth / 2, barHeight);
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 16px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('N', barX + barWidth / 4, centerY + 5);
+
+    // Polo Sur (rojo)
+    ctx.fillStyle = '#ef4444';
+    ctx.fillRect(barX + barWidth / 2, barY, barWidth / 2, barHeight);
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText('S', barX + 3 * barWidth / 4, centerY + 5);
+
+    // Líneas de campo magnético (cerradas)
+    const numLoops = 5;
+    for (let i = 1; i <= numLoops; i++) {
+      const scale = i * 25;
+      
+      ctx.strokeStyle = `rgba(139, 92, 246, ${1 - i * 0.15})`;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      
+      // Lado derecho (saliendo de N)
+      for (let angle = -Math.PI / 2; angle <= Math.PI / 2; angle += 0.1) {
+        const x = centerX + barWidth / 4 + (scale + barWidth / 4) * Math.cos(angle);
+        const y = centerY + scale * Math.sin(angle);
+        if (angle === -Math.PI / 2) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      
+      // Lado izquierdo (entrando a S)
+      for (let angle = Math.PI / 2; angle <= 3 * Math.PI / 2; angle += 0.1) {
+        const x = centerX - barWidth / 4 + (scale + barWidth / 4) * Math.cos(angle);
+        const y = centerY + scale * Math.sin(angle);
+        ctx.lineTo(x, y);
+      }
+      
+      ctx.closePath();
+      ctx.stroke();
+
+      // Flechas en las líneas de campo
+      if (i % 2 === 0) {
+        // Flecha arriba
+        const arrowX = centerX + barWidth / 4 + scale + barWidth / 4;
+        const arrowY = centerY;
+        ctx.save();
+        ctx.translate(arrowX, arrowY);
+        ctx.rotate(0);
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(-6, -4);
+        ctx.lineTo(-6, 4);
+        ctx.closePath();
+        ctx.fillStyle = '#8b5cf6';
+        ctx.fill();
+        ctx.restore();
+      }
+    }
+
+    // Superficie gaussiana
+    const gaussRadius = 120 + Math.sin(time) * 8;
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, gaussRadius, 0, 2 * Math.PI);
+    ctx.strokeStyle = '#10b981';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([5, 5]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#6b7280';
+    ctx.font = '11px Arial';
+    ctx.fillText('Flujo magnético neto = 0', width - 150, height - 30);
+    ctx.fillText('(líneas cerradas)', width - 150, height - 15);
+  };
+
+  const drawFaraday = (ctx, width, height) => {
+    const centerX = width / 2;
+    const centerY = height / 2;
+    const coilRadius = 80;
+
+    ctx.fillStyle = '#1e40af';
+    ctx.font = 'bold 16px Arial';
+    ctx.fillText('Ley de Faraday - Inducción Electromagnética', 20, 30);
+    ctx.font = '12px Arial';
+    ctx.fillText('ε = -dΦ/dt', 20, 50);
+
+    // Bobina
+    const numTurns = 4;
+    for (let i = 0; i < numTurns; i++) {
+      const offsetY = (i - numTurns / 2) * 15;
+      ctx.strokeStyle = '#f59e0b';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.ellipse(centerX, centerY + offsetY, coilRadius, 25, 0, 0, 2 * Math.PI);
+      ctx.stroke();
+    }
+
+    // Campo magnético variable (representado por flechas)
+    const fieldIntensity = Math.abs(Math.sin(time)) * params.intensidadCampo;
+    const numArrows = 8;
+    
+    for (let i = 0; i < numArrows; i++) {
+      for (let j = 0; j < numArrows; j++) {
+        const x = centerX - 60 + (i * 120) / numArrows;
+        const y = centerY - 60 + (j * 120) / numArrows;
+        
+        if (Math.sqrt(Math.pow(x - centerX, 2) + Math.pow(y - centerY, 2)) < coilRadius - 10) {
+          // Punto (campo entrando) o cruz (campo saliendo)
+          ctx.fillStyle = `rgba(239, 68, 68, ${fieldIntensity})`;
+          if (Math.sin(time) > 0) {
+            // Puntos (campo entrando)
+            ctx.beginPath();
+            ctx.arc(x, y, 3, 0, 2 * Math.PI);
+            ctx.fill();
+          } else {
+            // Cruces (campo saliendo)
+            ctx.strokeStyle = `rgba(239, 68, 68, ${fieldIntensity})`;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(x - 4, y - 4);
+            ctx.lineTo(x + 4, y + 4);
+            ctx.moveTo(x + 4, y - 4);
+            ctx.lineTo(x - 4, y + 4);
+            ctx.stroke();
+          }
+        }
+      }
+    }
+
+    // Corriente inducida
+    const current = Math.cos(time) * fieldIntensity;
+    if (Math.abs(current) > 0.1) {
+      ctx.strokeStyle = '#10b981';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      const direction = current > 0 ? 1 : -1;
+      ctx.arc(centerX, centerY, coilRadius + 20, 0, Math.PI * direction, direction > 0);
+      ctx.stroke();
+
+      // Flecha de corriente
+      const arrowAngle = direction > 0 ? Math.PI : 0;
+      const arrowX = centerX + (coilRadius + 20) * Math.cos(arrowAngle);
+      const arrowY = centerY + (coilRadius + 20) * Math.sin(arrowAngle);
+      
+      ctx.save();
+      ctx.translate(arrowX, arrowY);
+      ctx.rotate(arrowAngle + (direction > 0 ? Math.PI / 2 : -Math.PI / 2));
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(-8, -5);
+      ctx.lineTo(-8, 5);
+      ctx.closePath();
+      ctx.fillStyle = '#10b981';
+      ctx.fill();
+      ctx.restore();
+
+      ctx.fillStyle = '#10b981';
+      ctx.font = 'bold 12px Arial';
+      ctx.textAlign = 'center';
+      ctx.fillText('I inducida', centerX, centerY - coilRadius - 30);
+    }
+
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#6b7280';
+    ctx.font = '11px Arial';
+    ctx.fillText('Campo magnético variable', width - 180, height - 45);
+    ctx.fillText('genera corriente inducida', width - 180, height - 30);
+    ctx.fillText('en la bobina', width - 180, height - 15);
+  };
+
+  const drawAmpereMaxwell = (ctx, width, height) => {
+    const centerX = width / 2;
+    const centerY = height / 2;
+
+    ctx.fillStyle = '#1e40af';
+    ctx.font = 'bold 16px Arial';
+    ctx.fillText('Ley de Ampère-Maxwell', 20, 30);
+    ctx.font = '12px Arial';
+    ctx.fillText('∮B·dl = μ₀(I + ε₀dΦₑ/dt)', 20, 50);
+
+    // Cable con corriente
+    const wireY = centerY;
+    ctx.strokeStyle = '#78350f';
+    ctx.lineWidth = 8;
+    ctx.beginPath();
+    ctx.moveTo(50, wireY);
+    ctx.lineTo(width - 50, wireY);
+    ctx.stroke();
+
+    // Corriente (animada)
+    const numCharges = 8;
+    for (let i = 0; i < numCharges; i++) {
+      const x = 50 + ((time * 50 + i * (width - 100) / numCharges) % (width - 100));
+      const y = wireY;
+      
+      ctx.beginPath();
+      ctx.arc(x, y, 4, 0, 2 * Math.PI);
+      ctx.fillStyle = '#fbbf24';
+      ctx.fill();
+      
+      // Signo +
+      ctx.strokeStyle = '#78350f';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(x - 2, y);
+      ctx.lineTo(x + 2, y);
+      ctx.moveTo(x, y - 2);
+      ctx.lineTo(x, y + 2);
+      ctx.stroke();
+    }
+
+    // Flecha de corriente
+    ctx.strokeStyle = '#10b981';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(width - 100, wireY - 30);
+    ctx.lineTo(width - 50, wireY - 30);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(width - 50, wireY - 30);
+    ctx.lineTo(width - 58, wireY - 35);
+    ctx.lineTo(width - 58, wireY - 25);
+    ctx.closePath();
+    ctx.fillStyle = '#10b981';
+    ctx.fill();
+    ctx.fillText('I', width - 45, wireY - 25);
+
+    // Círculos concéntricos de campo magnético
+    const numCircles = 5;
+    for (let i = 1; i <= numCircles; i++) {
+      const radius = i * 30 + 20;
+      
+      ctx.strokeStyle = `rgba(139, 92, 246, ${1 - i * 0.15})`;
+      ctx.lineWidth = 2;
+      ctx.setLineDash([5, 3]);
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Flechas indicando dirección del campo (regla de la mano derecha)
+      const arrowAngle = time + i * Math.PI / 4;
+      const arrowX = centerX + radius * Math.cos(arrowAngle);
+      const arrowY = centerY + radius * Math.sin(arrowAngle);
+      
+      ctx.save();
+      ctx.translate(arrowX, arrowY);
+      ctx.rotate(arrowAngle + Math.PI / 2);
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(-6, -4);
+      ctx.lineTo(-6, 4);
+      ctx.closePath();
+      ctx.fillStyle = '#8b5cf6';
+      ctx.fill();
+      ctx.restore();
+
+      if (i === 3) {
+        const labelAngle = arrowAngle + Math.PI / 6;
+        const labelX = centerX + (radius + 15) * Math.cos(labelAngle);
+        const labelY = centerY + (radius + 15) * Math.sin(labelAngle);
+        ctx.fillStyle = '#8b5cf6';
+        ctx.font = 'bold 12px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('B', labelX, labelY);
+      }
+    }
+
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#6b7280';
+    ctx.font = '11px Arial';
+    ctx.fillText('Campo magnético circular', width - 180, height - 45);
+    ctx.fillText('alrededor del conductor', width - 180, height - 30);
+    ctx.fillText('con corriente', width - 180, height - 15);
+  };
+
+  const drawEspectro = (ctx, width, height) => {
+    ctx.fillStyle = '#1e40af';
+    ctx.font = 'bold 16px Arial';
+    ctx.fillText('Espectro Electromagnético', 20, 30);
+
+    const spectrumData = [
+      { name: 'Ondas de Radio', color: '#ef4444', start: 0, width: 80 },
+      { name: 'Microondas', color: '#f97316', start: 80, width: 80 },
+      { name: 'Infrarrojo', color: '#f59e0b', start: 160, width: 80 },
+      { name: 'Visible', color: '#10b981', start: 240, width: 80 },
+      { name: 'Ultravioleta', color: '#3b82f6', start: 320, width: 80 },
+      { name: 'Rayos X', color: '#6366f1', start: 400, width: 80 },
+      { name: 'Rayos Gamma', color: '#8b5cf6', start: 480, width: 80 }
+    ];
+
+    const barY = 80;
+    const barHeight = 60;
+
+    // Dibujar espectro
+    spectrumData.forEach(item => {
+      const gradient = ctx.createLinearGradient(item.start + 50, barY, item.start + 50, barY + barHeight);
+      gradient.addColorStop(0, item.color);
+      gradient.addColorStop(1, item.color + '80');
+      
+      ctx.fillStyle = gradient;
+      ctx.fillRect(item.start + 50, barY, item.width, barHeight);
+      
+      ctx.strokeStyle = '#1f2937';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(item.start + 50, barY, item.width, barHeight);
+
+      // Etiquetas
+      ctx.save();
+      ctx.translate(item.start + 50 + item.width / 2, barY + barHeight + 15);
+      ctx.rotate(-Math.PI / 4);
+      ctx.fillStyle = '#374151';
+      ctx.font = '10px Arial';
+      ctx.textAlign = 'right';
+      ctx.fillText(item.name, 0, 0);
+      ctx.restore();
+    });
+
+    // Onda animada en la región visible
+    const visibleStart = 240 + 50;
+    const visibleWidth = 80;
+    const waveY = barY + barHeight / 2;
+    const waveAmplitude = 20;
+
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (let x = 0; x < visibleWidth; x++) {
+      const waveX = visibleStart + x;
+      const y = waveY + waveAmplitude * Math.sin((x / 10) * Math.PI - time);
+      if (x === 0) ctx.moveTo(waveX, y);
+      else ctx.lineTo(waveX, y);
+    }
+    ctx.stroke();
+
+    // Información de frecuencias
+    ctx.fillStyle = '#374151';
+    ctx.font = '11px Arial';
+    ctx.textAlign = 'left';
+    
+    const infoY = barY + barHeight + 80;
+    ctx.fillText('Frecuencia aumenta →', 50, infoY);
+    ctx.fillText('Longitud de onda disminuye →', 50, infoY + 15);
+    ctx.fillText('Energía aumenta →', 50, infoY + 30);
+
+    // Indicador de longitud de onda
+    const indicatorY = infoY + 60;
+    const longWave = 100 + 50 * Math.sin(time);
+    
+    ctx.strokeStyle = '#ef4444';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(50, indicatorY);
+    for (let x = 0; x < 200; x++) {
+      const y = indicatorY + 20 * Math.sin((x / longWave) * 2 * Math.PI);
+      ctx.lineTo(50 + x, y);
+    }
+    ctx.stroke();
+
+    ctx.fillStyle = '#ef4444';
+    ctx.font = '10px Arial';
+    ctx.fillText(`λ = ${(longWave / 50).toFixed(1)} (relativo)`, 260, indicatorY + 5);
+
+    const shortWave = 20 + 10 * Math.cos(time);
+    
+    ctx.strokeStyle = '#8b5cf6';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(50, indicatorY + 50);
+    for (let x = 0; x < 200; x++) {
+      const y = indicatorY + 50 + 20 * Math.sin((x / shortWave) * 2 * Math.PI);
+      ctx.lineTo(50 + x, y);
+    }
+    ctx.stroke();
+
+    ctx.fillStyle = '#8b5cf6';
+    ctx.fillText(`λ = ${(shortWave / 50).toFixed(1)} (relativo)`, 260, indicatorY + 55);
+
+    // Aplicaciones
+    ctx.fillStyle = '#1e40af';
+    ctx.font = 'bold 12px Arial';
+    ctx.fillText('Aplicaciones:', 50, height - 80);
+    
+    ctx.fillStyle = '#374151';
+    ctx.font = '10px Arial';
+    ctx.fillText('• Telecomunicaciones (Radio, TV, WiFi)', 50, height - 65);
+    ctx.fillText('• Radar y navegación (Microondas)', 50, height - 50);
+    ctx.fillText('• Energía solar (Luz visible e IR)', 50, height - 35);
+    ctx.fillText('• Medicina (Rayos X, UV)', 50, height - 20);
+  };
+
+  const handleReset = () => {
+    setTime(0);
+    setIsPlaying(false);
+  };
+
+  return (
+    <div className="p-8 max-w-5xl mx-auto bg-gradient-to-br from-blue-50 to-purple-50 min-h-screen">
+      <h2 className="text-3xl font-bold text-gray-800 mb-2">Simulación de Ondas Electromagnéticas</h2>
+      <h3 className="text-xl text-gray-600 mb-6">Ecuaciones de Maxwell y Propagación</h3>
+
+      <div className="bg-white border border-gray-200 rounded-lg p-6 mb-6 shadow-md">
+        <label className="block text-sm font-semibold text-gray-700 mb-2">Tipo de Simulación</label>
+        <select
+          value={simType}
+          onChange={(e) => { setSimType(e.target.value); setTime(0); }}
+          className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 mb-4 bg-white"
+        >
+          <option value="propagacion">Propagación de Ondas Electromagnéticas</option>
+          <option value="gaussE">Ley de Gauss - Campo Eléctrico</option>
+          <option value="gaussB">Ley de Gauss - Magnetismo (No monopolos)</option>
+          <option value="faraday">Ley de Faraday - Inducción Electromagnética</option>
+          <option value="ampere">Ley de Ampère-Maxwell</option>
+          <option value="espectro">Espectro Electromagnético</option>
+        </select>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+          {simType === 'propagacion' && (
+            <>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Amplitud</label>
+                <input
+                  type="range"
+                  min="0.5"
+                  max="2"
+                  step="0.1"
+                  value={params.amplitud}
+                  onChange={(e) => setParams({...params, amplitud: parseFloat(e.target.value)})}
+                  className="w-full"
+                />
+                <span className="text-xs text-gray-600">{params.amplitud.toFixed(1)}</span>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Frecuencia</label>
+                <input
+                  type="range"
+                  min="0.5"
+                  max="3"
+                  step="0.1"
+                  value={params.frecuencia}
+                  onChange={(e) => setParams({...params, frecuencia: parseFloat(e.target.value)})}
+                  className="w-full"
+                />
+                <span className="text-xs text-gray-600">{params.frecuencia.toFixed(1)}</span>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Longitud de onda</label>
+                <input
+                  type="range"
+                  min="2"
+                  max="10"
+                  step="0.5"
+                  value={params.longitud}
+                  onChange={(e) => setParams({...params, longitud: parseFloat(e.target.value)})}
+                  className="w-full"
+                />
+                <span className="text-xs text-gray-600">{params.longitud.toFixed(1)}</span>
+              </div>
+            </>
+          )}
+          
+          {(simType === 'gaussE' || simType === 'gaussB' || simType === 'faraday') && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Intensidad de Campo</label>
+              <input
+                type="range"
+                min="0.5"
+                max="2"
+                step="0.1"
+                value={params.intensidadCampo}
+                onChange={(e) => setParams({...params, intensidadCampo: parseFloat(e.target.value)})}
+                className="w-full"
+              />
+              <span className="text-xs text-gray-600">{params.intensidadCampo.toFixed(1)}</span>
+            </div>
+          )}
+
+          {simType === 'ampere' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Corriente</label>
+              <input
+                type="range"
+                min="0.5"
+                max="2"
+                step="0.1"
+                value={params.corriente}
+                onChange={(e) => setParams({...params, corriente: parseFloat(e.target.value)})}
+                className="w-full"
+              />
+              <span className="text-xs text-gray-600">{params.corriente.toFixed(1)} A</span>
+            </div>
+          )}
+        </div>
+
+        <div className="flex gap-3 mb-4">
+          <button
+            onClick={() => setIsPlaying(!isPlaying)}
+            className={`flex-1 py-3 rounded-lg font-semibold transition-colors ${
+              isPlaying 
+                ? 'bg-yellow-500 hover:bg-yellow-600 text-white' 
+                : 'bg-green-600 hover:bg-green-700 text-white'
+            }`}
+          >
+            {isPlaying ? '⏸ Pausar' : '▶ Reproducir'}
+          </button>
+          <button
+            onClick={handleReset}
+            className="flex-1 bg-gray-600 hover:bg-gray-700 text-white py-3 rounded-lg font-semibold transition-colors"
+          >
+            ↻ Reiniciar
+          </button>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Velocidad de Animación</label>
+          <input
+            type="range"
+            min="0.1"
+            max="3"
+            step="0.1"
+            value={speed}
+            onChange={(e) => setSpeed(parseFloat(e.target.value))}
+            className="w-full"
+          />
+          <span className="text-xs text-gray-600">{speed.toFixed(1)}x</span>
+        </div>
+      </div>
+
+      <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-md">
+        <canvas
+          ref={canvasRef}
+          width={700}
+          height={500}
+          className="w-full border border-gray-300 rounded"
+        />
+      </div>
+
+      <div className="mt-6 bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-6 shadow-md">
+        <h3 className="text-lg font-bold text-gray-800 mb-3">Información</h3>
+        <div className="space-y-2 text-sm text-gray-700">
+          {simType === 'propagacion' && (
+            <>
+              <p><strong>Propagación de Ondas EM:</strong> Las ondas electromagnéticas son perturbaciones del campo eléctrico (E) y magnético (B) que se propagan perpendiculares entre sí.</p>
+              <p><strong>Velocidad:</strong> c = 3×10⁸ m/s en el vacío</p>
+              <p><strong>Relación:</strong> c = λ·f donde λ es longitud de onda y f es frecuencia</p>
+            </>
+          )}
+          {simType === 'gaussE' && (
+            <>
+              <p><strong>Ley de Gauss Eléctrica:</strong> ∮E·dA = q/ε₀</p>
+              <p>El flujo eléctrico a través de una superficie cerrada es proporcional a la carga encerrada.</p>
+              <p>Las líneas de campo eléctrico salen de cargas positivas y entran en cargas negativas.</p>
+            </>
+          )}
+          {simType === 'gaussB' && (
+            <>
+              <p><strong>Ley de Gauss Magnética:</strong> ∮B·dA = 0</p>
+              <p>No existen monopolos magnéticos. Las líneas de campo magnético son siempre cerradas.</p>
+              <p>Todo polo norte tiene un polo sur asociado (dipolos magnéticos).</p>
+            </>
+          )}
+          {simType === 'faraday' && (
+            <>
+              <p><strong>Ley de Faraday:</strong> ε = -dΦ/dt</p>
+              <p>Un campo magnético variable genera una fuerza electromotriz (fem) inducida.</p>
+              <p>Esta es la base del funcionamiento de generadores eléctricos y transformadores.</p>
+            </>
+          )}
+          {simType === 'ampere' && (
+            <>
+              <p><strong>Ley de Ampère-Maxwell:</strong> ∮B·dl = μ₀(I + ε₀dΦₑ/dt)</p>
+              <p>Una corriente eléctrica genera un campo magnético circular a su alrededor.</p>
+              <p>Maxwell añadió el término de corriente de desplazamiento (ε₀dΦₑ/dt).</p>
+            </>
+          )}
+          {simType === 'espectro' && (
+            <>
+              <p><strong>Espectro Electromagnético:</strong> Conjunto de todas las ondas electromagnéticas ordenadas por frecuencia/longitud de onda.</p>
+              <p><strong>Aplicaciones:</strong> Radio/TV (comunicación), Microondas (radar, WiFi), Infrarrojo (visión nocturna), Luz visible (visión), UV (esterilización), Rayos X (medicina), Rayos Gamma (tratamiento cáncer).</p>
+              <p>Todas viajan a la velocidad de la luz en el vacío.</p>
+            </>
+          )}
+        </div>
+      </div>
+
+      <div className="mt-6 bg-white border border-gray-200 rounded-lg p-6 shadow-md">
+        <h3 className="text-lg font-bold text-gray-800 mb-3">Ecuaciones de Maxwell - Resumen</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+          <div className="bg-blue-50 p-4 rounded-lg">
+            <p className="font-semibold text-blue-900 mb-2">1. Ley de Gauss (Eléctrica)</p>
+            <p className="text-gray-700">∮E·dA = q/ε₀</p>
+            <p className="text-xs text-gray-600 mt-1">Las cargas eléctricas crean campo eléctrico</p>
+          </div>
+          <div className="bg-red-50 p-4 rounded-lg">
+            <p className="font-semibold text-red-900 mb-2">2. Ley de Gauss (Magnética)</p>
+            <p className="text-gray-700">∮B·dA = 0</p>
+            <p className="text-xs text-gray-600 mt-1">No existen monopolos magnéticos</p>
+          </div>
+          <div className="bg-green-50 p-4 rounded-lg">
+            <p className="font-semibold text-green-900 mb-2">3. Ley de Faraday</p>
+            <p className="text-gray-700">∮E·dl = -dΦ_B/dt</p>
+            <p className="text-xs text-gray-600 mt-1">Campo magnético variable genera campo eléctrico</p>
+          </div>
+          <div className="bg-purple-50 p-4 rounded-lg">
+            <p className="font-semibold text-purple-900 mb-2">4. Ley de Ampère-Maxwell</p>
+            <p className="text-gray-700">∮B·dl = μ₀(I + ε₀dΦ_E/dt)</p>
+            <p className="text-xs text-gray-600 mt-1">Corriente y campo eléctrico variable generan campo magnético</p>
+          </div>
+        </div>
+        <div className="mt-4 bg-yellow-50 p-4 rounded-lg border border-yellow-200">
+          <p className="text-sm text-gray-700">
+            <strong>Unificación:</strong> Estas cuatro ecuaciones unifican el campo eléctrico y magnético en el electromagnetismo. 
+            Predicen la existencia de ondas electromagnéticas que se propagan a la velocidad de la luz.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+export default ClassicalMechanicsApp;
