@@ -1,5 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { BookOpen, Calculator, Activity, Clock } from 'lucide-react';
+import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
+import { TrendingUp, Ruler, Pause, Play, RotateCcw } from 'lucide-react';
+import { Legend } from 'recharts';
 
 function GravitacionSimulation() {
   const canvasRef = useRef(null);
@@ -856,171 +859,355 @@ function ConservacionCalculator() {
   );
 }
 
+const simTypeNombres = {
+  pendulo: 'Péndulo Simple',
+  resorte: 'Masa-Resorte (Horizontal)',
+  caida: 'Caída Libre'
+};
+
+// Constante de gravedad
+const G = 9.81;
+
 function ConservacionSimulation() {
   const canvasRef = useRef(null);
   const [isRunning, setIsRunning] = useState(false);
-  const [simType, setSimType] = useState('pendulo');
-  const [params, setParams] = useState({ h: 5, k: 50, m: 2 });
+  const [simType, setSimType] = useState('pendulo'); // Iniciar en péndulo
+  const [compareMode, setCompareMode] = useState(false);
+  const [showProblem, setShowProblem] = useState(false);
+  const [showSolution, setShowSolution] = useState(false);
+  
+  // Parámetros unificados para todos los modos
+  const [params, setParams] = useState({ 
+    // Comunes
+    masa: 2, 
+    tiempoMax: 10,
+    escalaX: 50, // px por metro
+    escalaY: 50,  // px por metro
+    // Péndulo
+    longitud: 2, // metros
+    theta0: 30, // grados
+    // Resorte
+    constanteK: 50, // N/m
+    amplitud: 0.5, // metros
+    // Caída
+    h0: 10, // metros
+    v0: 0, // m/s
+  });
+  
+  const [params2, setParams2] = useState({ 
+    masa: 4, 
+    tiempoMax: 10,
+    escalaX: 50, 
+    escalaY: 50,
+    longitud: 1.5, 
+    theta0: 45, 
+    constanteK: 25, 
+    amplitud: 0.8, 
+    h0: 8, 
+    v0: 2,
+  });
+  
+  const [graphData, setGraphData] = useState([]);
+  const [problemaActual, setProblemaActual] = useState(0);
   const animationRef = useRef(null);
   const timeRef = useRef(0);
+  const trajectoryRef = useRef([]);
+  const trajectoryRef2 = useRef([]);
 
+  // --- CÁLCULOS Y PROBLEMAS ---
+  
+  const calcularPredicciones = (p) => {
+    if (simType === 'pendulo') {
+      const omega = Math.sqrt(G / p.longitud);
+      const T = (2 * Math.PI) / omega;
+      const theta0_rad = (p.theta0 * Math.PI) / 180;
+      // h_max = L * (1 - cos(theta_max))
+      const h_max = p.longitud * (1 - Math.cos(theta0_rad));
+      const E_Total = p.masa * G * h_max;
+      const v_max = Math.sqrt(2 * G * h_max); // En el punto más bajo
+      
+      return {
+        energiaTotal: E_Total.toFixed(2),
+        periodo: T.toFixed(2),
+        alturaMaxima: h_max.toFixed(2),
+        velocidadMaxima: v_max.toFixed(2),
+      };
+    } else if (simType === 'resorte') {
+      const omega = Math.sqrt(p.constanteK / p.masa);
+      const T = (2 * Math.PI) / omega;
+      const E_Total = 0.5 * p.constanteK * p.amplitud * p.amplitud;
+      const v_max = p.amplitud * omega; // En x=0
+      
+      return {
+        energiaTotal: E_Total.toFixed(2),
+        periodo: T.toFixed(2),
+        velocidadMaxima: v_max.toFixed(2),
+        fuerzaMaxima: (p.constanteK * p.amplitud).toFixed(2)
+      };
+    } else if (simType === 'caida') {
+      const K_i = 0.5 * p.masa * p.v0 * p.v0;
+      const U_i = p.masa * G * p.h0;
+      const E_Total = K_i + U_i;
+      const v_f = Math.sqrt(p.v0*p.v0 + 2*G*p.h0);
+      const t_vuelo = (v_f - p.v0) / G;
+      
+      return {
+        energiaTotal: E_Total.toFixed(2),
+        energiaPotencialInicial: U_i.toFixed(2),
+        energiaCineticaInicial: K_i.toFixed(2),
+        velocidadImpacto: v_f.toFixed(2),
+        tiempoCaida: t_vuelo.toFixed(2)
+      };
+    }
+    return {};
+  };
+
+  const predicciones = calcularPredicciones(params);
+
+  const problemas = {
+    pendulo: [
+      {
+        enunciado: `Un péndulo de ${params.masa} kg y ${params.longitud} m se suelta desde ${params.theta0}°. ¿Cuál es su energía mecánica total?`,
+        solucion: `h_max = L·(1 - cos(θ)) = ${params.longitud}·(1 - cos(${params.theta0}°)) = ${predicciones.alturaMaxima} m\nE_Total = U_max = m·g·h_max = ${params.masa}·9.81·${predicciones.alturaMaxima} = ${predicciones.energiaTotal} J`
+      },
+      {
+        enunciado: `¿Cuál es la velocidad máxima (en m/s) del péndulo, que ocurre en el punto más bajo (h=0)?`,
+        solucion: `E_Total = K_max = ½·m·v_max²\n${predicciones.energiaTotal} = 0.5·${params.masa}·v_max²\nv_max = √(2·${predicciones.energiaTotal} / ${params.masa}) = ${predicciones.velocidadMaxima} m/s`
+      },
+      {
+        enunciado: `¿Cuál es el período de oscilación (T) del péndulo (usando la aprox. de ángulo pequeño)?`,
+        solucion: `T = 2π·√(L/g)\nT = 2π·√(${params.longitud} / 9.81) = ${predicciones.periodo} s`
+      }
+    ],
+    resorte: [
+      {
+        enunciado: `Un bloque de ${params.masa} kg unido a un resorte (k=${params.constanteK} N/m) se estira ${params.amplitud} m y se suelta. ¿Cuál es la energía total?`,
+        solucion: `E_Total = U_max = ½·k·A²\nE_Total = 0.5·${params.constanteK}·${params.amplitud}² = ${predicciones.energiaTotal} J`
+      },
+      {
+        enunciado: `¿Cuál es la velocidad máxima (en m/s) del bloque, que ocurre en la posición de equilibrio (x=0)?`,
+        solucion: `E_Total = K_max = ½·m·v_max²\n${predicciones.energiaTotal} = 0.5·${params.masa}·v_max²\nv_max = √(2·${predicciones.energiaTotal} / ${params.masa}) = ${predicciones.velocidadMaxima} m/s`
+      },
+      {
+        enunciado: `¿Cuál es el período de oscilación (T) del sistema?`,
+        solucion: `T = 2π·√(m/k)\nT = 2π·√(${params.masa} / ${params.constanteK}) = ${predicciones.periodo} s`
+      }
+    ],
+    caida: [
+      {
+        enunciado: `Un objeto de ${params.masa} kg se suelta desde ${params.h0} m (v₀=${params.v0} m/s). ¿Cuál es su energía mecánica total?`,
+        solucion: `E_Total = K_i + U_i\nK_i = ½·${params.masa}·${params.v0}² = ${predicciones.energiaCineticaInicial} J\nU_i = ${params.masa}·g·${params.h0} = ${predicciones.energiaPotencialInicial} J\nE_Total = ${predicciones.energiaCineticaInicial} + ${predicciones.energiaPotencialInicial} = ${predicciones.energiaTotal} J`
+      },
+      {
+        enunciado: `¿Con qué velocidad (en m/s) golpeará el suelo el objeto?`,
+        solucion: `En h=0, U_f = 0. E_Total = K_f = ${predicciones.energiaTotal} J\nv_f = √(2·K_f / m) = √(2·${predicciones.energiaTotal} / ${params.masa}) = ${predicciones.velocidadImpacto} m/s`
+      },
+      {
+        enunciado: `¿Cuánto tiempo tardará en caer?`,
+        solucion: `Usando v_f = v₀ + g·t\nt = (v_f - v₀) / g = (${predicciones.velocidadImpacto} - ${params.v0}) / 9.81 = ${predicciones.tiempoCaida} s`
+      }
+    ]
+  };
+
+  // --- EFECTO DE ANIMACIÓN ---
+  
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
+    
+    // Limpia el canvas si no está corriendo
+    if (!isRunning) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        // Podríamos dibujar el estado inicial estático aquí
+        return;
+    }
 
     if (isRunning) {
       timeRef.current = 0;
+      trajectoryRef.current = [];
+      trajectoryRef2.current = [];
+      setGraphData([]);
       
       const animate = () => {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
+        const canvasHeight = compareMode ? canvas.height / 2 : canvas.height;
         
-        const t = timeRef.current;
-        let shouldContinue = true;
+        const drawSimulation = (p, yOffset, traj, color) => {
+          const t = timeRef.current;
+          let x_canvas = 0, y_canvas = 0;
+          let K = 0, U = 0, E_Total = 0;
+          let shouldContinue = true;
 
-        if (simType === 'pendulo') {
-          const L = 150;
-          const g = 9.81;
-          const theta0 = (params.h / L) * 2;
-          const omega = Math.sqrt(g / L);
-          const theta = theta0 * Math.cos(omega * t);
-          
-          const pivotX = canvas.width / 2;
-          const pivotY = 100;
-          const bobX = pivotX + L * Math.sin(theta);
-          const bobY = pivotY + L * Math.cos(theta);
-          
-          ctx.strokeStyle = '#6b7280';
-          ctx.lineWidth = 2;
-          ctx.beginPath();
-          ctx.moveTo(pivotX, pivotY);
-          ctx.lineTo(bobX, bobY);
-          ctx.stroke();
-          
-          ctx.fillStyle = '#374151';
-          ctx.beginPath();
-          ctx.arc(pivotX, pivotY, 8, 0, 2 * Math.PI);
-          ctx.fill();
-          
-          ctx.fillStyle = '#3b82f6';
-          ctx.beginPath();
-          ctx.arc(bobX, bobY, 20, 0, 2 * Math.PI);
-          ctx.fill();
-          
-          const h = L * (1 - Math.cos(theta));
-          const v = L * omega * theta0 * Math.sin(omega * t);
-          const U = params.m * g * h;
-          const K = 0.5 * params.m * Math.pow(v, 2);
-          const E = U + K;
-          
-          ctx.fillStyle = '#1f2937';
-          ctx.font = '14px Arial';
-          ctx.fillText('Energía Potencial: ' + U.toFixed(2) + ' J', 10, 20);
-          ctx.fillText('Energía Cinética: ' + K.toFixed(2) + ' J', 10, 40);
-          ctx.fillText('Energía Total: ' + E.toFixed(2) + ' J', 10, 60);
-          ctx.fillText('Altura: ' + h.toFixed(2) + ' m', 10, 80);
-          
-          ctx.strokeStyle = '#d1d5db';
-          ctx.setLineDash([5, 5]);
-          ctx.beginPath();
-          ctx.moveTo(0, pivotY + L);
-          ctx.lineTo(canvas.width, pivotY + L);
-          ctx.stroke();
-          ctx.setLineDash([]);
-          
-          if (t > 15) shouldContinue = false;
-          
-        } else if (simType === 'resorte') {
-          const centerY = canvas.height / 2;
-          const A = params.h * 20;
-          const omega = Math.sqrt(params.k / params.m);
-          const x = A * Math.cos(omega * t);
-          
-          const blockX = canvas.width / 2 + x;
-          
-          ctx.strokeStyle = '#6b7280';
-          ctx.lineWidth = 3;
-          ctx.beginPath();
-          ctx.moveTo(50, centerY);
-          
-          const coils = 15;
-          const coilWidth = (blockX - 50) / coils;
-          for (let i = 0; i < coils; i++) {
-            const x1 = 50 + i * coilWidth;
-            const x2 = 50 + (i + 0.5) * coilWidth;
-            const x3 = 50 + (i + 1) * coilWidth;
-            ctx.lineTo(x1, centerY);
-            ctx.lineTo(x2, centerY - 10);
-            ctx.lineTo(x3, centerY);
+          // --- Dibujar Cuadrícula y Suelo/Pared ---
+          ctx.strokeStyle = '#e5e7eb';
+          ctx.lineWidth = 1;
+          for (let i = 0; i < canvas.width; i += 50) { // Vertical
+            ctx.beginPath(); ctx.moveTo(i, yOffset); ctx.lineTo(i, yOffset + canvasHeight); ctx.stroke();
           }
-          ctx.stroke();
-          
-          ctx.fillStyle = '#3b82f6';
-          ctx.fillRect(blockX - 20, centerY - 20, 40, 40);
-          
-          const v = -A * omega * Math.sin(omega * t);
-          const K = 0.5 * params.m * Math.pow(v, 2);
-          const U = 0.5 * params.k * Math.pow(x / 100, 2);
-          const E = K + U;
-          
-          ctx.fillStyle = '#1f2937';
-          ctx.font = '14px Arial';
-          ctx.fillText('Energía Cinética: ' + K.toFixed(2) + ' J', 10, 20);
-          ctx.fillText('Energía Elástica: ' + U.toFixed(2) + ' J', 10, 40);
-          ctx.fillText('Energía Total: ' + E.toFixed(2) + ' J', 10, 60);
-          ctx.fillText('Deformación: ' + (x / 100).toFixed(3) + ' m', 10, 80);
-          
-          if (t > 10) shouldContinue = false;
-          
-        } else if (simType === 'caida') {
-          const g = 9.81;
-          const h0 = params.h * 30;
-          const y0 = 100;
-          const h = h0 - 0.5 * g * t * t * 30;
-          
-          if (h > 0) {
-            const ballY = y0 + (h0 - h);
+          const sueloY = yOffset + canvasHeight / 2 + 100; // Suelo para Caída
+          const paredX = 150; // Pared para Resorte
+
+          if (simType === 'pendulo') {
+            const pivotX = canvas.width / 2;
+            const pivotY = yOffset + 100;
+            const L_pixels = p.longitud * p.escalaY;
             
-            ctx.strokeStyle = '#d1d5db';
-            ctx.setLineDash([5, 5]);
-            ctx.beginPath();
-            ctx.moveTo(0, y0);
-            ctx.lineTo(canvas.width, y0);
+            const omega = Math.sqrt(G / p.longitud);
+            const theta0_rad = (p.theta0 * Math.PI) / 180;
+            // Usar la solución exacta (no aproximación de ángulo pequeño) para la física
+            // E = mgh_max = mgL(1-cos(theta0))
+            const E_T = p.masa * G * p.longitud * (1 - Math.cos(theta0_rad));
+            // E = K + U = 0.5*m*v^2 + mgh = 0.5*m*(L*theta_dot)^2 + mgL(1-cos(theta))
+            // theta_dot^2 = (2/mL^2) * (E - mgL(1-cos(theta)))
+            // Esta es una ecuación diferencial. La aprox. de ángulo pequeño es más fácil de animar:
+            const theta = theta0_rad * Math.cos(omega * t);
+            
+            const bobX = pivotX + L_pixels * Math.sin(theta);
+            const bobY = pivotY + L_pixels * Math.cos(theta);
+            
+            // Dibujar
+            ctx.strokeStyle = '#6b7280'; ctx.lineWidth = 2; // Cuerda
+            ctx.beginPath(); ctx.moveTo(pivotX, pivotY); ctx.lineTo(bobX, bobY); ctx.stroke();
+            ctx.fillStyle = '#374151'; ctx.beginPath(); // Pivote
+            ctx.arc(pivotX, pivotY, 8, 0, 2 * Math.PI); ctx.fill();
+            
+            x_canvas = bobX; y_canvas = bobY;
+            
+            // Física
+            const h_real = p.longitud * (1 - Math.cos(theta));
+            const v_real = -p.longitud * omega * theta0_rad * Math.sin(omega * t); // Aprox.
+            U = p.masa * G * h_real;
+            K = 0.5 * p.masa * v_real * v_real;
+            E_Total = K + U; // Debería ser ~constante (con aprox.)
+
+            if (t > p.tiempoMax) shouldContinue = false;
+
+          } else if (simType === 'resorte') {
+            const centerY = yOffset + canvasHeight / 2;
+            const A_pixels = p.amplitud * p.escalaX;
+            const omega = Math.sqrt(p.constanteK / p.masa);
+            const x_pixels = A_pixels * Math.cos(omega * t);
+            
+            const blockX = paredX + 100 + x_pixels; // 100 = long. natural del resorte (visual)
+            
+            // Dibujar Pared
+            ctx.strokeStyle = '#1f2937'; ctx.lineWidth = 4; ctx.beginPath();
+            ctx.moveTo(paredX, centerY - 50); ctx.lineTo(paredX, centerY + 50); ctx.stroke();
+            
+            // Dibujar Resorte
+            ctx.strokeStyle = '#6b7280'; ctx.lineWidth = 3; ctx.beginPath();
+            ctx.moveTo(paredX, centerY);
+            const coils = 15;
+            const coilWidth = (blockX - 20 - paredX) / coils; // -20 para el borde del bloque
+            for (let i = 0; i < coils; i++) {
+              ctx.lineTo(paredX + i * coilWidth + coilWidth / 2, centerY + (i % 2 === 0 ? -10 : 10));
+            }
+            ctx.lineTo(blockX - 20, centerY);
             ctx.stroke();
-            ctx.setLineDash([]);
+
+            x_canvas = blockX; y_canvas = centerY;
             
-            ctx.strokeStyle = '#d1d5db';
-            ctx.setLineDash([5, 5]);
+            // Dibujar Bloque
+            ctx.fillStyle = color;
+            ctx.fillRect(x_canvas - 20, y_canvas - 20, 40, 40);
+            
+            // Física
+            const x_real = p.amplitud * Math.cos(omega * t);
+            const v_real = -p.amplitud * omega * Math.sin(omega * t);
+            U = 0.5 * p.constanteK * x_real * x_real;
+            K = 0.5 * p.masa * v_real * v_real;
+            E_Total = K + U;
+            
+            // No dibujar el objeto genérico, ya dibujamos el bloque
+            traj.current.push({ x: x_canvas, y: y_canvas, K, U, E_Total });
+            if (t > p.tiempoMax) shouldContinue = false;
+            return { K, U, E_Total, shouldContinue }; // Retorno temprano para evitar doble dibujo
+            
+          } else if (simType === 'caida') {
+            // Dibujar Suelo
+            ctx.strokeStyle = '#1f2937'; ctx.lineWidth = 3; ctx.beginPath(); 
+            ctx.moveTo(0, sueloY); ctx.lineTo(canvas.width, sueloY); ctx.stroke();
+            
+            const v_y = p.v0 + G * t;
+            const y_real = p.h0 - (p.v0 * t + 0.5 * G * t * t); // h medida desde el suelo
+            
+            x_canvas = canvas.width / 2; // Caída vertical
+            y_canvas = sueloY - y_real * p.escalaY - 14; // -14 por radio
+            
+            if (y_real > 0) {
+              K = 0.5 * p.masa * v_y * v_y;
+              U = p.masa * G * y_real;
+              E_Total = K + U;
+            } else {
+              // Golpeó el suelo
+              const t_impacto = (Math.sqrt(p.v0*p.v0 + 2*G*p.h0) - p.v0) / G;
+              const v_impacto = p.v0 + G * t_impacto;
+              K = 0.5 * p.masa * v_impacto * v_impacto;
+              U = 0;
+              E_Total = K + U;
+              y_canvas = sueloY - 14; // Fijar al suelo
+              shouldContinue = false;
+            }
+            
+            if (t > p.tiempoMax) shouldContinue = false;
+          }
+
+          // --- Dibujar Objeto y Trayectoria (Péndulo y Caída) ---
+          traj.current.push({ x: x_canvas, y: y_canvas, K, U, E_Total });
+          
+          if (traj.current.length > 1 && simType !== 'resorte') {
+            ctx.strokeStyle = color === '#3b82f6' ? '#fbbf24' : '#ec4899';
+            ctx.lineWidth = 3;
             ctx.beginPath();
-            ctx.moveTo(0, y0 + h0);
-            ctx.lineTo(canvas.width, y0 + h0);
+            traj.current.forEach((point, i) => {
+              if (i === 0) ctx.moveTo(point.x, point.y);
+              else ctx.lineTo(point.x, point.y);
+            });
             ctx.stroke();
-            ctx.setLineDash([]);
-            
-            ctx.fillStyle = '#3b82f6';
+          }
+
+          // Objeto
+          if (simType !== 'resorte') {
+            ctx.fillStyle = color;
+            ctx.shadowColor = color;
+            ctx.shadowBlur = 20;
             ctx.beginPath();
-            ctx.arc(canvas.width / 2, ballY, 15, 0, 2 * Math.PI);
+            ctx.arc(x_canvas, y_canvas, 14, 0, 2 * Math.PI);
             ctx.fill();
-            
-            const hMeters = h / 30;
-            const v = g * t;
-            const U = params.m * g * hMeters;
-            const K = 0.5 * params.m * Math.pow(v, 2);
-            const E = U + K;
-            
-            ctx.fillStyle = '#1f2937';
-            ctx.font = '14px Arial';
-            ctx.fillText('Altura: ' + hMeters.toFixed(2) + ' m', 10, 20);
-            ctx.fillText('Velocidad: ' + v.toFixed(2) + ' m/s', 10, 40);
-            ctx.fillText('E. Potencial: ' + U.toFixed(2) + ' J', 10, 60);
-            ctx.fillText('E. Cinética: ' + K.toFixed(2) + ' J', 10, 80);
-            ctx.fillText('E. Total: ' + E.toFixed(2) + ' J', 10, 100);
-          } else {
-            shouldContinue = false;
+            ctx.shadowBlur = 0;
           }
+          
+          return { K, U, E_Total, shouldContinue };
+        };
+
+        // --- Bucle de Animación ---
+        const result1 = drawSimulation(params, 0, trajectoryRef, '#3b82f6');
+        let result2 = null;
+        
+        const canCompare = true; // Todos los modos son comparables
+        
+        if (compareMode && canCompare) {
+          ctx.strokeStyle = '#1f2937'; ctx.lineWidth = 4; ctx.beginPath();
+          ctx.moveTo(0, canvas.height / 2); ctx.lineTo(canvas.width, canvas.height / 2); ctx.stroke();
+          result2 = drawSimulation(params2, canvas.height / 2, trajectoryRef2, '#ec4899');
         }
 
-        timeRef.current += 0.05;
+        const t = timeRef.current;
+        timeRef.current += 0.05; // Incremento de tiempo
+
+        // Actualizar datos de gráficas (solo del Objeto 1)
+        setGraphData(prev => [...prev, {
+          tiempo: parseFloat(t.toFixed(2)),
+          energiaCinetica: parseFloat(result1.K.toFixed(2)),
+          energiaPotencial: parseFloat(result1.U.toFixed(2)),
+          energiaTotal: parseFloat(result1.E_Total.toFixed(2))
+        }]);
+
+        let shouldContinue = result1.shouldContinue;
+        if (compareMode && canCompare) {
+            shouldContinue = result1.shouldContinue || (result2 && result2.shouldContinue);
+        }
 
         if (shouldContinue) {
           animationRef.current = requestAnimationFrame(animate);
@@ -1037,75 +1224,297 @@ function ConservacionSimulation() {
         cancelAnimationFrame(animationRef.current);
       }
     };
-  }, [isRunning, simType, params]);
+  }, [isRunning, simType, params, params2, compareMode]);
 
-  return (
-    <div className="p-8 max-w-6xl mx-auto">
-      <h2 className="text-3xl font-bold text-gray-800 mb-6">Simulación de Conservación de Energía</h2>
+  const resetSimulation = () => {
+    setIsRunning(false);
+    timeRef.current = 0;
+    trajectoryRef.current = [];
+    trajectoryRef2.current = [];
+    setGraphData([]);
+  };
+  
+  // --- Componente de Gráfica ---
+  const Grafica = ({ dataKey, color, unit }) => (
+    <div className="bg-white p-4 rounded-lg shadow-md h-64">
+      <h4 className="font-bold text-gray-700 text-sm mb-2 capitalize">{dataKey.replace(/([A-Z])/g, ' $1')} vs. Tiempo</h4>
+      <ResponsiveContainer width="100%" height="100%">
+        <LineChart data={graphData} margin={{ top: 5, right: 20, left: -5, bottom: 20 }}>
+          <CartesianGrid strokeDasharray="3 3" />
+          <XAxis 
+            dataKey="tiempo" 
+            label={{ value: "Tiempo (s)", position: 'insideBottom', offset: -10 }} 
+            tick={{ fontSize: 10 }}
+          />
+          <YAxis 
+            label={{ value: unit, angle: -90, position: 'insideLeft', offset: 5 }}
+            tick={{ fontSize: 10 }}
+            domain={['auto', 'auto']}
+          />
+          <Tooltip 
+            formatter={(value) => [`${value} ${unit}`, dataKey.replace(/([A-Z])/g, ' $1')]}
+            labelFormatter={(label) => `Tiempo: ${label} s`}
+          />
+          <Legend verticalAlign="top" height={36}/>
+          <Line 
+            type="monotone" 
+            dataKey={dataKey} 
+            stroke={color} 
+            strokeWidth={2} 
+            dot={false} 
+            isAnimationActive={false}
+          />
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+  );
 
-      <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6">
-        <p className="text-sm text-gray-700">Observa cómo se conserva la energía en diferentes sistemas.</p>
-      </div>
+  // --- Inputs Dinámicos ---
+  const renderInputs = (p, setP) => {
+    const isP1 = p === params;
 
-      <div className="mb-6">
-        <label className="block text-sm font-semibold text-gray-700 mb-2">Tipo de Sistema</label>
-        <select value={simType} onChange={(e) => { setSimType(e.target.value); setIsRunning(false); }} className="w-full p-3 border border-gray-300 rounded-lg">
-          <option value="pendulo">Péndulo Simple</option>
-          <option value="resorte">Sistema Masa-Resorte</option>
-          <option value="caida">Caída Libre</option>
-        </select>
-      </div>
+    return (
+      <>
+        <div className="mb-3">
+          <label className="block text-xs font-medium text-gray-700 mb-1">Masa (kg)</label>
+          <input type="number" step="0.5" value={p.masa} onChange={(e) => setP({...p, masa: Number(e.target.value)})} className="w-full p-2 border-2 border-gray-300 rounded-lg text-sm" disabled={isRunning} />
+        </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         {simType === 'pendulo' && (
           <>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Amplitud: {params.h}</label>
-              <input type="range" min="1" max="10" value={params.h} onChange={(e) => setParams({...params, h: Number(e.target.value)})} className="w-full" disabled={isRunning} />
+            <div className="mb-3">
+              <label className="block text-xs font-medium text-gray-700 mb-1">Longitud (m)</label>
+              <input type="number" step="0.1" value={p.longitud} onChange={(e) => setP({...p, longitud: Number(e.target.value)})} className="w-full p-2 border-2 border-gray-300 rounded-lg text-sm" disabled={isRunning} />
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Masa: {params.m} kg</label>
-              <input type="range" min="1" max="10" value={params.m} onChange={(e) => setParams({...params, m: Number(e.target.value)})} className="w-full" disabled={isRunning} />
+            <div className="mb-3">
+              <label className="block text-xs font-medium text-gray-700 mb-1">Ángulo Inicial (°)</label>
+              <input type="number" step="5" value={p.theta0} onChange={(e) => setP({...p, theta0: Number(e.target.value)})} className="w-full p-2 border-2 border-gray-300 rounded-lg text-sm" disabled={isRunning} />
             </div>
           </>
         )}
+
         {simType === 'resorte' && (
           <>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Amplitud: {params.h}</label>
-              <input type="range" min="1" max="10" value={params.h} onChange={(e) => setParams({...params, h: Number(e.target.value)})} className="w-full" disabled={isRunning} />
+            <div className="mb-3">
+              <label className="block text-xs font-medium text-gray-700 mb-1">Constante k (N/m)</label>
+              <input type="number" step="5" value={p.constanteK} onChange={(e) => setP({...p, constanteK: Number(e.target.value)})} className="w-full p-2 border-2 border-gray-300 rounded-lg text-sm" disabled={isRunning} />
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Constante k: {params.k} N/m</label>
-              <input type="range" min="10" max="100" value={params.k} onChange={(e) => setParams({...params, k: Number(e.target.value)})} className="w-full" disabled={isRunning} />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Masa: {params.m} kg</label>
-              <input type="range" min="1" max="10" value={params.m} onChange={(e) => setParams({...params, m: Number(e.target.value)})} className="w-full" disabled={isRunning} />
+            <div className="mb-3">
+              <label className="block text-xs font-medium text-gray-700 mb-1">Amplitud (m)</label>
+              <input type="number" step="0.1" value={p.amplitud} onChange={(e) => setP({...p, amplitud: Number(e.target.value)})} className="w-full p-2 border-2 border-gray-300 rounded-lg text-sm" disabled={isRunning} />
             </div>
           </>
         )}
+        
         {simType === 'caida' && (
           <>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Altura inicial: {params.h} m</label>
-              <input type="range" min="2" max="10" value={params.h} onChange={(e) => setParams({...params, h: Number(e.target.value)})} className="w-full" disabled={isRunning} />
+            <div className="mb-3">
+              <label className="block text-xs font-medium text-gray-700 mb-1">Altura Inicial (m)</label>
+              <input type="number" step="1" value={p.h0} onChange={(e) => setP({...p, h0: Number(e.target.value)})} className="w-full p-2 border-2 border-gray-300 rounded-lg text-sm" disabled={isRunning} />
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Masa: {params.m} kg</label>
-              <input type="range" min="1" max="10" value={params.m} onChange={(e) => setParams({...params, m: Number(e.target.value)})} className="w-full" disabled={isRunning} />
+            <div className="mb-3">
+              <label className="block text-xs font-medium text-gray-700 mb-1">Vel. Inicial (m/s)</label>
+              <input type="number" step="1" value={p.v0} onChange={(e) => setP({...p, v0: Number(e.target.value)})} className="w-full p-2 border-2 border-gray-300 rounded-lg text-sm" disabled={isRunning} />
             </div>
           </>
         )}
-        <div className="flex items-end">
-          <button onClick={() => setIsRunning(!isRunning)} className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors">
-            {isRunning ? 'Detener' : 'Iniciar'}
+
+        {isP1 && (
+          <>
+            <div className="mb-3">
+              <label className="block text-xs font-medium text-gray-700 mb-1">Escala X (px/m)</label>
+              <input type="number" value={p.escalaX} onChange={(e) => setP({...p, escalaX: Number(e.target.value)})} className="w-full p-2 border-2 border-gray-300 rounded-lg text-sm" disabled={isRunning} />
+            </div>
+            <div className="mb-3">
+              <label className="block text-xs font-medium text-gray-700 mb-1">Escala Y (px/m)</label>
+              <input type="number" value={p.escalaY} onChange={(e) => setP({...p, escalaY: Number(e.target.value)})} className="w-full p-2 border-2 border-gray-300 rounded-lg text-sm" disabled={isRunning} />
+            </div>
+            <div className="mb-3">
+              <label className="block text-xs font-medium text-gray-700 mb-1">Tiempo máx (s)</label>
+              <input type="number" value={p.tiempoMax} onChange={(e) => setP({...p, tiempoMax: Number(e.target.value)})} className="w-full p-2 border-2 border-gray-300 rounded-lg text-sm" disabled={isRunning} />
+            </div>
+          </>
+        )}
+      </>
+    );
+  };
+
+  const canCompare = true; // Todos los modos son comparables
+
+  // --- RENDER ---
+  return (
+    <div className="p-6 max-w-[1900px] mx-auto bg-gradient-to-br from-blue-50 to-indigo-50 min-h-screen">
+      <div className="flex justify-between items-center mb-4">
+        <div>
+          <h2 className="text-4xl font-bold text-gray-800 mb-1">Simulación de Conservación de Energía</h2>
+          <p className="text-gray-600">Gráficas en tiempo real • Comparación • Análisis predictivo</p>
+        </div>
+        <div className="flex gap-2">
+          <button 
+            onClick={() => { setCompareMode(!compareMode); resetSimulation(); }}
+            className={`px-4 py-2 rounded-lg font-semibold transition-all ${
+              compareMode ? 'bg-purple-600 text-white shadow-lg' : 'bg-white border-2 border-purple-600 text-purple-600'
+            } ${canCompare ? '' : 'opacity-50 cursor-not-allowed'}`}
+            disabled={!canCompare}
+          >
+            {compareMode ? '✓ Comparando' : '⚖️ Comparar'}
+          </button>
+          <button 
+            onClick={() => { setShowProblem(!showProblem); setShowSolution(false); }}
+            className="px-4 py-2 bg-orange-500 text-white rounded-lg font-semibold hover:bg-orange-600 transition-all"
+          >
+            {showProblem ? 'Ocultar' : '📝 Problema'}
           </button>
         </div>
       </div>
 
-      <div className="bg-white border-2 border-gray-300 rounded-lg overflow-hidden">
-        <canvas ref={canvasRef} width={800} height={400} className="w-full" />
+      {showProblem && (
+        <div className="bg-orange-50 border-l-4 border-orange-500 p-5 mb-4 rounded-lg shadow-md">
+          <div className="flex justify-between items-start mb-3">
+            <h3 className="font-bold text-orange-800 text-lg">📚 Problema {problemaActual + 1} de 3: {simTypeNombres[simType]}</h3>
+            <div className="flex gap-2">
+              <button 
+                onClick={() => setProblemaActual((problemaActual - 1 + 3) % 3)}
+                className="bg-orange-400 text-white px-3 py-1 rounded-lg text-sm font-semibold hover:bg-orange-500"
+              >
+                ◀ Anterior
+              </button>
+              <button 
+                onClick={() => setProblemaActual((problemaActual + 1) % 3)}
+                className="bg-orange-400 text-white px-3 py-1 rounded-lg text-sm font-semibold hover:bg-orange-500"
+              >
+                Siguiente ▶
+              </button>
+            </div>
+          </div>
+          <p className="text-gray-800 mb-3 font-medium">{problemas[simType][problemaActual].enunciado}</p>
+          <div className="flex gap-2">
+            <button 
+              onClick={() => setShowSolution(!showSolution)}
+              className="bg-orange-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-orange-700"
+            >
+              {showSolution ? '🔒 Ocultar Solución' : '💡 Ver Solución'}
+            </button>
+            <button 
+              onClick={() => setIsRunning(true)}
+              className="bg-blue-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-blue-700"
+            >
+              ▶ Simular Problema
+            </button>
+          </div>
+          {showSolution && (
+            <div className="mt-4 bg-white p-4 rounded-lg border-2 border-orange-300">
+              <h4 className="font-bold text-gray-700 mb-2">✅ Solución:</h4>
+              <pre className="text-gray-800 font-mono text-sm whitespace-pre-wrap">{problemas[simType][problemaActual].solucion}</pre>
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 xl:grid-cols-5 gap-4">
+        {/* Panel de controles */}
+        <div className="xl:col-span-1 space-y-4">
+          <div className="bg-white p-4 rounded-lg shadow-md">
+            <label className="block text-sm font-bold text-gray-700 mb-2">Sistema Físico</label>
+            <select 
+              value={simType} 
+              onChange={(e) => { setSimType(e.target.value); resetSimulation(); setProblemaActual(0); }} 
+              className="w-full p-2 border-2 border-gray-300 rounded-lg"
+            >
+              {Object.keys(simTypeNombres).map(key => (
+                <option key={key} value={key}>{simTypeNombres[key]}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="bg-white p-4 rounded-lg shadow-md border-l-4 border-blue-500">
+            <h3 className="font-bold text-blue-700 mb-3">🔵 Objeto 1</h3>
+            {renderInputs(params, setParams)}
+          </div>
+
+          {compareMode && canCompare && (
+            <div className="bg-white p-4 rounded-lg shadow-md border-l-4 border-pink-500">
+              <h3 className="font-bold text-pink-700 mb-3">🔴 Objeto 2</h3>
+              {renderInputs(params2, setParams2)}
+            </div>
+          )}
+
+          <div className="bg-gradient-to-br from-green-50 to-blue-50 p-4 rounded-lg shadow-md border-2 border-green-400">
+            <h3 className="font-bold text-green-800 mb-2 text-sm">📊 Cálculos Predictivos (Objeto 1)</h3>
+            <div className="text-xs space-y-1 text-gray-700">
+              {simType === 'pendulo' && (
+                <>
+                  <p><strong>E. Total:</strong> {predicciones.energiaTotal} J</p>
+                  <p><strong>Período:</strong> {predicciones.periodo} s</p>
+                  <p><strong>Vel. Máxima:</strong> {predicciones.velocidadMaxima} m/s</p>
+                </>
+              )}
+              {simType === 'resorte' && (
+                 <>
+                  <p><strong>E. Total:</strong> {predicciones.energiaTotal} J</p>
+                  <p><strong>Período:</strong> {predicciones.periodo} s</p>
+                  <p><strong>Vel. Máxima:</strong> {predicciones.velocidadMaxima} m/s</p>
+                </>
+              )}
+              {simType === 'caida' && (
+                <>
+                  <p><strong>E. Total:</strong> {predicciones.energiaTotal} J</p>
+                  <p><strong>V. Impacto:</strong> {predicciones.velocidadImpacto} m/s</p>
+                  <p><strong>T. Caída:</strong> {predicciones.tiempoCaida} s</p>
+                </>
+              )}
+            </div>
+          </div>
+
+          <div className="flex gap-2">
+            <button 
+              onClick={() => setIsRunning(!isRunning)} 
+              className={`flex-1 py-3 rounded-lg font-bold transition-all ${
+                isRunning 
+                  ? 'bg-red-500 hover:bg-red-600 text-white shadow-lg' 
+                  : 'bg-blue-600 hover:bg-blue-700 text-white shadow-lg'
+              }`}
+            >
+              {isRunning ? '⏸ Pausar' : '▶ Iniciar'}
+            </button>
+            <button 
+              onClick={resetSimulation} 
+              className="flex-1 bg-gray-500 hover:bg-gray-600 text-white py-3 rounded-lg font-bold transition-all shadow-lg"
+            >
+              🔄 Reiniciar
+            </button>
+          </div>
+        </div>
+
+        {/* Canvas y Gráficas */}
+        <div className="xl:col-span-4 space-y-4">
+          <div className="bg-white border-4 border-gray-300 rounded-lg overflow-hidden shadow-lg">
+            <canvas ref={canvasRef} width={1100} height={compareMode && canCompare ? 600 : 500} className="w-full" />
+          </div>
+
+          {/* Gráficas en tiempo real */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            
+            <Grafica 
+              dataKey="energiaCinetica" 
+              color="#10b981" 
+              unit="Joules" 
+            />
+            
+            <Grafica 
+              dataKey="energiaPotencial" 
+              color="#3b82f6" 
+              unit="Joules" 
+            />
+            
+            <Grafica 
+              dataKey="energiaTotal" 
+              color="#ef4444" 
+              unit="Joules" 
+            />
+            
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -1122,75 +1531,237 @@ function MomentumCalculador() {
   );
 }
 
+const simTypeNombresColision = {
+  elastica: 'Colisión Elástica',
+  inelastica: 'Colisión Perfectamente Inelástica'
+};
+
 function MomentumSimulation() {
   const canvasRef = useRef(null);
   const [isRunning, setIsRunning] = useState(false);
   const [simType, setSimType] = useState('elastica');
-  const [params, setParams] = useState({ m1: 5, m2: 5, v1: 8, v2: 0 });
+  const [compareMode, setCompareMode] = useState(false);
+  const [showProblem, setShowProblem] = useState(false);
+  const [showSolution, setShowSolution] = useState(false);
+  
+  // Parámetros unificados para todos los modos
+  const [params, setParams] = useState({ 
+    m1: 5, 
+    v1: 8,
+    m2: 5, 
+    v2: 0,
+    tiempoMax: 5,
+    escalaX: 30, // px por metro
+  });
+  
+  const [params2, setParams2] = useState({ 
+    m1: 10, 
+    v1: 5,
+    m2: 5, 
+    v2: -2,
+    tiempoMax: 5,
+    escalaX: 30,
+  });
+  
+  const [graphData, setGraphData] = useState([]);
+  const [problemaActual, setProblemaActual] = useState(0);
   const animationRef = useRef(null);
-  const pos1Ref = useRef(100);
-  const pos2Ref = useRef(500);
-  const vel1Ref = useRef(0);
-  const vel2Ref = useRef(0);
-  const collisionRef = useRef(false);
+  const timeRef = useRef(0);
+  
+  // Refs para el estado de la física (para CADA simulación)
+  const phyState1 = useRef({ pos1: 0, pos2: 0, vel1: 0, vel2: 0, collision: false });
+  const phyState2 = useRef({ pos1: 0, pos2: 0, vel1: 0, vel2: 0, collision: false });
 
+  // --- CÁLCULOS Y PROBLEMAS ---
+  
+  const calcularPredicciones = (p) => {
+    const { m1, v1, m2, v2 } = p;
+    const p_inicial = m1 * v1 + m2 * v2;
+    const k_inicial = 0.5 * m1 * v1**2 + 0.5 * m2 * v2**2;
+    
+    let v1f, v2f;
+
+    if (simType === 'elastica') {
+      v1f = ((m1 - m2) * v1 + 2 * m2 * v2) / (m1 + m2);
+      v2f = ((m2 - m1) * v2 + 2 * m1 * v1) / (m1 + m2);
+    } else { // 'inelastica'
+      v1f = (m1 * v1 + m2 * v2) / (m1 + m2);
+      v2f = v1f;
+    }
+
+    const p_final = m1 * v1f + m2 * v2f;
+    const k_final = 0.5 * m1 * v1f**2 + 0.5 * m2 * v2f**2;
+
+    return {
+      p_inicial: p_inicial.toFixed(2),
+      k_inicial: k_inicial.toFixed(2),
+      v1f: v1f.toFixed(2),
+      v2f: v2f.toFixed(2),
+      p_final: p_final.toFixed(2),
+      k_final: k_final.toFixed(2),
+      k_perdida: (k_inicial - k_final).toFixed(2)
+    };
+  };
+
+  const predicciones = calcularPredicciones(params);
+
+  const problemas = {
+    elastica: [
+      {
+        enunciado: `Masa 1 (${params.m1} kg) a ${params.v1} m/s choca elásticamente con Masa 2 (${params.m2} kg) a ${params.v2} m/s. ¿Cuáles son las velocidades finales?`,
+        solucion: `v1f = ((m1-m2)v1 + 2m2·v2)/(m1+m2) = ${predicciones.v1f} m/s\nv2f = ((m2-m1)v2 + 2m1·v1)/(m1+m2) = ${predicciones.v2f} m/s`
+      },
+      {
+        enunciado: `Para la colisión anterior, ¿cuál es el momentum (P) total antes y después?`,
+        solucion: `P_inicial = m1·v1 + m2·v2 = ${params.m1}·${params.v1} + ${params.m2}·${params.v2} = ${predicciones.p_inicial} kg·m/s\nP_final = m1·v1f + m2·v2f = ${params.m1}·${predicciones.v1f} + ${params.m2}·${predicciones.v2f} = ${predicciones.p_final} kg·m/s\n(Se conserva)`
+      },
+      {
+        enunciado: `¿Cuál es la energía cinética (K) total antes y después de esta colisión elástica?`,
+        solucion: `K_inicial = ½m1·v1² + ½m2·v2² = ${predicciones.k_inicial} J\nK_final = ½m1·v1f² + ½m2·v2f² = ${predicciones.k_final} J\n(Se conserva)`
+      }
+    ],
+    inelastica: [
+      {
+        enunciado: `Masa 1 (${params.m1} kg) a ${params.v1} m/s choca y se pega (inelástica) con Masa 2 (${params.m2} kg) a ${params.v2} m/s. ¿Cuál es la velocidad final?`,
+        solucion: `v_final = (m1·v1 + m2·v2)/(m1+m2)\nv_final = (${params.m1}·${params.v1} + ${params.m2}·${params.v2}) / (${params.m1}+${params.m2}) = ${predicciones.v1f} m/s`
+      },
+      {
+        enunciado: `Para la colisión inelástica, ¿cuál es el momentum (P) total antes y después?`,
+        solucion: `P_inicial = ${predicciones.p_inicial} kg·m/s\nP_final = (m1+m2)·vf = (${params.m1}+${params.m2})·${predicciones.v1f} = ${predicciones.p_final} kg·m/s\n(Se conserva)`
+      },
+      {
+        enunciado: `¿Cuánta energía cinética (K) se perdió en esta colisión inelástica?`,
+        solucion: `K_inicial = ${predicciones.k_inicial} J\nK_final = ½(m1+m2)·vf² = 0.5·(${params.m1}+${params.m2})·${predicciones.v1f}² = ${predicciones.k_final} J\nK_perdida = K_i - K_f = ${predicciones.k_perdida} J`
+      }
+    ]
+  };
+
+  // --- EFECTO DE ANIMACIÓN ---
+  
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
+    
+    if (!isRunning) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        // Dibujar estado inicial estático
+        const yOffset = 0;
+        const canvasHeight = canvas.height;
+        const sueloY = yOffset + canvasHeight - 50;
+        ctx.fillStyle = '#374151'; // Suelo
+        ctx.fillRect(0, sueloY, canvas.width, 50);
+        return;
+    }
 
     if (isRunning) {
-      pos1Ref.current = 100;
-      pos2Ref.current = 500;
-      vel1Ref.current = params.v1;
-      vel2Ref.current = params.v2;
-      collisionRef.current = false;
+      // Reiniciar estado de física
+      phyState1.current = { pos1_px: 150, pos2_px: 550, vel1_ms: params.v1, vel2_ms: params.v2, collision: false };
+      phyState2.current = { pos1_px: 150, pos2_px: 550, vel1_ms: params2.v1, vel2_ms: params2.v2, collision: false };
+      
+      timeRef.current = 0;
+      setGraphData([]);
       
       const animate = () => {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
+        const canvasHeight = compareMode ? canvas.height / 2 : canvas.height;
+        const dt = 0.016; // Asumir 60fps (16ms)
         
-        ctx.fillStyle = '#374151';
-        ctx.fillRect(0, canvas.height - 50, canvas.width, 50);
-        
-        if (!collisionRef.current && pos1Ref.current + 30 >= pos2Ref.current - 30) {
-          collisionRef.current = true;
+        const drawSimulation = (p, yOffset, phyState, color) => {
+          const { m1, m2, escalaX } = p;
+          const state = phyState.current; // Acceso directo al ref
+
+          // --- Dibujar Suelo ---
+          const sueloY = yOffset + canvasHeight - 50;
+          ctx.fillStyle = '#374151';
+          ctx.fillRect(0, sueloY, canvas.width, 50);
           
-          if (simType === 'elastica') {
-            const v1f = ((params.m1 - params.m2) * vel1Ref.current + 2 * params.m2 * vel2Ref.current) / (params.m1 + params.m2);
-            const v2f = ((params.m2 - params.m1) * vel2Ref.current + 2 * params.m1 * vel1Ref.current) / (params.m1 + params.m2);
-            vel1Ref.current = v1f;
-            vel2Ref.current = v2f;
-          } else {
-            const vf = (params.m1 * vel1Ref.current + params.m2 * vel2Ref.current) / (params.m1 + params.m2);
-            vel1Ref.current = vf;
-            vel2Ref.current = vf;
+          // --- Tamaños Visuales ---
+          const size1 = 20 + m1 * 2;
+          const size2 = 20 + m2 * 2;
+
+          // --- Lógica de Colisión ---
+          if (!state.collision && state.pos1_px + size1/2 >= state.pos2_px - size2/2) {
+            state.collision = true;
+            
+            const v1i = state.vel1_ms;
+            const v2i = state.vel2_ms;
+
+            if (simType === 'elastica') {
+              state.vel1_ms = ((m1 - m2) * v1i + 2 * m2 * v2i) / (m1 + m2);
+              state.vel2_ms = ((m2 - m1) * v2i + 2 * m1 * v1i) / (m1 + m2);
+            } else { // 'inelastica'
+              const vf = (m1 * v1i + m2 * v2i) / (m1 + m2);
+              state.vel1_ms = vf;
+              state.vel2_ms = vf;
+            }
           }
+          
+          // --- Actualizar Posiciones ---
+          // Multiplicador de velocidad para que sea visible
+          const speedMultiplier = 5; 
+          state.pos1_px += state.vel1_ms * escalaX * dt * speedMultiplier;
+          state.pos2_px += state.vel2_ms * escalaX * dt * speedMultiplier;
+
+          // --- Dibujar Objetos ---
+          const y_pos1 = sueloY - size1 / 2;
+          const y_pos2 = sueloY - size2 / 2;
+          
+          ctx.fillStyle = color; // Objeto 1
+          ctx.fillRect(state.pos1_px - size1/2, y_pos1, size1, size1);
+          
+          ctx.fillStyle = (color === '#3b82f6' ? '#ef4444' : '#ec4899'); // Objeto 2
+          ctx.fillRect(state.pos2_px - size2/2, y_pos2, size2, size2);
+          
+          // --- Cálculos para Gráficas ---
+          const p1 = m1 * state.vel1_ms;
+          const p2 = m2 * state.vel2_ms;
+          const pTotal = p1 + p2;
+          const k1 = 0.5 * m1 * state.vel1_ms**2;
+          const k2 = 0.5 * m2 * state.vel2_ms**2;
+          const kTotal = k1 + k2;
+
+          // Condición de paro
+          const shouldContinue = (state.pos1_px < canvas.width + size1 && state.pos1_px > 0 - size1) && timeRef.current < p.tiempoMax;
+          
+          return { 
+            pTotal, 
+            kTotal, 
+            v1: state.vel1_ms, 
+            v2: state.vel2_ms, 
+            shouldContinue 
+          };
+        };
+
+        // --- Bucle de Animación ---
+        const result1 = drawSimulation(params, 0, phyState1, '#3b82f6');
+        let result2 = null;
+        
+        const canCompare = true;
+        if (compareMode && canCompare) {
+          ctx.strokeStyle = '#1f2937'; ctx.lineWidth = 4; ctx.beginPath();
+          ctx.moveTo(0, canvas.height / 2); ctx.lineTo(canvas.width, canvas.height / 2); ctx.stroke();
+          result2 = drawSimulation(params2, canvas.height / 2, phyState2, '#3b82f6');
         }
-        
-        pos1Ref.current += vel1Ref.current * 2;
-        pos2Ref.current += vel2Ref.current * 2;
-        
-        const size1 = 20 + params.m1 * 2;
-        const size2 = 20 + params.m2 * 2;
-        
-        ctx.fillStyle = '#3b82f6';
-        ctx.fillRect(pos1Ref.current - size1/2, canvas.height - 70 - size1/2, size1, size1);
-        
-        ctx.fillStyle = '#ef4444';
-        ctx.fillRect(pos2Ref.current - size2/2, canvas.height - 70 - size2/2, size2, size2);
-        
-        const p1 = params.m1 * vel1Ref.current;
-        const p2 = params.m2 * vel2Ref.current;
-        const pTotal = p1 + p2;
-        
-        ctx.fillStyle = '#1f2937';
-        ctx.font = '14px Arial';
-        ctx.fillText('Objeto 1: m=' + params.m1 + ' kg, v=' + vel1Ref.current.toFixed(2) + ' m/s', 10, 20);
-        ctx.fillText('Objeto 2: m=' + params.m2 + ' kg, v=' + vel2Ref.current.toFixed(2) + ' m/s', 10, 40);
-        ctx.fillText('Momentum total: ' + pTotal.toFixed(2) + ' kg·m/s', 10, 60);
-        ctx.fillText(collisionRef.current ? 'Colisión ocurrida' : 'Antes de colisión', 10, 80);
-        
-        if (pos1Ref.current < canvas.width && pos2Ref.current < canvas.width && pos1Ref.current > 0) {
+
+        const t = timeRef.current;
+        timeRef.current += dt;
+
+        // Actualizar datos de gráficas (solo del Objeto 1)
+        setGraphData(prev => [...prev, {
+          tiempo: parseFloat(t.toFixed(2)),
+          momentumTotal: parseFloat(result1.pTotal.toFixed(2)),
+          energiaCineticaTotal: parseFloat(result1.kTotal.toFixed(2)),
+          vel1: parseFloat(result1.v1.toFixed(2)),
+          vel2: parseFloat(result1.v2.toFixed(2)),
+        }]);
+
+        let shouldContinue = result1.shouldContinue;
+        if (compareMode && canCompare) {
+            shouldContinue = result1.shouldContinue || (result2 && result2.shouldContinue);
+        }
+
+        if (shouldContinue) {
           animationRef.current = requestAnimationFrame(animate);
         } else {
           setIsRunning(false);
@@ -1205,51 +1776,290 @@ function MomentumSimulation() {
         cancelAnimationFrame(animationRef.current);
       }
     };
-  }, [isRunning, simType, params]);
+  }, [isRunning, simType, params, params2, compareMode]);
 
+  const resetSimulation = () => {
+    setIsRunning(false);
+    timeRef.current = 0;
+    setGraphData([]);
+  };
+  
+  // --- Componente de Gráfica (Reutilizable) ---
+  const Grafica = ({ dataKey, color, unit, name }) => (
+    <div className="bg-white p-4 rounded-lg shadow-md h-64">
+      <h4 className="font-bold text-gray-700 text-sm mb-2 capitalize">{name} vs. Tiempo</h4>
+      <ResponsiveContainer width="100%" height="100%">
+        <LineChart data={graphData} margin={{ top: 5, right: 20, left: -5, bottom: 20 }}>
+          <CartesianGrid strokeDasharray="3 3" />
+          <XAxis 
+            dataKey="tiempo" 
+            label={{ value: "Tiempo (s)", position: 'insideBottom', offset: -10 }} 
+            tick={{ fontSize: 10 }}
+          />
+          <YAxis 
+            label={{ value: unit, angle: -90, position: 'insideLeft', offset: 5 }}
+            tick={{ fontSize: 10 }}
+            domain={['auto', 'auto']}
+          />
+          <Tooltip 
+            formatter={(value) => [`${value} ${unit}`, name]}
+            labelFormatter={(label) => `Tiempo: ${label} s`}
+          />
+          <Legend verticalAlign="top" height={36}/>
+          <Line 
+            type="monotone" 
+            dataKey={dataKey} 
+            stroke={color} 
+            strokeWidth={2} 
+            dot={false} 
+            name={name}
+            isAnimationActive={false}
+          />
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+  );
+
+  // --- Inputs Dinámicos ---
+  const renderInputs = (p, setP) => {
+    const isP1 = p === params;
+    return (
+      <>
+        <div className="mb-3">
+          <label className="block text-xs font-medium text-gray-700 mb-1">Masa 1 (kg)</label>
+          <input type="number" step="0.5" value={p.m1} onChange={(e) => setP({...p, m1: Number(e.target.value)})} className="w-full p-2 border-2 border-gray-300 rounded-lg text-sm" disabled={isRunning} />
+        </div>
+        <div className="mb-3">
+          <label className="block text-xs font-medium text-gray-700 mb-1">Velocidad 1 (m/s)</label>
+          <input type="number" step="0.5" value={p.v1} onChange={(e) => setP({...p, v1: Number(e.target.value)})} className="w-full p-2 border-2 border-gray-300 rounded-lg text-sm" disabled={isRunning} />
+        </div>
+        <div className="mb-3">
+          <label className="block text-xs font-medium text-gray-700 mb-1">Masa 2 (kg)</label>
+          <input type="number" step="0.5" value={p.m2} onChange={(e) => setP({...p, m2: Number(e.target.value)})} className="w-full p-2 border-2 border-gray-300 rounded-lg text-sm" disabled={isRunning} />
+        </div>
+        <div className="mb-3">
+          <label className="block text-xs font-medium text-gray-700 mb-1">Velocidad 2 (m/s)</label>
+          <input type="number" step="0.5" value={p.v2} onChange={(e) => setP({...p, v2: Number(e.target.value)})} className="w-full p-2 border-2 border-gray-300 rounded-lg text-sm" disabled={isRunning} />
+        </div>
+
+        {isP1 && (
+          <>
+            <div className="mb-3">
+              <label className="block text-xs font-medium text-gray-700 mb-1">Escala X (px/m)</label>
+              <input type="number" value={p.escalaX} onChange={(e) => setP({...p, escalaX: Number(e.target.value)})} className="w-full p-2 border-2 border-gray-300 rounded-lg text-sm" disabled={isRunning} />
+            </div>
+            <div className="mb-3">
+              <label className="block text-xs font-medium text-gray-700 mb-1">Tiempo máx (s)</label>
+              <input type="number" value={p.tiempoMax} onChange={(e) => setP({...p, tiempoMax: Number(e.target.value)})} className="w-full p-2 border-2 border-gray-300 rounded-lg text-sm" disabled={isRunning} />
+            </div>
+          </>
+        )}
+      </>
+    );
+  };
+
+  const canCompare = true;
+
+  // --- RENDER ---
   return (
-    <div className="p-8 max-w-6xl mx-auto">
-      <h2 className="text-3xl font-bold text-gray-800 mb-6">Simulación de Colisiones</h2>
-
-      <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6">
-        <p className="text-sm text-gray-700">Observa la conservación del momentum en colisiones.</p>
-      </div>
-
-      <div className="mb-6">
-        <label className="block text-sm font-semibold text-gray-700 mb-2">Tipo de Colisión</label>
-        <select value={simType} onChange={(e) => { setSimType(e.target.value); setIsRunning(false); }} className="w-full p-3 border border-gray-300 rounded-lg">
-          <option value="elastica">Colisión Elástica</option>
-          <option value="inelastica">Colisión Perfectamente Inelástica</option>
-        </select>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+    <div className="p-6 max-w-[1900px] mx-auto bg-gradient-to-br from-blue-50 to-indigo-50 min-h-screen">
+      <div className="flex justify-between items-center mb-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Masa 1: {params.m1} kg</label>
-          <input type="range" min="1" max="10" value={params.m1} onChange={(e) => setParams({...params, m1: Number(e.target.value)})} className="w-full" disabled={isRunning} />
+          <h2 className="text-4xl font-bold text-gray-800 mb-1">Simulación de Moméntum y Colisiones</h2>
+          <p className="text-gray-600">Gráficas en tiempo real • Comparación • Análisis predictivo</p>
         </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Masa 2: {params.m2} kg</label>
-          <input type="range" min="1" max="10" value={params.m2} onChange={(e) => setParams({...params, m2: Number(e.target.value)})} className="w-full" disabled={isRunning} />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Velocidad 1: {params.v1} m/s</label>
-          <input type="range" min="2" max="15" value={params.v1} onChange={(e) => setParams({...params, v1: Number(e.target.value)})} className="w-full" disabled={isRunning} />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Velocidad 2: {params.v2} m/s</label>
-          <input type="range" min="-5" max="5" value={params.v2} onChange={(e) => setParams({...params, v2: Number(e.target.value)})} className="w-full" disabled={isRunning} />
+        <div className="flex gap-2">
+          <button 
+            onClick={() => { setCompareMode(!compareMode); resetSimulation(); }}
+            className={`px-4 py-2 rounded-lg font-semibold transition-all ${
+              compareMode ? 'bg-purple-600 text-white shadow-lg' : 'bg-white border-2 border-purple-600 text-purple-600'
+            }`}
+          >
+            {compareMode ? '✓ Comparando' : '⚖️ Comparar'}
+          </button>
+          <button 
+            onClick={() => { setShowProblem(!showProblem); setShowSolution(false); }}
+            className="px-4 py-2 bg-orange-500 text-white rounded-lg font-semibold hover:bg-orange-600 transition-all"
+          >
+            {showProblem ? 'Ocultar' : '📝 Problema'}
+          </button>
         </div>
       </div>
 
-      <div className="mb-6">
-        <button onClick={() => setIsRunning(!isRunning)} className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors">
-          {isRunning ? 'Detener' : 'Iniciar'}
-        </button>
-      </div>
+      {showProblem && (
+        <div className="bg-orange-50 border-l-4 border-orange-500 p-5 mb-4 rounded-lg shadow-md">
+          <div className="flex justify-between items-start mb-3">
+            <h3 className="font-bold text-orange-800 text-lg">📚 Problema {problemaActual + 1} de 3: {simTypeNombresColision[simType]}</h3>
+            <div className="flex gap-2">
+              <button 
+                onClick={() => setProblemaActual((problemaActual - 1 + 3) % 3)}
+                className="bg-orange-400 text-white px-3 py-1 rounded-lg text-sm font-semibold hover:bg-orange-500"
+              >
+                ◀ Anterior
+              </button>
+              <button 
+                onClick={() => setProblemaActual((problemaActual + 1) % 3)}
+                className="bg-orange-400 text-white px-3 py-1 rounded-lg text-sm font-semibold hover:bg-orange-500"
+              >
+                Siguiente ▶
+              </button>
+            </div>
+          </div>
+          <p className="text-gray-800 mb-3 font-medium">{problemas[simType][problemaActual].enunciado}</p>
+          <div className="flex gap-2">
+            <button 
+              onClick={() => setShowSolution(!showSolution)}
+              className="bg-orange-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-orange-700"
+            >
+              {showSolution ? '🔒 Ocultar Solución' : '💡 Ver Solución'}
+            </button>
+            <button 
+              onClick={() => setIsRunning(true)}
+              className="bg-blue-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-blue-700"
+            >
+              ▶ Simular Problema
+            </button>
+          </div>
+          {showSolution && (
+            <div className="mt-4 bg-white p-4 rounded-lg border-2 border-orange-300">
+              <h4 className="font-bold text-gray-700 mb-2">✅ Solución:</h4>
+              <pre className="text-gray-800 font-mono text-sm whitespace-pre-wrap">{problemas[simType][problemaActual].solucion}</pre>
+            </div>
+          )}
+        </div>
+      )}
 
-      <div className="bg-white border-2 border-gray-300 rounded-lg overflow-hidden">
-        <canvas ref={canvasRef} width={800} height={400} className="w-full" />
+      <div className="grid grid-cols-1 xl:grid-cols-5 gap-4">
+        {/* Panel de controles */}
+        <div className="xl:col-span-1 space-y-4">
+          <div className="bg-white p-4 rounded-lg shadow-md">
+            <label className="block text-sm font-bold text-gray-700 mb-2">Tipo de Colisión</label>
+            <select 
+              value={simType} 
+              onChange={(e) => { setSimType(e.target.value); resetSimulation(); setProblemaActual(0); }} 
+              className="w-full p-2 border-2 border-gray-300 rounded-lg"
+            >
+              {Object.keys(simTypeNombresColision).map(key => (
+                <option key={key} value={key}>{simTypeNombresColision[key]}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="bg-white p-4 rounded-lg shadow-md border-l-4 border-blue-500">
+            <h3 className="font-bold text-blue-700 mb-3">🔵 Objeto 1</h3>
+            {renderInputs(params, setParams)}
+          </div>
+
+          {compareMode && canCompare && (
+            <div className="bg-white p-4 rounded-lg shadow-md border-l-4 border-pink-500">
+              <h3 className="font-bold text-pink-700 mb-3">🔴 Objeto 2</h3>
+              {renderInputs(params2, setParams2)}
+            </div>
+          )}
+
+          <div className="bg-gradient-to-br from-green-50 to-blue-50 p-4 rounded-lg shadow-md border-2 border-green-400">
+            <h3 className="font-bold text-green-800 mb-2 text-sm">📊 Cálculos Predictivos (Obj 1)</h3>
+            <div className="text-xs space-y-1 text-gray-700">
+              <p><strong>P Inicial:</strong> {predicciones.p_inicial} kg·m/s</p>
+              <p><strong>K Inicial:</strong> {predicciones.k_inicial} J</p>
+              <hr className="my-1"/>
+              <p><strong>V1 Final:</strong> {predicciones.v1f} m/s</p>
+              <p><strong>V2 Final:</strong> {predicciones.v2f} m/s</p>
+              <p><strong>P Final:</strong> {predicciones.p_final} kg·m/s</p>
+              <p><strong>K Final:</strong> {predicciones.k_final} J</p>
+              {simType === 'inelastica' && (
+                <p className="font-bold text-red-600"><strong>K Perdida:</strong> {predicciones.k_perdida} J</p>
+              )}
+            </div>
+          </div>
+
+          <div className="flex gap-2">
+            <button 
+              onClick={() => setIsRunning(!isRunning)} 
+              className={`flex-1 py-3 rounded-lg font-bold transition-all ${
+                isRunning 
+                  ? 'bg-red-500 hover:bg-red-600 text-white shadow-lg' 
+                  : 'bg-blue-600 hover:bg-blue-700 text-white shadow-lg'
+              }`}
+            >
+              {isRunning ? '⏸ Pausar' : '▶ Iniciar'}
+            </button>
+            <button 
+              onClick={resetSimulation} 
+              className="flex-1 bg-gray-500 hover:bg-gray-600 text-white py-3 rounded-lg font-bold transition-all shadow-lg"
+            >
+              🔄 Reiniciar
+            </button>
+          </div>
+        </div>
+
+        {/* Canvas y Gráficas */}
+        <div className="xl:col-span-4 space-y-4">
+          <div className="bg-white border-4 border-gray-300 rounded-lg overflow-hidden shadow-lg">
+            <canvas ref={canvasRef} width={1100} height={compareMode && canCompare ? 600 : 500} className="w-full" />
+          </div>
+
+          {/* Gráficas en tiempo real */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            
+            <Grafica 
+              dataKey="momentumTotal" 
+              color="#ef4444" 
+              unit="kg·m/s"
+              name="Momentum Total"
+            />
+            
+            <Grafica 
+              dataKey="energiaCineticaTotal" 
+              color="#10b981" 
+              unit="Joules"
+              name="Energía Cinética Total"
+            />
+            
+            {/* Gráfica de Velocidades */}
+            <div className="bg-white p-4 rounded-lg shadow-md h-64">
+              <h4 className="font-bold text-gray-700 text-sm mb-2 capitalize">Velocidades vs. Tiempo</h4>
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={graphData} margin={{ top: 5, right: 20, left: -5, bottom: 20 }}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis 
+                    dataKey="tiempo" 
+                    label={{ value: "Tiempo (s)", position: 'insideBottom', offset: -10 }} 
+                    tick={{ fontSize: 10 }}
+                  />
+                  <YAxis 
+                    label={{ value: "m/s", angle: -90, position: 'insideLeft', offset: 5 }}
+                    tick={{ fontSize: 10 }}
+                    domain={['auto', 'auto']}
+                  />
+                  <Tooltip 
+                    labelFormatter={(label) => `Tiempo: ${label} s`}
+                  />
+                  <Legend verticalAlign="top" height={36}/>
+                  <Line 
+                    type="monotone" 
+                    dataKey="vel1" 
+                    stroke="#3b82f6" 
+                    strokeWidth={2} 
+                    dot={false} 
+                    name="Velocidad Obj 1"
+                    isAnimationActive={false}
+                  />
+                  <Line 
+                    type="monotone" 
+                    dataKey="vel2" 
+                    stroke="#ef4444" 
+                    strokeWidth={2} 
+                    dot={false} 
+                    name="Velocidad Obj 2"
+                    isAnimationActive={false}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+            
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -1455,127 +2265,253 @@ function RotacionCalculator() {
   );
 }
 
+const simTypeNombresRotacion = {
+  uniforme: 'Rotación Uniforme',
+  aceleracion: 'Rotación con Torque'
+};
+
 function RotacionSimulation() {
   const canvasRef = useRef(null);
   const [isRunning, setIsRunning] = useState(false);
-  const [simType, setSimType] = useState('disco');
-  const [params, setParams] = useState({ omega: 3, tau: 5, I: 2 });
+  const [simType, setSimType] = useState('uniforme');
+  const [compareMode, setCompareMode] = useState(false);
+  const [showProblem, setShowProblem] = useState(false);
+  const [showSolution, setShowSolution] = useState(false);
+  
+  // Parámetros unificados
+  const [params, setParams] = useState({ 
+    omega: 3, // rad/s
+    tau: 5,   // N·m
+    I: 2,     // kg·m²
+    tiempoMax: 10,
+    // escala no es necesaria, el radio es fijo
+  });
+  
+  const [params2, setParams2] = useState({ 
+    omega: 5,
+    tau: 10,
+    I: 4,
+    tiempoMax: 10,
+  });
+  
+  const [graphData, setGraphData] = useState([]);
+  const [problemaActual, setProblemaActual] = useState(0);
   const animationRef = useRef(null);
-  const thetaRef = useRef(0);
-  const omegaRef = useRef(0);
+  const timeRef = useRef(0);
+  
+  // Refs para el estado de la física
+  const phyState1 = useRef({ theta: 0, omega: 0 });
+  const phyState2 = useRef({ theta: 0, omega: 0 });
 
+  // --- CÁLCULOS Y PROBLEMAS ---
+  
+  const calcularPredicciones = (p) => {
+    const { omega, tau, I, tiempoMax } = p;
+    
+    if (simType === 'uniforme') {
+      const K = 0.5 * I * omega**2;
+      const L = I * omega;
+      const anguloFinal = omega * tiempoMax;
+      return {
+        tipo: 'Uniforme',
+        K: K.toFixed(2),
+        L: L.toFixed(2),
+        anguloFinal: anguloFinal.toFixed(2),
+        alpha: (0).toFixed(2),
+      };
+    } else { // 'aceleracion'
+      const alpha = tau / I;
+      const omegaFinal = alpha * tiempoMax; // Asumiendo inicio desde 0
+      const anguloFinal = 0.5 * alpha * tiempoMax**2;
+      const K = 0.5 * I * omegaFinal**2;
+      const L = I * omegaFinal;
+      return {
+        tipo: 'Acelerado',
+        alpha: alpha.toFixed(2),
+        omegaFinal: omegaFinal.toFixed(2),
+        anguloFinal: anguloFinal.toFixed(2),
+        K: K.toFixed(2),
+        L: L.toFixed(2),
+      };
+    }
+  };
+
+  const predicciones = calcularPredicciones(params);
+
+  const problemas = {
+    uniforme: [
+      {
+        enunciado: `Un disco (I=${params.I} kg·m²) gira uniformemente a ${params.omega} rad/s. ¿Cuál es su Energía Cinética Rotacional (K)?`,
+        solucion: `K = ½·I·ω²\nK = 0.5 × ${params.I} × ${params.omega}² = ${predicciones.K} J`
+      },
+      {
+        enunciado: `Para el mismo disco (I=${params.I} kg·m², ω=${params.omega} rad/s), ¿cuál es su Momento Angular (L)?`,
+        solucion: `L = I·ω\nL = ${params.I} × ${params.omega} = ${predicciones.L} kg·m²/s`
+      },
+      {
+        enunciado: `¿Qué ángulo (en radianes) habrá girado el disco en ${params.tiempoMax} segundos?`,
+        solucion: `θ = ω·t\nθ = ${params.omega} × ${params.tiempoMax} = ${predicciones.anguloFinal} rad`
+      }
+    ],
+    aceleracion: [
+      {
+        enunciado: `Se aplica un torque de ${params.tau} N·m a un disco (I=${params.I} kg·m²) en reposo. ¿Cuál es su aceleración angular (α)?`,
+        solucion: `τ = I·α  =>  α = τ / I\nα = ${params.tau} / ${params.I} = ${predicciones.alpha} rad/s²`
+      },
+      {
+        enunciado: `Partiendo del reposo, ¿qué velocidad angular (ω) alcanzará el disco después de ${params.tiempoMax} segundos?`,
+        solucion: `ω_f = ω_i + α·t\nω_f = 0 + ${predicciones.alpha} × ${params.tiempoMax} = ${predicciones.omegaFinal} rad/s`
+      },
+      {
+        enunciado: `¿Cuál será la Energía Cinética (K) del disco en ${params.tiempoMax} segundos?`,
+        solucion: `K_f = ½·I·ω_f²\nK_f = 0.5 × ${params.I} × ${predicciones.omegaFinal}² = ${predicciones.K} J`
+      }
+    ]
+  };
+
+  // --- EFECTO DE ANIMACIÓN ---
+  
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
+    
+    if (!isRunning) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        // Dibujar estado inicial estático
+        return;
+    }
 
     if (isRunning) {
-      thetaRef.current = 0;
-      omegaRef.current = simType === 'aceleracion' ? 0 : params.omega;
+      // Reiniciar estado de física
+      phyState1.current = { 
+        theta: 0, 
+        omega: simType === 'aceleracion' ? 0 : params.omega 
+      };
+      phyState2.current = { 
+        theta: 0, 
+        omega: simType === 'aceleracion' ? 0 : params2.omega 
+      };
+      
+      timeRef.current = 0;
+      setGraphData([]);
       
       const animate = () => {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
+        const canvasHeight = compareMode ? canvas.height / 2 : canvas.height;
+        const dt = 0.016; // Asumir ~60fps
         
-        const centerX = canvas.width / 2;
-        const centerY = canvas.height / 2;
-        const radius = 100;
+        const drawSimulation = (p, yOffset, phyState, color) => {
+          const t = timeRef.current;
+          const state = phyState.current; // Acceso directo al ref
+          
+          const centerX = canvas.width / 2;
+          const centerY = yOffset + canvasHeight / 2;
+          const radius = Math.min(canvas.width / 6, canvasHeight / 3);
 
-        if (simType === 'disco' || simType === 'uniforme') {
-          omegaRef.current = params.omega;
-          thetaRef.current += omegaRef.current * 0.05;
+          let K, L, alpha;
+
+          // --- Lógica de Física ---
+          if (simType === 'uniforme') {
+            state.omega = p.omega; // Constante
+            alpha = 0;
+          } else { // 'aceleracion'
+            alpha = p.tau / p.I;
+            state.omega += alpha * dt; // ω_f = ω_i + α·dt
+          }
+          state.theta += state.omega * dt; // θ_f = θ_i + ω·dt
           
-          ctx.strokeStyle = '#3b82f6';
+          K = 0.5 * p.I * state.omega**2;
+          L = p.I * state.omega;
+
+          // --- Dibujar Disco ---
+          ctx.strokeStyle = color;
           ctx.lineWidth = 3;
           ctx.beginPath();
           ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
           ctx.stroke();
           
-          ctx.fillStyle = '#3b82f6';
+          ctx.fillStyle = color;
           ctx.globalAlpha = 0.3;
           ctx.beginPath();
           ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
           ctx.fill();
           ctx.globalAlpha = 1;
           
+          // --- Dibujar Radio ---
           ctx.strokeStyle = '#ef4444';
           ctx.lineWidth = 4;
           ctx.beginPath();
           ctx.moveTo(centerX, centerY);
-          const endX = centerX + radius * Math.cos(thetaRef.current);
-          const endY = centerY + radius * Math.sin(thetaRef.current);
+          const endX = centerX + radius * Math.cos(state.theta);
+          const endY = centerY + radius * Math.sin(state.theta);
           ctx.lineTo(endX, endY);
           ctx.stroke();
           
+          // --- Dibujar Pivote ---
           ctx.fillStyle = '#1f2937';
           ctx.beginPath();
           ctx.arc(centerX, centerY, 8, 0, 2 * Math.PI);
           ctx.fill();
+
+          // --- Dibujar Torque (si aplica) ---
+          if (simType === 'aceleracion') {
+            ctx.strokeStyle = '#10b981';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            // Dibuja un arco para representar el torque
+            ctx.arc(centerX, centerY, radius + 20, 0, Math.PI / 2);
+            ctx.stroke();
+            
+            // Flecha del arco
+            const arrowX = centerX;
+            const arrowY = centerY + radius + 20;
+            ctx.fillStyle = '#10b981';
+            ctx.beginPath();
+            ctx.moveTo(arrowX, arrowY);
+            ctx.lineTo(arrowX - 10, arrowY - 5);
+            ctx.lineTo(arrowX + 5, arrowY - 10);
+            ctx.fill();
+          }
           
-          const K = 0.5 * params.I * Math.pow(omegaRef.current, 2);
-          const L = params.I * omegaRef.current;
+          const shouldContinue = t < p.tiempoMax;
           
-          ctx.fillStyle = '#1f2937';
-          ctx.font = '14px Arial';
-          ctx.fillText('Velocidad angular ω: ' + omegaRef.current.toFixed(2) + ' rad/s', 10, 20);
-          ctx.fillText('Ángulo θ: ' + thetaRef.current.toFixed(2) + ' rad', 10, 40);
-          ctx.fillText('Energía cinética: ' + K.toFixed(2) + ' J', 10, 60);
-          ctx.fillText('Momento angular L: ' + L.toFixed(2) + ' kg·m²/s', 10, 80);
-          
-        } else if (simType === 'aceleracion') {
-          const alpha = params.tau / params.I;
-          omegaRef.current += alpha * 0.05;
-          thetaRef.current += omegaRef.current * 0.05;
-          
-          ctx.strokeStyle = '#3b82f6';
-          ctx.lineWidth = 3;
-          ctx.beginPath();
-          ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
-          ctx.stroke();
-          
-          ctx.fillStyle = '#3b82f6';
-          ctx.globalAlpha = 0.3;
-          ctx.beginPath();
-          ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
-          ctx.fill();
-          ctx.globalAlpha = 1;
-          
-          ctx.strokeStyle = '#ef4444';
-          ctx.lineWidth = 4;
-          ctx.beginPath();
-          ctx.moveTo(centerX, centerY);
-          const endX = centerX + radius * Math.cos(thetaRef.current);
-          const endY = centerY + radius * Math.sin(thetaRef.current);
-          ctx.lineTo(endX, endY);
-          ctx.stroke();
-          
-          const torqueArrowLen = params.tau * 10;
-          ctx.strokeStyle = '#10b981';
-          ctx.lineWidth = 3;
-          ctx.beginPath();
-          ctx.arc(centerX, centerY, radius + 30, -Math.PI/4, Math.PI/4, false);
-          ctx.stroke();
-          
-          ctx.fillStyle = '#10b981';
-          ctx.beginPath();
-          ctx.moveTo(centerX + (radius + 30) * Math.cos(Math.PI/4), centerY + (radius + 30) * Math.sin(Math.PI/4));
-          ctx.lineTo(centerX + (radius + 30) * Math.cos(Math.PI/4) - 10, centerY + (radius + 30) * Math.sin(Math.PI/4) - 10);
-          ctx.lineTo(centerX + (radius + 30) * Math.cos(Math.PI/4) - 5, centerY + (radius + 30) * Math.sin(Math.PI/4) + 5);
-          ctx.fill();
-          
-          ctx.fillStyle = '#1f2937';
-          ctx.beginPath();
-          ctx.arc(centerX, centerY, 8, 0, 2 * Math.PI);
-          ctx.fill();
-          
-          ctx.fillStyle = '#1f2937';
-          ctx.font = '14px Arial';
-          ctx.fillText('Torque τ: ' + params.tau.toFixed(2) + ' N·m', 10, 20);
-          ctx.fillText('Velocidad angular ω: ' + omegaRef.current.toFixed(2) + ' rad/s', 10, 40);
-          ctx.fillText('Aceleración angular α: ' + alpha.toFixed(2) + ' rad/s²', 10, 60);
-          ctx.fillText('Momento de inercia I: ' + params.I.toFixed(2) + ' kg·m²', 10, 80);
+          return { 
+            K, 
+            L, 
+            omega: state.omega,
+            shouldContinue 
+          };
+        };
+
+        // --- Bucle de Animación ---
+        const result1 = drawSimulation(params, 0, phyState1, '#3b82f6');
+        let result2 = null;
+        
+        const canCompare = true;
+        if (compareMode && canCompare) {
+          ctx.strokeStyle = '#1f2937'; ctx.lineWidth = 4; ctx.beginPath();
+          ctx.moveTo(0, canvas.height / 2); ctx.lineTo(canvas.width, canvas.height / 2); ctx.stroke();
+          result2 = drawSimulation(params2, canvas.height / 2, phyState2, '#ec4899');
         }
 
-        if (thetaRef.current < 30) {
+        const t = timeRef.current;
+        timeRef.current += dt;
+
+        // Actualizar datos de gráficas (solo del Objeto 1)
+        setGraphData(prev => [...prev, {
+          tiempo: parseFloat(t.toFixed(2)),
+          velocidadAngular: parseFloat(result1.omega.toFixed(2)),
+          energiaCinetica: parseFloat(result1.K.toFixed(2)),
+          momentoAngular: parseFloat(result1.L.toFixed(2)),
+        }]);
+
+        let shouldContinue = result1.shouldContinue;
+        if (compareMode && canCompare) {
+            shouldContinue = result1.shouldContinue || (result2 && result2.shouldContinue);
+        }
+
+        if (shouldContinue) {
           animationRef.current = requestAnimationFrame(animate);
         } else {
           setIsRunning(false);
@@ -1590,58 +2526,256 @@ function RotacionSimulation() {
         cancelAnimationFrame(animationRef.current);
       }
     };
-  }, [isRunning, simType, params]);
+  }, [isRunning, simType, params, params2, compareMode]);
 
-  return (
-    <div className="p-8 max-w-6xl mx-auto">
-      <h2 className="text-3xl font-bold text-gray-800 mb-6">Simulación de Rotación</h2>
+  const resetSimulation = () => {
+    setIsRunning(false);
+    timeRef.current = 0;
+    setGraphData([]);
+  };
+  
+  // --- Componente de Gráfica (Reutilizable) ---
+  const Grafica = ({ dataKey, color, unit, name }) => (
+    <div className="bg-white p-4 rounded-lg shadow-md h-64">
+      <h4 className="font-bold text-gray-700 text-sm mb-2 capitalize">{name} vs. Tiempo</h4>
+      <ResponsiveContainer width="100%" height="100%">
+        <LineChart data={graphData} margin={{ top: 5, right: 20, left: -5, bottom: 20 }}>
+          <CartesianGrid strokeDasharray="3 3" />
+          <XAxis 
+            dataKey="tiempo" 
+            label={{ value: "Tiempo (s)", position: 'insideBottom', offset: -10 }} 
+            tick={{ fontSize: 10 }}
+          />
+          <YAxis 
+            label={{ value: unit, angle: -90, position: 'insideLeft', offset: 5 }}
+            tick={{ fontSize: 10 }}
+            domain={['auto', 'auto']}
+          />
+          <Tooltip 
+            formatter={(value) => [`${value} ${unit}`, name]}
+            labelFormatter={(label) => `Tiempo: ${label} s`}
+          />
+          <Legend verticalAlign="top" height={36}/>
+          <Line 
+            type="monotone" 
+            dataKey={dataKey} 
+            stroke={color} 
+            strokeWidth={2} 
+            dot={false} 
+            name={name}
+            isAnimationActive={false}
+          />
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+  );
 
-      <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6">
-        <p className="text-sm text-gray-700">Visualiza el movimiento rotacional y la aplicación de torques.</p>
-      </div>
-
-      <div className="mb-6">
-        <label className="block text-sm font-semibold text-gray-700 mb-2">Tipo de Simulación</label>
-        <select value={simType} onChange={(e) => { setSimType(e.target.value); setIsRunning(false); }} className="w-full p-3 border border-gray-300 rounded-lg">
-          <option value="uniforme">Rotación Uniforme</option>
-          <option value="aceleracion">Rotación con Torque</option>
-        </select>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+  // --- Inputs Dinámicos ---
+  const renderInputs = (p, setP) => {
+    const isP1 = p === params;
+    return (
+      <>
         {simType === 'uniforme' && (
-          <>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Velocidad angular: {params.omega} rad/s</label>
-              <input type="range" min="1" max="8" step="0.5" value={params.omega} onChange={(e) => setParams({...params, omega: Number(e.target.value)})} className="w-full" disabled={isRunning} />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Momento de inercia: {params.I} kg·m²</label>
-              <input type="range" min="0.5" max="5" step="0.5" value={params.I} onChange={(e) => setParams({...params, I: Number(e.target.value)})} className="w-full" disabled={isRunning} />
-            </div>
-          </>
+          <div className="mb-3">
+            <label className="block text-xs font-medium text-gray-700 mb-1">Velocidad Angular (rad/s)</label>
+            <input type="number" step="0.5" value={p.omega} onChange={(e) => setP({...p, omega: Number(e.target.value)})} className="w-full p-2 border-2 border-gray-300 rounded-lg text-sm" disabled={isRunning} />
+          </div>
         )}
+        
         {simType === 'aceleracion' && (
-          <>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Torque: {params.tau} N·m</label>
-              <input type="range" min="1" max="15" value={params.tau} onChange={(e) => setParams({...params, tau: Number(e.target.value)})} className="w-full" disabled={isRunning} />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Momento de inercia: {params.I} kg·m²</label>
-              <input type="range" min="0.5" max="5" step="0.5" value={params.I} onChange={(e) => setParams({...params, I: Number(e.target.value)})} className="w-full" disabled={isRunning} />
-            </div>
-          </>
+          <div className="mb-3">
+            <label className="block text-xs font-medium text-gray-700 mb-1">Torque (N·m)</label>
+            <input type="number" step="0.5" value={p.tau} onChange={(e) => setP({...p, tau: Number(e.target.value)})} className="w-full p-2 border-2 border-gray-300 rounded-lg text-sm" disabled={isRunning} />
+          </div>
         )}
-        <div className="flex items-end">
-          <button onClick={() => setIsRunning(!isRunning)} className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors">
-            {isRunning ? 'Detener' : 'Iniciar'}
+
+        <div className="mb-3">
+          <label className="block text-xs font-medium text-gray-700 mb-1">Momento de Inercia (kg·m²)</label>
+          <input type="number" step="0.1" value={p.I} onChange={(e) => setP({...p, I: Number(e.target.value)})} className="w-full p-2 border-2 border-gray-300 rounded-lg text-sm" disabled={isRunning} />
+        </div>
+
+        {isP1 && (
+          <div className="mb-3">
+            <label className="block text-xs font-medium text-gray-700 mb-1">Tiempo máx (s)</label>
+            <input type="number" value={p.tiempoMax} onChange={(e) => setP({...p, tiempoMax: Number(e.target.value)})} className="w-full p-2 border-2 border-gray-300 rounded-lg text-sm" disabled={isRunning} />
+          </div>
+        )}
+      </>
+    );
+  };
+
+  const canCompare = true;
+
+  // --- RENDER ---
+  return (
+    <div className="p-6 max-w-[1900px] mx-auto bg-gradient-to-br from-blue-50 to-indigo-50 min-h-screen">
+      <div className="flex justify-between items-center mb-4">
+        <div>
+          <h2 className="text-4xl font-bold text-gray-800 mb-1">Simulación de Dinámica Rotacional</h2>
+          <p className="text-gray-600">Gráficas en tiempo real • Comparación • Análisis predictivo</p>
+        </div>
+        <div className="flex gap-2">
+          <button 
+            onClick={() => { setCompareMode(!compareMode); resetSimulation(); }}
+            className={`px-4 py-2 rounded-lg font-semibold transition-all ${
+              compareMode ? 'bg-purple-600 text-white shadow-lg' : 'bg-white border-2 border-purple-600 text-purple-600'
+            }`}
+          >
+            {compareMode ? '✓ Comparando' : '⚖️ Comparar'}
+          </button>
+          <button 
+            onClick={() => { setShowProblem(!showProblem); setShowSolution(false); }}
+            className="px-4 py-2 bg-orange-500 text-white rounded-lg font-semibold hover:bg-orange-600 transition-all"
+          >
+            {showProblem ? 'Ocultar' : '📝 Problema'}
           </button>
         </div>
       </div>
 
-      <div className="bg-white border-2 border-gray-300 rounded-lg overflow-hidden">
-        <canvas ref={canvasRef} width={800} height={400} className="w-full" />
+      {showProblem && (
+        <div className="bg-orange-50 border-l-4 border-orange-500 p-5 mb-4 rounded-lg shadow-md">
+          <div className="flex justify-between items-start mb-3">
+            <h3 className="font-bold text-orange-800 text-lg">📚 Problema {problemaActual + 1} de 3: {simTypeNombresRotacion[simType]}</h3>
+            <div className="flex gap-2">
+              <button 
+                onClick={() => setProblemaActual((problemaActual - 1 + 3) % 3)}
+                className="bg-orange-400 text-white px-3 py-1 rounded-lg text-sm font-semibold hover:bg-orange-500"
+              >
+                ◀ Anterior
+              </button>
+              <button 
+                onClick={() => setProblemaActual((problemaActual + 1) % 3)}
+                className="bg-orange-400 text-white px-3 py-1 rounded-lg text-sm font-semibold hover:bg-orange-500"
+              >
+                Siguiente ▶
+              </button>
+            </div>
+          </div>
+          <p className="text-gray-800 mb-3 font-medium">{problemas[simType][problemaActual].enunciado}</p>
+          <div className="flex gap-2">
+            <button 
+              onClick={() => setShowSolution(!showSolution)}
+              className="bg-orange-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-orange-700"
+            >
+              {showSolution ? '🔒 Ocultar Solución' : '💡 Ver Solución'}
+            </button>
+            <button 
+              onClick={() => setIsRunning(true)}
+              className="bg-blue-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-blue-700"
+            >
+              ▶ Simular Problema
+            </button>
+          </div>
+          {showSolution && (
+            <div className="mt-4 bg-white p-4 rounded-lg border-2 border-orange-300">
+              <h4 className="font-bold text-gray-700 mb-2">✅ Solución:</h4>
+              <pre className="text-gray-800 font-mono text-sm whitespace-pre-wrap">{problemas[simType][problemaActual].solucion}</pre>
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 xl:grid-cols-5 gap-4">
+        {/* Panel de controles */}
+        <div className="xl:col-span-1 space-y-4">
+          <div className="bg-white p-4 rounded-lg shadow-md">
+            <label className="block text-sm font-bold text-gray-700 mb-2">Tipo de Rotación</label>
+            <select 
+              value={simType} 
+              onChange={(e) => { setSimType(e.target.value); resetSimulation(); setProblemaActual(0); }} 
+              className="w-full p-2 border-2 border-gray-300 rounded-lg"
+            >
+              {Object.keys(simTypeNombresRotacion).map(key => (
+                <option key={key} value={key}>{simTypeNombresRotacion[key]}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="bg-white p-4 rounded-lg shadow-md border-l-4 border-blue-500">
+            <h3 className="font-bold text-blue-700 mb-3">🔵 Objeto 1</h3>
+            {renderInputs(params, setParams)}
+          </div>
+
+          {compareMode && canCompare && (
+            <div className="bg-white p-4 rounded-lg shadow-md border-l-4 border-pink-500">
+              <h3 className="font-bold text-pink-700 mb-3">🔴 Objeto 2</h3>
+              {renderInputs(params2, setParams2)}
+            </div>
+          )}
+
+          <div className="bg-gradient-to-br from-green-50 to-blue-50 p-4 rounded-lg shadow-md border-2 border-green-400">
+            <h3 className="font-bold text-green-800 mb-2 text-sm">📊 Cálculos Predictivos (Obj 1)</h3>
+            <div className="text-xs space-y-1 text-gray-700">
+              {simType === 'uniforme' && (
+                <>
+                  <p><strong>K:</strong> {predicciones.K} J</p>
+                  <p><strong>L:</strong> {predicciones.L} kg·m²/s</p>
+                  <p><strong>Ángulo en {params.tiempoMax}s:</strong> {predicciones.anguloFinal} rad</p>
+                </>
+              )}
+              {simType === 'aceleracion' && (
+                <>
+                  <p><strong>α:</strong> {predicciones.alpha} rad/s²</p>
+                  <p><strong>ω final ({params.tiempoMax}s):</strong> {predicciones.omegaFinal} rad/s</p>
+                  <p><strong>K final:</strong> {predicciones.K} J</p>
+                  <p><strong>L final:</strong> {predicciones.L} kg·m²/s</p>
+                </>
+              )}
+            </div>
+          </div>
+
+          <div className="flex gap-2">
+            <button 
+              onClick={() => setIsRunning(!isRunning)} 
+              className={`flex-1 py-3 rounded-lg font-bold transition-all ${
+                isRunning 
+                  ? 'bg-red-500 hover:bg-red-600 text-white shadow-lg' 
+                  : 'bg-blue-600 hover:bg-blue-700 text-white shadow-lg'
+              }`}
+            >
+              {isRunning ? '⏸ Pausar' : '▶ Iniciar'}
+            </button>
+            <button 
+              onClick={resetSimulation} 
+              className="flex-1 bg-gray-500 hover:bg-gray-600 text-white py-3 rounded-lg font-bold transition-all shadow-lg"
+            >
+              🔄 Reiniciar
+            </button>
+          </div>
+        </div>
+
+        {/* Canvas y Gráficas */}
+        <div className="xl:col-span-4 space-y-4">
+          <div className="bg-white border-4 border-gray-300 rounded-lg overflow-hidden shadow-lg">
+            <canvas ref={canvasRef} width={1100} height={compareMode && canCompare ? 600 : 500} className="w-full" />
+          </div>
+
+          {/* Gráficas en tiempo real */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            
+            <Grafica 
+              dataKey="velocidadAngular" 
+              color="#3b82f6" 
+              unit="rad/s"
+              name="Velocidad Angular (ω)"
+            />
+            
+            <Grafica 
+              dataKey="energiaCinetica" 
+              color="#10b981" 
+              unit="Joules"
+              name="Energía Cinética (K)"
+            />
+
+            <Grafica 
+              dataKey="momentoAngular" 
+              color="#ef4444" 
+              unit="kg·m²/s"
+              name="Momento Angular (L)"
+            />
+            
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -2074,7 +3208,8 @@ function GravitacionSimulacion() {
       </div>
     </div>
   );
-}function DinamicaCalculator() {
+}
+function DinamicaCalculator() {
   const [calcType, setCalcType] = useState('segunda_ley');
   const [inputs, setInputs] = useState({});
   const [result, setResult] = useState(null);
@@ -2259,164 +3394,345 @@ function GravitacionSimulacion() {
   );
 }
 
+const simTypeNombresDinamica = {
+  fuerza: 'Fuerza Neta (F=ma)',
+  friccion: 'Fuerza con Fricción',
+  plano: 'Plano Inclinado',
+  circular: 'Movimiento Circular'
+};
+
+
+
 function DinamicaSimulation() {
   const canvasRef = useRef(null);
   const [isRunning, setIsRunning] = useState(false);
   const [simType, setSimType] = useState('fuerza');
-  const [params, setParams] = useState({ m: 5, F: 20, mu: 0.2, theta: 30 });
+  const [compareMode, setCompareMode] = useState(false);
+  const [showProblem, setShowProblem] = useState(false);
+  const [showSolution, setShowSolution] = useState(false);
+  
+  // Parámetros unificados
+  const [params, setParams] = useState({ 
+    masa: 5,
+    fuerza: 20, // Fuerza aplicada
+    v0: 0,
+    mu_c: 0.2, // Coef. fricción cinética
+    theta: 30, // Ángulo del plano inclinado
+    radio_circ: 2, // Radio de movimiento circular
+    v_circ: 5, // Velocidad tangencial
+    tiempoMax: 10,
+    escala: 50, // px por metro
+  });
+  
+  const [params2, setParams2] = useState({ 
+    masa: 10,
+    fuerza: 20,
+    v0: 0,
+    mu_c: 0.1,
+    theta: 45,
+    radio_circ: 3,
+    v_circ: 4,
+    tiempoMax: 10,
+    escala: 50,
+  });
+  
+  const [graphData, setGraphData] = useState([]);
+  const [problemaActual, setProblemaActual] = useState(0);
   const animationRef = useRef(null);
   const timeRef = useRef(0);
-  const posRef = useRef(50);
-  const velRef = useRef(0);
+  
+  // Refs para el estado de la física
+  const phyState1 = useRef({ pos: 0, vel: 0, angulo: 0 });
+  const phyState2 = useRef({ pos: 0, vel: 0, angulo: 0 });
 
+  // --- CÁLCULOS Y PROBLEMAS ---
+  
+  const calcularPredicciones = (p) => {
+    let a = 0, F_neta = 0, v_final = 0, pos_final = 0;
+    const t = p.tiempoMax;
+
+    if (simType === 'fuerza') {
+      F_neta = p.fuerza;
+      a = F_neta / p.masa;
+      v_final = p.v0 + a * t;
+      pos_final = p.v0 * t + 0.5 * a * t * t;
+      return {
+        aceleracion: a.toFixed(2),
+        fuerzaNeta: F_neta.toFixed(2),
+        velocidadFinal: v_final.toFixed(2),
+        distancia: pos_final.toFixed(2)
+      };
+    } else if (simType === 'friccion') {
+      const F_friccion = p.mu_c * p.masa * G;
+      F_neta = p.fuerza - F_friccion;
+      if (F_neta < 0) F_neta = 0; // No se mueve si F < f_e (asumimos f_e ~ f_c)
+      a = F_neta / p.masa;
+      v_final = p.v0 + a * t;
+      pos_final = p.v0 * t + 0.5 * a * t * t;
+      return {
+        aceleracion: a.toFixed(2),
+        fuerzaFriccion: F_friccion.toFixed(2),
+        fuerzaNeta: F_neta.toFixed(2),
+        velocidadFinal: v_final.toFixed(2)
+      };
+    } else if (simType === 'plano') {
+      const theta_rad = (p.theta * Math.PI) / 180;
+      const F_paralela = p.masa * G * Math.sin(theta_rad);
+      const F_normal = p.masa * G * Math.cos(theta_rad);
+      const F_friccion = p.mu_c * F_normal;
+      F_neta = F_paralela - F_friccion;
+      if (F_neta < 0) F_neta = 0;
+      a = F_neta / p.masa;
+      v_final = p.v0 + a * t;
+      pos_final = p.v0 * t + 0.5 * a * t * t;
+      return {
+        aceleracion: a.toFixed(2),
+        fuerzaParalela: F_paralela.toFixed(2),
+        fuerzaFriccion: F_friccion.toFixed(2),
+        fuerzaNeta: F_neta.toFixed(2)
+      };
+    } else if (simType === 'circular') {
+      const a_c = (p.v_circ * p.v_circ) / p.radio_circ;
+      const F_c = p.masa * a_c; // Fuerza Centrípeta
+      const omega = p.v_circ / p.radio_circ;
+      const T = (2 * Math.PI) / omega;
+      return {
+        aceleracionCentripeta: a_c.toFixed(2),
+        fuerzaCentripeta: F_c.toFixed(2),
+        velocidadAngular: omega.toFixed(2),
+        periodo: T.toFixed(2)
+      };
+    }
+    return {};
+  };
+
+  const predicciones = calcularPredicciones(params);
+
+  const problemas = {
+    fuerza: [
+      {
+        enunciado: `Un bloque de ${params.masa} kg (v₀=${params.v0} m/s) es empujado por una fuerza neta de ${params.fuerza} N. ¿Cuál es su aceleración?`,
+        solucion: `2da Ley de Newton: ΣF = m·a\na = ΣF / m = ${params.fuerza} N / ${params.masa} kg = ${predicciones.aceleracion} m/s²`
+      },
+      {
+        enunciado: `¿Qué velocidad alcanzará el bloque después de ${params.tiempoMax} segundos?`,
+        solucion: `v_f = v₀ + a·t\nv_f = ${params.v0} + ${predicciones.aceleracion} · ${params.tiempoMax} = ${predicciones.velocidadFinal} m/s`
+      },
+      {
+        enunciado: `¿Qué distancia recorrerá en ese tiempo?`,
+        solucion: `x = v₀t + ½at²\nx = ${params.v0}·${params.tiempoMax} + 0.5·${predicciones.aceleracion}·${params.tiempoMax}² = ${predicciones.distancia} m`
+      }
+    ],
+    friccion: [
+      {
+        enunciado: `Un bloque de ${params.masa} kg es empujado con F=${params.fuerza} N en un suelo con μ_c=${params.mu_c}. ¿Cuál es la fuerza de fricción cinética?`,
+        solucion: `f_c = μ_c · N\nComo N = P = m·g\nf_c = ${params.mu_c} · ${params.masa} kg · 9.81 m/s² = ${predicciones.fuerzaFriccion} N`
+      },
+      {
+        enunciado: `¿Cuál es la fuerza neta sobre el bloque?`,
+        solucion: `ΣF_x = F_aplicada - f_c\nΣF_x = ${params.fuerza} N - ${predicciones.fuerzaFriccion} N = ${predicciones.fuerzaNeta} N`
+      },
+      {
+        enunciado: `¿Cuál es la aceleración real del bloque?`,
+        solucion: `a = ΣF_neta / m\na = ${predicciones.fuerzaNeta} N / ${params.masa} kg = ${predicciones.aceleracion} m/s²`
+      }
+    ],
+    plano: [
+      {
+        enunciado: `Un bloque de ${params.masa} kg está en un plano inclinado de ${params.theta}°. ¿Cuál es la componente del peso paralela al plano (Px)?`,
+        solucion: `Px = m·g·sin(θ)\nPx = ${params.masa} · 9.81 · sin(${params.theta}°) = ${predicciones.fuerzaParalela} N`
+      },
+      {
+        enunciado: `Si el coeficiente de fricción es μ_c=${params.mu_c}, ¿cuál es la fuerza de fricción?`,
+        solucion: `N = m·g·cos(θ) = ${params.masa}·9.81·cos(${params.theta}°) = ${(params.masa * G * Math.cos(params.theta * Math.PI / 180)).toFixed(2)} N\nf_c = μ_c · N = ${params.mu_c} · ${(params.masa * G * Math.cos(params.theta * Math.PI / 180)).toFixed(2)} = ${predicciones.fuerzaFriccion} N`
+      },
+      {
+        enunciado: `¿Con qué aceleración (a) se desliza el bloque?`,
+        solucion: `ΣF = Px - f_c = ${predicciones.fuerzaParalela} - ${predicciones.fuerzaFriccion} = ${predicciones.fuerzaNeta} N\na = ΣF / m = ${predicciones.fuerzaNeta} / ${params.masa} = ${predicciones.aceleracion} m/s²`
+      }
+    ],
+    circular: [
+      {
+        enunciado: `Un objeto de ${params.masa} kg gira en un círculo de ${params.radio_circ} m a ${params.v_circ} m/s. ¿Cuál es su aceleración centrípeta?`,
+        solucion: `a_c = v² / r\na_c = ${params.v_circ}² / ${params.radio_circ} = ${predicciones.aceleracionCentripeta} m/s²`
+      },
+      {
+        enunciado: `¿Qué fuerza centrípeta (F_c) se requiere para mantener este movimiento?`,
+        solucion: `F_c = m · a_c\nF_c = ${params.masa} kg · ${predicciones.aceleracionCentripeta} m/s² = ${predicciones.fuerzaCentripeta} N`
+      },
+      {
+        enunciado: `¿Cuál es el período (T) de una rotación?`,
+        solucion: `T = 2πr / v\nT = (2 · π · ${params.radio_circ}) / ${params.v_circ} = ${predicciones.periodo} s`
+      }
+    ]
+  };
+
+  // --- EFECTO DE ANIMACIÓN ---
+  
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
+    
+    if (!isRunning) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        return;
+    }
 
     if (isRunning) {
+      phyState1.current = { pos: 0, vel: params.v0, angulo: 0 };
+      phyState2.current = { pos: 0, vel: params2.v0, angulo: 0 };
+      
       timeRef.current = 0;
-      posRef.current = 50;
-      velRef.current = 0;
+      setGraphData([]);
       
       const animate = () => {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
+        const canvasHeight = compareMode ? canvas.height / 2 : canvas.height;
+        const dt = 0.016;
         
-        const t = timeRef.current;
-        let x = posRef.current;
-        let shouldContinue = true;
+        const drawSimulation = (p, yOffset, phyState, color) => {
+          const t = timeRef.current;
+          const state = phyState.current;
+          
+          const centerX = canvas.width / 2;
+          const centerY = yOffset + canvasHeight / 2;
+          
+          let x_canvas = 0, y_canvas = 0, a = 0, pos = 0, vel = 0;
+          let shouldContinue = true;
 
-        if (simType === 'fuerza') {
-          const a = params.F / params.m;
-          velRef.current += a * 0.05;
-          posRef.current += velRef.current * 0.05 * 10;
-          x = posRef.current;
-          
-          ctx.fillStyle = '#374151';
-          ctx.fillRect(0, canvas.height - 50, canvas.width, 50);
-          
-          ctx.fillStyle = '#3b82f6';
-          ctx.fillRect(x, canvas.height - 90, 40, 40);
-          
-          ctx.strokeStyle = '#ef4444';
-          ctx.lineWidth = 3;
-          ctx.beginPath();
-          ctx.moveTo(x + 40, canvas.height - 70);
-          ctx.lineTo(x + 40 + params.F * 2, canvas.height - 70);
-          ctx.stroke();
-          
-          ctx.fillStyle = '#ef4444';
-          ctx.beginPath();
-          ctx.moveTo(x + 40 + params.F * 2, canvas.height - 70);
-          ctx.lineTo(x + 40 + params.F * 2 - 10, canvas.height - 75);
-          ctx.lineTo(x + 40 + params.F * 2 - 10, canvas.height - 65);
-          ctx.fill();
-          
-          ctx.fillStyle = '#1f2937';
-          ctx.font = '14px Arial';
-          ctx.fillText('F = ' + params.F + ' N', x + 45 + params.F * 2, canvas.height - 75);
-          ctx.fillText('m = ' + params.m + ' kg', x + 5, canvas.height - 95);
-          ctx.fillText('v = ' + velRef.current.toFixed(2) + ' m/s', 10, 20);
-          ctx.fillText('a = ' + a.toFixed(2) + ' m/s²', 10, 40);
-          
-          if (x > canvas.width) shouldContinue = false;
-          
-        } else if (simType === 'friccion') {
-          const g = 9.81;
-          const N = params.m * g;
-          const Fr = params.mu * N;
-          const Fneta = params.F - Fr;
-          const a = Fneta / params.m;
-          
-          if (a > 0) {
-            velRef.current += a * 0.05;
-            posRef.current += velRef.current * 0.05 * 10;
+          if (simType === 'fuerza' || simType === 'friccion') {
+            let F_neta = 0;
+            if (simType === 'fuerza') {
+              F_neta = p.fuerza;
+            } else { // 'friccion'
+              const F_friccion = p.mu_c * p.masa * G;
+              F_neta = p.fuerza - F_friccion;
+              if (F_neta < 0 && state.vel === 0) F_neta = 0; // Fricción estática
+              else if (F_neta < 0 && state.vel > 0) F_neta = -F_friccion; // Frenando
+            }
+            
+            a = F_neta / p.masa;
+            state.vel += a * dt;
+            state.pos += state.vel * dt;
+            pos = state.pos;
+            vel = state.vel;
+
+            const sueloY = yOffset + canvasHeight - 50;
+            x_canvas = 50 + state.pos * p.escala;
+            y_canvas = sueloY - 40; // 40 = altura del bloque
+
+            // --- Dibujar Suelo ---
+            ctx.fillStyle = '#374151'; ctx.fillRect(0, sueloY, canvas.width, 50);
+            // --- Dibujar Bloque ---
+            ctx.fillStyle = color; ctx.fillRect(x_canvas, y_canvas, 40, 40);
+
+            // --- Dibujar Vectores ---
+            ctx.strokeStyle = '#ef4444'; ctx.lineWidth = 3; // F_aplicada
+            ctx.beginPath(); ctx.moveTo(x_canvas + 40, y_canvas + 20); ctx.lineTo(x_canvas + 40 + p.fuerza * 1.5, y_canvas + 20); ctx.stroke();
+            if (simType === 'friccion') {
+              const F_friccion_viz = (p.mu_c * p.masa * G) * 1.5;
+              ctx.strokeStyle = '#f59e0b'; // F_friccion
+              ctx.beginPath(); ctx.moveTo(x_canvas, y_canvas + 20); ctx.lineTo(x_canvas - F_friccion_viz, y_canvas + 20); ctx.stroke();
+            }
+
+          } else if (simType === 'plano') {
+            const theta_rad = (p.theta * Math.PI) / 180;
+            const F_paralela = p.masa * G * Math.sin(theta_rad);
+            const F_normal = p.masa * G * Math.cos(theta_rad);
+            const F_friccion = p.mu_c * F_normal;
+            let F_neta = F_paralela - F_friccion;
+            
+            if (F_neta < 0) F_neta = 0;
+            a = F_neta / p.masa;
+            
+            state.vel += a * dt;
+            state.pos += state.vel * dt; // pos es la distancia a lo largo del plano
+            pos = state.pos;
+            vel = state.vel;
+
+            const startX = 50;
+            const startY = yOffset + canvasHeight - 50;
+            const planeLength = canvas.width - 100;
+            const endY = startY - planeLength * Math.sin(theta_rad);
+            
+            // --- Dibujar Plano ---
+            ctx.strokeStyle = '#374151'; ctx.lineWidth = 4;
+            ctx.beginPath(); ctx.moveTo(startX, startY); ctx.lineTo(startX + planeLength, endY); ctx.stroke();
+            
+            // --- Dibujar Bloque ---
+            x_canvas = startX + state.pos * p.escala * Math.cos(theta_rad);
+            y_canvas = startY - state.pos * p.escala * Math.sin(theta_rad);
+            
+            ctx.save();
+            ctx.translate(x_canvas, y_canvas);
+            ctx.rotate(-theta_rad);
+            ctx.fillStyle = color;
+            ctx.fillRect(-20, -40, 40, 40); // Dibujar el bloque
+            ctx.restore();
+            
+          } else if (simType === 'circular') {
+            const r_px = p.radio_circ * p.escala;
+            const omega = p.v_circ / p.radio_circ;
+            state.angulo += omega * dt;
+            
+            x_canvas = centerX + r_px * Math.cos(state.angulo);
+            y_canvas = centerY + r_px * Math.sin(state.angulo);
+            
+            a = (p.v_circ * p.v_circ) / p.radio_circ; // Aceleración centrípeta
+            pos = state.angulo; // Posición angular
+            vel = p.v_circ; // Velocidad tangencial
+            
+            // --- Dibujar Órbita ---
+            ctx.strokeStyle = '#d1d5db'; ctx.lineWidth = 2; ctx.setLineDash([5, 5]);
+            ctx.beginPath(); ctx.arc(centerX, centerY, r_px, 0, 2 * Math.PI); ctx.stroke();
+            ctx.setLineDash([]);
+            
+            // --- Dibujar Cuerda/Radio ---
+            ctx.strokeStyle = '#6b7280'; ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.moveTo(centerX, centerY); ctx.lineTo(x_canvas, y_canvas); ctx.stroke();
+            
+            // --- Dibujar Fuerza Centrípeta ---
+            const F_c_viz = p.masa * a * 2;
+            ctx.strokeStyle = '#ef4444'; ctx.lineWidth = 3;
+            ctx.beginPath(); ctx.moveTo(x_canvas, y_canvas); ctx.lineTo(x_canvas + F_c_viz * -Math.cos(state.angulo), y_canvas + F_c_viz * -Math.sin(state.angulo)); ctx.stroke();
+
+            // --- Dibujar Objeto ---
+            ctx.fillStyle = color;
+            ctx.beginPath(); ctx.arc(x_canvas, y_canvas, 15, 0, 2 * Math.PI); ctx.fill();
           }
-          x = posRef.current;
           
-          ctx.fillStyle = '#374151';
-          ctx.fillRect(0, canvas.height - 50, canvas.width, 50);
+          if (t > p.tiempoMax) shouldContinue = false;
           
-          ctx.fillStyle = '#3b82f6';
-          ctx.fillRect(x, canvas.height - 90, 40, 40);
-          
-          ctx.strokeStyle = '#ef4444';
-          ctx.lineWidth = 3;
-          ctx.beginPath();
-          ctx.moveTo(x + 40, canvas.height - 70);
-          ctx.lineTo(x + 40 + params.F * 2, canvas.height - 70);
-          ctx.stroke();
-          
-          ctx.fillStyle = '#ef4444';
-          ctx.beginPath();
-          ctx.moveTo(x + 40 + params.F * 2, canvas.height - 70);
-          ctx.lineTo(x + 40 + params.F * 2 - 10, canvas.height - 75);
-          ctx.lineTo(x + 40 + params.F * 2 - 10, canvas.height - 65);
-          ctx.fill();
-          
-          ctx.strokeStyle = '#f59e0b';
-          ctx.lineWidth = 3;
-          ctx.beginPath();
-          ctx.moveTo(x, canvas.height - 70);
-          ctx.lineTo(x - Fr * 2, canvas.height - 70);
-          ctx.stroke();
-          
-          ctx.fillStyle = '#f59e0b';
-          ctx.beginPath();
-          ctx.moveTo(x - Fr * 2, canvas.height - 70);
-          ctx.lineTo(x - Fr * 2 + 10, canvas.height - 75);
-          ctx.lineTo(x - Fr * 2 + 10, canvas.height - 65);
-          ctx.fill();
-          
-          ctx.fillStyle = '#1f2937';
-          ctx.font = '12px Arial';
-          ctx.fillText('F = ' + params.F + ' N', x + 45 + params.F * 2, canvas.height - 75);
-          ctx.fillText('Fr = ' + Fr.toFixed(2) + ' N', x - Fr * 2 - 60, canvas.height - 75);
-          ctx.fillText('μ = ' + params.mu, x + 5, canvas.height - 95);
-          ctx.fillText('v = ' + velRef.current.toFixed(2) + ' m/s', 10, 20);
-          
-          if (x > canvas.width) shouldContinue = false;
-          
-        } else if (simType === 'plano') {
-          const g = 9.81;
-          const thetaRad = params.theta * Math.PI / 180;
-          const Fp = params.m * g * Math.sin(thetaRad);
-          const a = Fp / params.m;
-          
-          velRef.current += a * 0.05;
-          posRef.current += velRef.current * 0.05 * 10;
-          x = posRef.current;
-          
-          const planeY = canvas.height - 100;
-          const planeEndX = canvas.width - 100;
-          const planeEndY = planeY - (planeEndX * Math.tan(thetaRad));
-          
-          ctx.strokeStyle = '#6b7280';
-          ctx.lineWidth = 4;
-          ctx.beginPath();
-          ctx.moveTo(0, planeY);
-          ctx.lineTo(planeEndX, planeEndY);
-          ctx.stroke();
-          
-          const boxY = planeY - (x * Math.tan(thetaRad));
-          
-          ctx.save();
-          ctx.translate(x + 20, boxY - 20);
-          ctx.rotate(-thetaRad);
-          ctx.fillStyle = '#3b82f6';
-          ctx.fillRect(-20, -20, 40, 40);
-          ctx.restore();
-          
-          ctx.fillStyle = '#1f2937';
-          ctx.font = '14px Arial';
-          ctx.fillText('θ = ' + params.theta + '°', 10, 20);
-          ctx.fillText('v = ' + velRef.current.toFixed(2) + ' m/s', 10, 40);
-          ctx.fillText('a = ' + a.toFixed(2) + ' m/s²', 10, 60);
-          
-          if (x > planeEndX - 50) shouldContinue = false;
+          return { pos, vel, a, shouldContinue };
+        };
+
+        // --- Bucle de Animación ---
+        const result1 = drawSimulation(params, 0, phyState1, '#3b82f6');
+        let result2 = null;
+        
+        const canCompare = true;
+        if (compareMode && canCompare) {
+          ctx.strokeStyle = '#1f2937'; ctx.lineWidth = 4; ctx.beginPath();
+          ctx.moveTo(0, canvas.height / 2); ctx.lineTo(canvas.width, canvas.height / 2); ctx.stroke();
+          result2 = drawSimulation(params2, canvas.height / 2, phyState2, '#ec4899');
         }
 
-        timeRef.current += 0.05;
+        const t = timeRef.current;
+        timeRef.current += dt;
+
+        // Actualizar datos de gráficas (solo del Objeto 1)
+        setGraphData(prev => [...prev, {
+          tiempo: parseFloat(t.toFixed(2)),
+          posicion: parseFloat(result1.pos.toFixed(2)),
+          velocidad: parseFloat(result1.vel.toFixed(2)),
+          aceleracion: parseFloat(result1.a.toFixed(2)),
+        }]);
+
+        let shouldContinue = result1.shouldContinue;
+        if (compareMode && canCompare) {
+            shouldContinue = result1.shouldContinue || (result2 && result2.shouldContinue);
+        }
 
         if (shouldContinue) {
           animationRef.current = requestAnimationFrame(animate);
@@ -2433,62 +3749,286 @@ function DinamicaSimulation() {
         cancelAnimationFrame(animationRef.current);
       }
     };
-  }, [isRunning, simType, params]);
+  }, [isRunning, simType, params, params2, compareMode]);
 
-  return (
-    <div className="p-8 max-w-6xl mx-auto">
-      <h2 className="text-3xl font-bold text-gray-800 mb-6">Simulación de Dinámica</h2>
+  const resetSimulation = () => {
+    setIsRunning(false);
+    timeRef.current = 0;
+    setGraphData([]);
+  };
+  
+  // --- Componente de Gráfica (Reutilizable) ---
+  const Grafica = ({ dataKey, color, unit, name }) => (
+    <div className="bg-white p-4 rounded-lg shadow-md h-64">
+      <h4 className="font-bold text-gray-700 text-sm mb-2 capitalize">{name} vs. Tiempo</h4>
+      <ResponsiveContainer width="100%" height="100%">
+        <LineChart data={graphData} margin={{ top: 5, right: 20, left: -5, bottom: 20 }}>
+          <CartesianGrid strokeDasharray="3 3" />
+          <XAxis 
+            dataKey="tiempo" 
+            label={{ value: "Tiempo (s)", position: 'insideBottom', offset: -10 }} 
+            tick={{ fontSize: 10 }}
+          />
+          <YAxis 
+            label={{ value: unit, angle: -90, position: 'insideLeft', offset: 5 }}
+            tick={{ fontSize: 10 }}
+            domain={['auto', 'auto']}
+          />
+          <Tooltip 
+            formatter={(value) => [`${value} ${unit}`, name]}
+            labelFormatter={(label) => `Tiempo: ${label} s`}
+          />
+          <Legend verticalAlign="top" height={36}/>
+          <Line 
+            type="monotone" 
+            dataKey={dataKey} 
+            stroke={color} 
+            strokeWidth={2} 
+            dot={false} 
+            name={name}
+            isAnimationActive={false}
+          />
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+  );
 
-      <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6">
-        <p className="text-sm text-gray-700">Visualiza fuerzas, fricción y movimiento en planos inclinados.</p>
-      </div>
-
-      <div className="mb-6">
-        <label className="block text-sm font-semibold text-gray-700 mb-2">Tipo de Simulación</label>
-        <select value={simType} onChange={(e) => { setSimType(e.target.value); setIsRunning(false); }} className="w-full p-3 border border-gray-300 rounded-lg">
-          <option value="fuerza">Fuerza Aplicada (F = ma)</option>
-          <option value="friccion">Fuerza con Fricción</option>
-          <option value="plano">Plano Inclinado</option>
-        </select>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Masa: {params.m} kg</label>
-          <input type="range" min="1" max="20" value={params.m} onChange={(e) => setParams({...params, m: Number(e.target.value)})} className="w-full" disabled={isRunning} />
+  // --- Inputs Dinámicos ---
+  const renderInputs = (p, setP) => {
+    const isP1 = p === params;
+    return (
+      <>
+        <div className="mb-3">
+          <label className="block text-xs font-medium text-gray-700 mb-1">Masa (kg)</label>
+          <input type="number" step="1" value={p.masa} onChange={(e) => setP({...p, masa: Number(e.target.value)})} className="w-full p-2 border-2 border-gray-300 rounded-lg text-sm" disabled={isRunning} />
         </div>
+        
+        {isP1 && (
+          <div className="mb-3">
+            <label className="block text-xs font-medium text-gray-700 mb-1">Velocidad Inicial (m/s)</label>
+            <input type="number" step="1" value={p.v0} onChange={(e) => setP({...p, v0: Number(e.target.value)})} className="w-full p-2 border-2 border-gray-300 rounded-lg text-sm" disabled={isRunning} />
+          </div>
+        )}
+
         {(simType === 'fuerza' || simType === 'friccion') && (
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Fuerza: {params.F} N</label>
-            <input type="range" min="5" max="50" value={params.F} onChange={(e) => setParams({...params, F: Number(e.target.value)})} className="w-full" disabled={isRunning} />
+          <div className="mb-3">
+            <label className="block text-xs font-medium text-gray-700 mb-1">Fuerza Aplicada (N)</label>
+            <input type="number" step="5" value={p.fuerza} onChange={(e) => setP({...p, fuerza: Number(e.target.value)})} className="w-full p-2 border-2 border-gray-300 rounded-lg text-sm" disabled={isRunning} />
           </div>
         )}
-        {simType === 'friccion' && (
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Coef. fricción: {params.mu}</label>
-            <input type="range" min="0" max="1" step="0.05" value={params.mu} onChange={(e) => setParams({...params, mu: Number(e.target.value)})} className="w-full" disabled={isRunning} />
+        
+        {(simType === 'friccion' || simType === 'plano') && (
+          <div className="mb-3">
+            <label className="block text-xs font-medium text-gray-700 mb-1">Coef. Fricción (μ_c)</label>
+            <input type="number" step="0.05" min="0" max="1" value={p.mu_c} onChange={(e) => setP({...p, mu_c: Number(e.target.value)})} className="w-full p-2 border-2 border-gray-300 rounded-lg text-sm" disabled={isRunning} />
           </div>
         )}
+
         {simType === 'plano' && (
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Ángulo: {params.theta}°</label>
-            <input type="range" min="10" max="60" value={params.theta} onChange={(e) => setParams({...params, theta: Number(e.target.value)})} className="w-full" disabled={isRunning} />
+          <div className="mb-3">
+            <label className="block text-xs font-medium text-gray-700 mb-1">Ángulo Plano (°)</label>
+            <input type="number" step="5" min="0" max="90" value={p.theta} onChange={(e) => setP({...p, theta: Number(e.target.value)})} className="w-full p-2 border-2 border-gray-300 rounded-lg text-sm" disabled={isRunning} />
           </div>
         )}
-        <div className="flex items-end">
-          <button onClick={() => setIsRunning(!isRunning)} className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors">
-            {isRunning ? 'Detener' : 'Iniciar'}
+        
+        {simType === 'circular' && (
+          <>
+            <div className="mb-3">
+              <label className="block text-xs font-medium text-gray-700 mb-1">Radio (m)</label>
+              <input type="number" step="0.5" min="0.5" value={p.radio_circ} onChange={(e) => setP({...p, radio_circ: Number(e.target.value)})} className="w-full p-2 border-2 border-gray-300 rounded-lg text-sm" disabled={isRunning} />
+            </div>
+            <div className="mb-3">
+              <label className="block text-xs font-medium text-gray-700 mb-1">Velocidad (m/s)</label>
+              <input type="number" step="1" value={p.v_circ} onChange={(e) => setP({...p, v_circ: Number(e.target.value)})} className="w-full p-2 border-2 border-gray-300 rounded-lg text-sm" disabled={isRunning} />
+            </div>
+          </>
+        )}
+
+        {isP1 && (
+          <>
+            <div className="mb-3">
+              <label className="block text-xs font-medium text-gray-700 mb-1">Escala (px/m)</label>
+              <input type="number" value={p.escala} onChange={(e) => setP({...p, escala: Number(e.target.value)})} className="w-full p-2 border-2 border-gray-300 rounded-lg text-sm" disabled={isRunning} />
+            </div>
+            <div className="mb-3">
+              <label className="block text-xs font-medium text-gray-700 mb-1">Tiempo máx (s)</label>
+              <input type="number" value={p.tiempoMax} onChange={(e) => setP({...p, tiempoMax: Number(e.target.value)})} className="w-full p-2 border-2 border-gray-300 rounded-lg text-sm" disabled={isRunning} />
+            </div>
+          </>
+        )}
+      </>
+    );
+  };
+
+  const canCompare = true;
+
+  // --- RENDER ---
+  return (
+    <div className="p-6 max-w-[1900px] mx-auto bg-gradient-to-br from-blue-50 to-indigo-50 min-h-screen">
+      <div className="flex justify-between items-center mb-4">
+        <div>
+          <h2 className="text-4xl font-bold text-gray-800 mb-1">Simulación de Dinámica (Leyes de Newton)</h2>
+          <p className="text-gray-600">Gráficas en tiempo real • Comparación • Análisis predictivo</p>
+        </div>
+        <div className="flex gap-2">
+          <button 
+            onClick={() => { setCompareMode(!compareMode); resetSimulation(); }}
+            className={`px-4 py-2 rounded-lg font-semibold transition-all ${
+              compareMode ? 'bg-purple-600 text-white shadow-lg' : 'bg-white border-2 border-purple-600 text-purple-600'
+            }`}
+          >
+            {compareMode ? '✓ Comparando' : '⚖️ Comparar'}
+          </button>
+          <button 
+            onClick={() => { setShowProblem(!showProblem); setShowSolution(false); }}
+            className="px-4 py-2 bg-orange-500 text-white rounded-lg font-semibold hover:bg-orange-600 transition-all"
+          >
+            {showProblem ? 'Ocultar' : '📝 Problema'}
           </button>
         </div>
       </div>
 
-      <div className="bg-white border-2 border-gray-300 rounded-lg overflow-hidden">
-        <canvas ref={canvasRef} width={800} height={400} className="w-full" />
+      {showProblem && (
+        <div className="bg-orange-50 border-l-4 border-orange-500 p-5 mb-4 rounded-lg shadow-md">
+          <div className="flex justify-between items-start mb-3">
+            <h3 className="font-bold text-orange-800 text-lg">📚 Problema {problemaActual + 1} de 3: {simTypeNombresDinamica[simType]}</h3>
+            <div className="flex gap-2">
+              <button 
+                onClick={() => setProblemaActual((problemaActual - 1 + 3) % 3)}
+                className="bg-orange-400 text-white px-3 py-1 rounded-lg text-sm font-semibold hover:bg-orange-500"
+              >
+                ◀ Anterior
+              </button>
+              <button 
+                onClick={() => setProblemaActual((problemaActual + 1) % 3)}
+                className="bg-orange-400 text-white px-3 py-1 rounded-lg text-sm font-semibold hover:bg-orange-500"
+              >
+                Siguiente ▶
+              </button>
+            </div>
+          </div>
+          <p className="text-gray-800 mb-3 font-medium">{problemas[simType][problemaActual].enunciado}</p>
+          <div className="flex gap-2">
+            <button 
+              onClick={() => setShowSolution(!showSolution)}
+              className="bg-orange-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-orange-700"
+            >
+              {showSolution ? '🔒 Ocultar Solución' : '💡 Ver Solución'}
+            </button>
+            <button 
+              onClick={() => setIsRunning(true)}
+              className="bg-blue-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-blue-700"
+            >
+              ▶ Simular Problema
+            </button>
+          </div>
+          {showSolution && (
+            <div className="mt-4 bg-white p-4 rounded-lg border-2 border-orange-300">
+              <h4 className="font-bold text-gray-700 mb-2">✅ Solución:</h4>
+              <pre className="text-gray-800 font-mono text-sm whitespace-pre-wrap">{problemas[simType][problemaActual].solucion}</pre>
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 xl:grid-cols-5 gap-4">
+        {/* Panel de controles */}
+        <div className="xl:col-span-1 space-y-4">
+          <div className="bg-white p-4 rounded-lg shadow-md">
+            <label className="block text-sm font-bold text-gray-700 mb-2">Tipo de Sistema</label>
+            <select 
+              value={simType} 
+              onChange={(e) => { setSimType(e.target.value); resetSimulation(); setProblemaActual(0); }} 
+              className="w-full p-2 border-2 border-gray-300 rounded-lg"
+            >
+              {Object.keys(simTypeNombresDinamica).map(key => (
+                <option key={key} value={key}>{simTypeNombresDinamica[key]}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="bg-white p-4 rounded-lg shadow-md border-l-4 border-blue-500">
+            <h3 className="font-bold text-blue-700 mb-3">🔵 Objeto 1</h3>
+            {renderInputs(params, setParams)}
+          </div>
+
+          {compareMode && canCompare && (
+            <div className="bg-white p-4 rounded-lg shadow-md border-l-4 border-pink-500">
+              <h3 className="font-bold text-pink-700 mb-3">🔴 Objeto 2</h3>
+              {renderInputs(params2, setParams2)}
+            </div>
+          )}
+
+          <div className="bg-gradient-to-br from-green-50 to-blue-50 p-4 rounded-lg shadow-md border-2 border-green-400">
+            <h3 className="font-bold text-green-800 mb-2 text-sm">📊 Cálculos Predictivos (Obj 1)</h3>
+            <div className="text-xs space-y-1 text-gray-700">
+              <p><strong>Aceleración:</strong> {predicciones.aceleracion || predicciones.aceleracionCentripeta} m/s²</p>
+              <p><strong>Fuerza Neta:</strong> {predicciones.fuerzaNeta || predicciones.fuerzaCentripeta} N</p>
+              
+              {simType === 'friccion' && <p><strong>F. Fricción:</strong> {predicciones.fuerzaFriccion} N</p>}
+              {simType === 'plano' && <p><strong>F. Paralela:</strong> {predicciones.fuerzaParalela} N</p>}
+              {simType === 'circular' && <p><strong>Período:</strong> {predicciones.periodo} s</p>}
+              
+              {(simType === 'fuerza' || simType === 'friccion') && <p><strong>Vel. Final:</strong> {predicciones.velocidadFinal} m/s</p>}
+            </div>
+          </div>
+
+          <div className="flex gap-2">
+            <button 
+              onClick={() => setIsRunning(!isRunning)} 
+              className={`flex-1 py-3 rounded-lg font-bold transition-all ${
+                isRunning 
+                  ? 'bg-red-500 hover:bg-red-600 text-white shadow-lg' 
+                  : 'bg-blue-600 hover:bg-blue-700 text-white shadow-lg'
+              }`}
+            >
+              {isRunning ? '⏸ Pausar' : '▶ Iniciar'}
+            </button>
+            <button 
+              onClick={resetSimulation} 
+              className="flex-1 bg-gray-500 hover:bg-gray-600 text-white py-3 rounded-lg font-bold transition-all shadow-lg"
+            >
+              🔄 Reiniciar
+            </button>
+          </div>
+        </div>
+
+        {/* Canvas y Gráficas */}
+        <div className="xl:col-span-4 space-y-4">
+          <div className="bg-white border-4 border-gray-300 rounded-lg overflow-hidden shadow-lg">
+            <canvas ref={canvasRef} width={1100} height={compareMode && canCompare ? 600 : 500} className="w-full" />
+          </div>
+
+          {/* Gráficas en tiempo real */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            
+            <Grafica 
+              dataKey="posicion" 
+              color="#3b82f6" 
+              unit={simType === 'circular' ? 'rad' : 'm'}
+              name={simType === 'circular' ? 'Posición Angular' : 'Posición'}
+            />
+            
+            <Grafica 
+              dataKey="velocidad" 
+              color="#10b981" 
+              unit="m/s"
+              name="Velocidad"
+            />
+            
+            <Grafica 
+              dataKey="aceleracion" 
+              color="#ef4444" 
+              unit="m/s²"
+              name={simType === 'circular' ? 'Acel. Centrípeta' : 'Aceleración'}
+            />
+            
+          </div>
+        </div>
       </div>
     </div>
   );
 }
-
 const ClassicalMechanicsApp = () => {
   const [selectedTopic, setSelectedTopic] = useState(null);
   const [selectedSection, setSelectedSection] = useState('historia');
@@ -2927,7 +4467,7 @@ Etotal = constante
 En sistemas donde actúan fuerzas no conservativas, como el rozamiento, la pérdida de energía mecánica se convierte en otras formas de energía, generalmente calor o sonido.`
       },
       calculadora: { component: TrabajoCalculator },
-      simulacion: { component: TrabajoSimulation }
+      simulacion: { component: TrabajoSimulacion }
     },
     conservacion: {
       historia: {
@@ -5807,7 +7347,7 @@ Además, las ondas electromagnéticas son utilizadas en medicina (rayos X, reson
       return (
         <div className="flex flex-col items-center justify-center h-full text-center p-8">
           <BookOpen className="w-24 h-24 text-blue-500 mb-6" />
-          <h2 className="text-3xl font-bold text-gray-800 mb-4">Aplicación de Fisica</h2>
+          <h2 className="text-3xl font-bold text-gray-800 mb-4">Ingeniería de Sistemas e Informatica</h2>
           <p className="text-gray-600 text-lg max-w-2xl">
             Seleccione un tema del menú lateral para acceder a su contenido.
           </p>
@@ -5849,7 +7389,7 @@ Además, las ondas electromagnéticas son utilizadas en medicina (rayos X, reson
     <div className="flex h-screen bg-gray-50">
       <div className="w-80 bg-gradient-to-b from-blue-900 to-blue-800 text-white overflow-y-auto">
         <div className="p-6 border-b border-blue-700">
-          <h1 className="text-2xl font-bold mb-2">Fisica</h1>
+          <h1 className="text-2xl font-bold mb-2">Fisica Lab</h1>
           <p className="text-blue-200 text-sm">Sistema de Aprendizaje Integral</p>
         </div>
         
@@ -6123,14 +7663,153 @@ function CinematicaCalculator() {
     </div>
   );
 }
-
 function CinematicaSimulation() {
   const canvasRef = useRef(null);
   const [isRunning, setIsRunning] = useState(false);
   const [simType, setSimType] = useState('mru');
-  const [params, setParams] = useState({ v0: 20, angle: 45, a: 3, omega: 1 });
+  const [compareMode, setCompareMode] = useState(false);
+  const [showProblem, setShowProblem] = useState(false);
+  const [showSolution, setShowSolution] = useState(false);
+  
+  const [params, setParams] = useState({ 
+    v0: 20, 
+    angle: 45, 
+    a: 3, 
+    omega: 1,
+    radio: 120,
+    tiempoMax: 10,
+    escalaX: 5,
+    escalaY: 5
+  });
+  
+  const [params2, setParams2] = useState({ 
+    v0: 15, 
+    angle: 60, 
+    a: 2,
+    escalaX: 5,
+    escalaY: 5
+  });
+  
+  const [showComponents, setShowComponents] = useState(false);
+  const [graphData, setGraphData] = useState([]);
+  const [problemaActual, setProblemaActual] = useState(0);
   const animationRef = useRef(null);
   const timeRef = useRef(0);
+  const trajectoryRef = useRef([]);
+  const trajectoryRef2 = useRef([]);
+
+  // Cálculos predictivos
+  const calcularPredicciones = () => {
+    const { v0, angle, a, tiempoMax } = params;
+    const g = 9.81;
+    
+    if (simType === 'mru') {
+      return {
+        tipo: 'MRU',
+        ecuacion: 'x = x₀ + v·t',
+        distanciaTotal: (v0 * tiempoMax).toFixed(2),
+        velocidadFinal: v0.toFixed(2),
+        tiempoPara100m: (100 / v0).toFixed(2)
+      };
+    } else if (simType === 'mrua') {
+      const vf = v0 + a * tiempoMax;
+      const dist = v0 * tiempoMax + 0.5 * a * tiempoMax * tiempoMax;
+      return {
+        tipo: 'MRUA',
+        ecuacion: 'x = x₀ + v₀·t + ½·a·t²',
+        distanciaTotal: dist.toFixed(2),
+        velocidadFinal: vf.toFixed(2),
+        aceleracion: a.toFixed(2)
+      };
+    } else if (simType === 'parabolico') {
+      const angleRad = (angle * Math.PI) / 180;
+      const vx = v0 * Math.cos(angleRad);
+      const vy = v0 * Math.sin(angleRad);
+      const tVuelo = (2 * vy) / g;
+      const alcance = vx * tVuelo;
+      const alturaMax = (vy * vy) / (2 * g);
+      return {
+        tipo: 'Parabólico',
+        alcanceMaximo: alcance.toFixed(2),
+        alturaMaxima: alturaMax.toFixed(2),
+        tiempoVuelo: tVuelo.toFixed(2),
+        componenteX: vx.toFixed(2),
+        componenteY: vy.toFixed(2)
+      };
+    } else if (simType === 'circular') {
+      const periodo = (2 * Math.PI) / params.omega;
+      const freq = 1 / periodo;
+      return {
+        tipo: 'Circular',
+        periodo: periodo.toFixed(2),
+        frecuencia: freq.toFixed(3),
+        velocidadLineal: (params.omega * 120).toFixed(2),
+        aceleracionCentripeta: (params.omega * params.omega * 120).toFixed(2)
+      };
+    }
+  };
+
+  const predicciones = calcularPredicciones();
+
+  // Generar problemas (3 por tipo)
+  const problemas = {
+    mru: [
+      {
+        enunciado: `Un tren viaja a velocidad constante de ${params.v0} m/s. ¿Qué distancia recorre en ${params.tiempoMax} segundos?`,
+        solucion: `Usando x = v·t\nx = ${params.v0} × ${params.tiempoMax} = ${predicciones.distanciaTotal} metros`
+      },
+      {
+        enunciado: `Un auto se mueve a ${params.v0} m/s. ¿Cuánto tiempo tarda en recorrer 100 metros?`,
+        solucion: `Usando t = x / v\nt = 100 / ${params.v0} = ${predicciones.tiempoPara100m} segundos`
+      },
+      {
+        enunciado: `Si un corredor mantiene una velocidad de ${params.v0} m/s, ¿qué distancia recorre en ${params.tiempoMax / 2} segundos?`,
+        solucion: `Usando x = v·t\nx = ${params.v0} × ${params.tiempoMax / 2} = ${(params.v0 * (params.tiempoMax / 2)).toFixed(2)} metros`
+      }
+    ],
+    mrua: [
+      {
+        enunciado: `Un auto con velocidad inicial de ${params.v0} m/s acelera a ${params.a} m/s². ¿Qué velocidad alcanza en ${params.tiempoMax} segundos?`,
+        solucion: `Usando v = v₀ + a·t\nv = ${params.v0} + ${params.a} × ${params.tiempoMax} = ${predicciones.velocidadFinal} m/s`
+      },
+      {
+        enunciado: `Un cohete parte de ${params.v0} m/s con aceleración de ${params.a} m/s². ¿Qué distancia recorre en ${params.tiempoMax} s?`,
+        solucion: `Usando x = v₀·t + ½·a·t²\nx = ${params.v0}·${params.tiempoMax} + ½·${params.a}·(${params.tiempoMax}²) = ${predicciones.distanciaTotal} metros`
+      },
+      {
+        enunciado: `Un ciclista parte de ${params.v0} m/s y acelera a ${params.a} m/s². ¿Cuánto tiempo tarda en alcanzar ${params.v0 + 20} m/s?`,
+        solucion: `Usando t = (v_f - v_0) / a\nt = (${params.v0 + 20} - ${params.v0}) / ${params.a} = ${((20) / params.a).toFixed(2)} segundos`
+      }
+    ],
+    parabolico: [
+      {
+        enunciado: `Se lanza un proyectil con velocidad de ${params.v0} m/s y ángulo de ${params.angle}°. ¿Cuál es el alcance máximo?`,
+        solucion: `Alcance = (v₀²·sen(2θ))/g\nAlcance = ${predicciones.alcanceMaximo} metros`
+      },
+      {
+        enunciado: `Un cañón dispara un proyectil a ${params.v0} m/s con ${params.angle}°. ¿Cuál es la altura máxima (H_max) que alcanza?`,
+        solucion: `H_max = (v₀²·sen²(θ))/2g\nH_max = ${predicciones.alturaMaxima} metros`
+      },
+      {
+        enunciado: `Se patea un balón a ${params.v0} m/s y ${params.angle}°. ¿Cuánto tiempo permanece en el aire?`,
+        solucion: `T_vuelo = (2·v₀·sen(θ))/g\nT_vuelo = ${predicciones.tiempoVuelo} segundos`
+      }
+    ],
+    circular: [
+      {
+        enunciado: `Un objeto gira con ω = ${params.omega} rad/s en un radio de ${params.radio} px. ¿Cuál es el período?`,
+        solucion: `Período T = 2π/ω\nT = ${predicciones.periodo} segundos`
+      },
+      {
+        enunciado: `Una rueda gira con ω = ${params.omega} rad/s. ¿Cuál es su frecuencia (f) en Hertz?`,
+        solucion: `f = ω / 2π\nf = ${params.omega} / (2π) = ${predicciones.frecuencia} Hz`
+      },
+      {
+        enunciado: `Un satélite orbita con ω = ${params.omega} rad/s a un radio de ${params.radio} px. ¿Cuál es su aceleración centrípeta?`,
+        solucion: `a_c = ω²·r\na_c = ${params.omega}² × ${params.radio} = ${predicciones.aceleracionCentripeta} m/s²`
+      }
+    ]
+  };
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -6139,120 +7818,282 @@ function CinematicaSimulation() {
 
     if (isRunning) {
       timeRef.current = 0;
+      trajectoryRef.current = [];
+      trajectoryRef2.current = [];
+      setGraphData([]);
       
       const animate = () => {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         
-        ctx.strokeStyle = '#374151';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(0, canvas.height - 50);
-        ctx.lineTo(canvas.width, canvas.height - 50);
-        ctx.stroke();
-
-        const t = timeRef.current;
-        let x = 0;
-        let y = 0;
-        let shouldContinue = true;
-
-        if (simType === 'mru') {
-          x = 50 + params.v0 * t * 8;
-          y = canvas.height - 70;
-          
-          ctx.strokeStyle = '#93c5fd';
+        const canvasHeight = compareMode ? canvas.height / 2 : canvas.height;
+        
+        const drawSimulation = (p, yOffset, traj, color) => {
+          // Cuadrícula y marcadores
+          ctx.strokeStyle = '#e5e7eb';
           ctx.lineWidth = 1;
-          ctx.setLineDash([5, 5]);
-          ctx.beginPath();
-          ctx.moveTo(0, y);
-          ctx.lineTo(canvas.width, y);
-          ctx.stroke();
-          ctx.setLineDash([]);
           
-          if (x > canvas.width) shouldContinue = false;
-          
-        } else if (simType === 'mrua') {
-          x = 50 + params.v0 * t * 8 + 0.5 * params.a * t * t * 8;
-          y = canvas.height - 70;
-          
-          ctx.strokeStyle = '#93c5fd';
-          ctx.lineWidth = 1;
-          ctx.setLineDash([5, 5]);
-          ctx.beginPath();
-          ctx.moveTo(0, y);
-          ctx.lineTo(canvas.width, y);
-          ctx.stroke();
-          ctx.setLineDash([]);
-          
-          if (x > canvas.width) shouldContinue = false;
-          
-        } else if (simType === 'parabolico') {
-          const g = 9.81;
-          const angleRad = (params.angle * Math.PI) / 180;
-          const vx = params.v0 * Math.cos(angleRad);
-          const vy = params.v0 * Math.sin(angleRad);
-          
-          x = vx * t * 8 + 50;
-          y = canvas.height - 50 - (vy * t - 0.5 * g * t * t) * 8;
-          
-          ctx.strokeStyle = '#93c5fd';
-          ctx.lineWidth = 2;
-          ctx.beginPath();
-          for (let i = 0; i < 200; i++) {
-            const ti = i * 0.05;
-            const xi = vx * ti * 8 + 50;
-            const yi = canvas.height - 50 - (vy * ti - 0.5 * g * ti * ti) * 8;
-            if (yi < canvas.height - 50 && xi < canvas.width) {
-              if (i === 0) ctx.moveTo(xi, yi);
-              else ctx.lineTo(xi, yi);
+          for (let i = 0; i < canvas.width; i += 50) {
+            ctx.beginPath();
+            ctx.moveTo(i, yOffset);
+            ctx.lineTo(i, yOffset + canvasHeight);
+            ctx.stroke();
+            
+            if (i > 50) {
+              ctx.fillStyle = '#6b7280';
+              ctx.font = 'bold 11px Arial';
+              const metros = ((i - 50) / p.escalaX).toFixed(0);
+              ctx.fillText(metros + 'm', i - 8, yOffset + canvasHeight - 10);
             }
           }
-          ctx.stroke();
           
-          if (y >= canvas.height - 50 || x > canvas.width) shouldContinue = false;
+          for (let i = 0; i < canvasHeight; i += 50) {
+            ctx.beginPath();
+            ctx.moveTo(0, yOffset + i);
+            ctx.lineTo(canvas.width, yOffset + i);
+            ctx.stroke();
+          }
+
+          const t = timeRef.current;
+          let x = 0, y = 0, vx = 0, vy = 0;
+          let shouldContinue = true;
+
+          if (simType === 'mru') {
+            x = 50 + p.v0 * t * p.escalaX;
+            y = yOffset + canvasHeight - 100;
+            vx = p.v0;
+            vy = 0;
+            
+            ctx.strokeStyle = '#1f2937';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(0, y + 20);
+            ctx.lineTo(canvas.width, y + 20);
+            ctx.stroke();
+            
+            if (x > canvas.width || t > p.tiempoMax) shouldContinue = false;
+            
+          } else if (simType === 'mrua') {
+            x = 50 + p.v0 * t * p.escalaX + 0.5 * p.a * t * t * p.escalaX;
+            y = yOffset + canvasHeight - 100;
+            vx = p.v0 + p.a * t;
+            vy = 0;
+            
+            ctx.strokeStyle = '#1f2937';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(0, y + 20);
+            ctx.lineTo(canvas.width, y + 20);
+            ctx.stroke();
+            
+            if (x > canvas.width || t > p.tiempoMax) shouldContinue = false;
+            
+          } else if (simType === 'parabolico') {
+            const g = 9.81;
+            const angleRad = (p.angle * Math.PI) / 180;
+            vx = p.v0 * Math.cos(angleRad);
+            vy = p.v0 * Math.sin(angleRad) - g * t;
+            
+            x = vx * t * p.escalaX + 50;
+            y = yOffset + canvasHeight - 50 - (p.v0 * Math.sin(angleRad) * t - 0.5 * g * t * t) * p.escalaY;
+            
+            ctx.strokeStyle = '#1f2937';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(0, yOffset + canvasHeight - 50);
+            ctx.lineTo(canvas.width, yOffset + canvasHeight - 50);
+            ctx.stroke();
+            
+            // Componentes del parabólico
+            if (showComponents) {
+              const compX = vx * t * p.escalaX + 50;
+              const compY = yOffset + canvasHeight - 50;
+              
+              // Línea horizontal (componente X)
+              ctx.strokeStyle = '#10b981';
+              ctx.lineWidth = 2;
+              ctx.setLineDash([5, 5]);
+              ctx.beginPath();
+              ctx.moveTo(50, compY);
+              ctx.lineTo(compX, compY);
+              ctx.stroke();
+              
+              // Línea vertical (componente Y)
+              ctx.strokeStyle = '#f59e0b';
+              ctx.beginPath();
+              ctx.moveTo(compX, compY);
+              ctx.lineTo(compX, y);
+              ctx.stroke();
+              ctx.setLineDash([]);
+              
+              // Etiquetas
+              ctx.fillStyle = '#10b981';
+              ctx.font = 'bold 12px Arial';
+              ctx.fillText(`MRU: vₓ=${vx.toFixed(1)} m/s`, compX - 80, compY + 15);
+              
+              ctx.fillStyle = '#f59e0b';
+              ctx.fillText(`Caída libre: vᵧ=${vy.toFixed(1)} m/s`, compX + 10, (y + compY) / 2);
+            }
+            
+            // Trayectoria teórica
+            ctx.strokeStyle = '#93c5fd';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([5, 5]);
+            ctx.beginPath();
+            for (let i = 0; i < 300; i++) {
+              const ti = i * 0.02;
+              const xi = vx * ti * p.escalaX + 50;
+              const yi = yOffset + canvasHeight - 50 - (p.v0 * Math.sin(angleRad) * ti - 0.5 * g * ti * ti) * p.escalaY;
+              if (yi < yOffset + canvasHeight - 50 && xi < canvas.width) {
+                if (i === 0) ctx.moveTo(xi, yi);
+                else ctx.lineTo(xi, yi);
+              }
+            }
+            ctx.stroke();
+            ctx.setLineDash([]);
+            
+            // Punto de altura máxima
+            const tMax = (p.v0 * Math.sin(angleRad)) / g;
+            if (Math.abs(t - tMax) < 0.15) {
+              const xMax = vx * tMax * p.escalaX + 50;
+              const yMax = yOffset + canvasHeight - 50 - (p.v0 * Math.sin(angleRad) * tMax - 0.5 * g * tMax * tMax) * p.escalaY;
+              
+              ctx.fillStyle = '#ef4444';
+              ctx.beginPath();
+              ctx.arc(xMax, yMax, 10, 0, 2 * Math.PI);
+              ctx.fill();
+              
+              ctx.fillStyle = '#7f1d1d';
+              ctx.font = 'bold 14px Arial';
+              ctx.fillText('⬆ Altura Máxima', xMax - 50, yMax - 15);
+            }
+            
+            if (y >= yOffset + canvasHeight - 50 || x > canvas.width || t > p.tiempoMax) shouldContinue = false;
+            
+          } else if (simType === 'circular') {
+            const centerX = canvas.width / 2;
+            const centerY = yOffset + canvasHeight / 2;
+            const radius = p.radio;
+            const theta = p.omega * t;
+            
+            x = centerX + radius * Math.cos(theta);
+            y = centerY + radius * Math.sin(theta);
+            
+            vx = -p.omega * radius * Math.sin(theta);
+            vy = p.omega * radius * Math.cos(theta);
+            
+            ctx.strokeStyle = '#93c5fd';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
+            ctx.stroke();
+            
+            ctx.strokeStyle = '#d1d5db';
+            ctx.lineWidth = 1;
+            ctx.setLineDash([3, 3]);
+            ctx.beginPath();
+            ctx.moveTo(centerX, centerY);
+            ctx.lineTo(x, y);
+            ctx.stroke();
+            ctx.setLineDash([]);
+            
+            ctx.fillStyle = '#ef4444';
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, 6, 0, 2 * Math.PI);
+            ctx.fill();
+            
+            if (t > p.tiempoMax) shouldContinue = false;
+          }
+
+          // Trayectoria recorrida
+          traj.current.push({ x, y });
           
-        } else if (simType === 'circular') {
-          const centerX = canvas.width / 2;
-          const centerY = canvas.height / 2;
-          const radius = 120;
-          const theta = params.omega * t;
-          
-          x = centerX + radius * Math.cos(theta);
-          y = centerY + radius * Math.sin(theta);
-          
-          ctx.strokeStyle = '#93c5fd';
-          ctx.lineWidth = 2;
+          if (traj.current.length > 1) {
+            ctx.strokeStyle = color === '#3b82f6' ? '#fbbf24' : '#ec4899';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            traj.current.forEach((point, i) => {
+              if (i === 0) ctx.moveTo(point.x, point.y);
+              else ctx.lineTo(point.x, point.y);
+            });
+            ctx.stroke();
+          }
+
+          // Vector velocidad
+          if (vx !== 0 || vy !== 0) {
+            const scale = 3;
+            ctx.strokeStyle = '#10b981';
+            ctx.fillStyle = '#10b981';
+            ctx.lineWidth = 3;
+            
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+            ctx.lineTo(x + vx * scale, y - vy * scale);
+            ctx.stroke();
+            
+            const arrowAngle = Math.atan2(-vy, vx);
+            const arrowSize = 10;
+            ctx.beginPath();
+            ctx.moveTo(x + vx * scale, y - vy * scale);
+            ctx.lineTo(
+              x + vx * scale - arrowSize * Math.cos(arrowAngle - Math.PI / 6),
+              y - vy * scale + arrowSize * Math.sin(arrowAngle - Math.PI / 6)
+            );
+            ctx.lineTo(
+              x + vx * scale - arrowSize * Math.cos(arrowAngle + Math.PI / 6),
+              y - vy * scale + arrowSize * Math.sin(arrowAngle + Math.PI / 6)
+            );
+            ctx.closePath();
+            ctx.fill();
+          }
+
+          // Objeto
+          ctx.fillStyle = color;
+          ctx.shadowColor = color;
+          ctx.shadowBlur = 20;
           ctx.beginPath();
-          ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
-          ctx.stroke();
-          
-          ctx.strokeStyle = '#d1d5db';
-          ctx.lineWidth = 1;
-          ctx.beginPath();
-          ctx.moveTo(centerX, centerY);
-          ctx.lineTo(x, y);
-          ctx.stroke();
-          
-          ctx.fillStyle = '#ef4444';
-          ctx.beginPath();
-          ctx.arc(centerX, centerY, 4, 0, 2 * Math.PI);
+          ctx.arc(x, y, 14, 0, 2 * Math.PI);
           ctx.fill();
+          ctx.shadowBlur = 0;
           
-          if (t > 15) shouldContinue = false;
+          return { x, y, vx, vy, shouldContinue };
+        };
+
+        const result1 = drawSimulation(params, 0, trajectoryRef, '#3b82f6');
+        let result2 = null;
+        
+        if (compareMode && simType !== 'circular') {
+          ctx.strokeStyle = '#1f2937';
+          ctx.lineWidth = 4;
+          ctx.beginPath();
+          ctx.moveTo(0, canvas.height / 2);
+          ctx.lineTo(canvas.width, canvas.height / 2);
+          ctx.stroke();
+          
+          result2 = drawSimulation(params2, canvas.height / 2, trajectoryRef2, '#ec4899');
         }
 
-        ctx.fillStyle = '#3b82f6';
-        ctx.shadowColor = '#3b82f6';
-        ctx.shadowBlur = 10;
-        ctx.beginPath();
-        ctx.arc(x, y, 10, 0, 2 * Math.PI);
-        ctx.fill();
-        ctx.shadowBlur = 0;
-        
-        ctx.fillStyle = '#1f2937';
-        ctx.font = '14px Arial';
-        ctx.fillText('Tiempo: ' + t.toFixed(2) + ' s', 10, 20);
-
+        const t = timeRef.current;
         timeRef.current += 0.05;
+
+        // Actualizar datos de gráficas
+        const dist1 = simType === 'mru' ? params.v0 * t : 
+                      simType === 'mrua' ? params.v0 * t + 0.5 * params.a * t * t :
+                      simType === 'parabolico' ? result1.vx * t : 0;
+        const vel1 = simType === 'mru' ? params.v0 :
+                     simType === 'mrua' ? params.v0 + params.a * t :
+                     Math.sqrt(result1.vx * result1.vx + result1.vy * result1.vy);
+        const acel1 = simType === 'mru' ? 0 :
+                      simType === 'mrua' ? params.a :
+                      simType === 'parabolico' ? 9.81 : 0;
+
+        setGraphData(prev => [...prev, {
+          tiempo: parseFloat(t.toFixed(2)),
+          posicion: parseFloat(dist1.toFixed(2)),
+          velocidad: parseFloat(vel1.toFixed(2)),
+          aceleracion: parseFloat(acel1.toFixed(2))
+        }]);
+
+        const shouldContinue = compareMode ? (result1.shouldContinue || (result2 && result2.shouldContinue)) : result1.shouldContinue;
 
         if (shouldContinue) {
           animationRef.current = requestAnimationFrame(animate);
@@ -6269,65 +8110,395 @@ function CinematicaSimulation() {
         cancelAnimationFrame(animationRef.current);
       }
     };
-  }, [isRunning, simType, params]);
+  }, [isRunning, simType, params, params2, compareMode, showComponents]);
+
+  const resetSimulation = () => {
+    setIsRunning(false);
+    timeRef.current = 0;
+    trajectoryRef.current = [];
+    trajectoryRef2.current = [];
+    setGraphData([]);
+  };
 
   return (
-    <div className="p-8 max-w-6xl mx-auto">
-      <h2 className="text-3xl font-bold text-gray-800 mb-6">Simulación de Cinemática</h2>
-
-      <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6">
-        <p className="text-sm text-gray-700">Visualiza diferentes tipos de movimiento ajustando los parámetros.</p>
-      </div>
-
-      <div className="mb-6">
-        <label className="block text-sm font-semibold text-gray-700 mb-2">Tipo de Simulación</label>
-        <select value={simType} onChange={(e) => { setSimType(e.target.value); setIsRunning(false); }} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
-          <option value="mru">Movimiento Rectilíneo Uniforme (MRU)</option>
-          <option value="mrua">Movimiento Rectilíneo Uniformemente Acelerado (MRUA)</option>
-          <option value="parabolico">Movimiento Parabólico</option>
-          <option value="circular">Movimiento Circular Uniforme</option>
-        </select>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        {(simType === 'mru' || simType === 'mrua' || simType === 'parabolico') && (
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Velocidad inicial: {params.v0} m/s</label>
-            <input type="range" min="5" max="40" value={params.v0} onChange={(e) => setParams({...params, v0: Number(e.target.value)})} className="w-full" disabled={isRunning} />
-          </div>
-        )}
-        {simType === 'mrua' && (
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Aceleración: {params.a} m/s²</label>
-            <input type="range" min="1" max="10" value={params.a} onChange={(e) => setParams({...params, a: Number(e.target.value)})} className="w-full" disabled={isRunning} />
-          </div>
-        )}
-        {simType === 'parabolico' && (
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Ángulo: {params.angle}°</label>
-            <input type="range" min="15" max="75" value={params.angle} onChange={(e) => setParams({...params, angle: Number(e.target.value)})} className="w-full" disabled={isRunning} />
-          </div>
-        )}
-        {simType === 'circular' && (
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Velocidad angular: {params.omega} rad/s</label>
-            <input type="range" min="0.5" max="3" step="0.1" value={params.omega} onChange={(e) => setParams({...params, omega: Number(e.target.value)})} className="w-full" disabled={isRunning} />
-          </div>
-        )}
-        <div className="flex items-end">
-          <button onClick={() => setIsRunning(!isRunning)} className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors">
-            {isRunning ? 'Detener' : 'Iniciar'}
+    <div className="p-6 max-w-[1900px] mx-auto bg-gradient-to-br from-blue-50 to-indigo-50 min-h-screen">
+      <div className="flex justify-between items-center mb-4">
+        <div>
+          <h2 className="text-4xl font-bold text-gray-800 mb-1">Simulación de Cinemática</h2>
+          <p className="text-gray-600">Gráficas en tiempo real • Comparación • Análisis predictivo</p>
+        </div>
+        <div className="flex gap-2">
+          <button 
+            onClick={() => { setCompareMode(!compareMode); resetSimulation(); }}
+            className={`px-4 py-2 rounded-lg font-semibold transition-all ${
+              compareMode ? 'bg-purple-600 text-white shadow-lg' : 'bg-white border-2 border-purple-600 text-purple-600'
+            }`}
+          >
+            {compareMode ? '✓ Comparando' : '⚖️ Comparar'}
+          </button>
+          <button 
+            onClick={() => { setShowProblem(!showProblem); setShowSolution(false); }}
+            className="px-4 py-2 bg-orange-500 text-white rounded-lg font-semibold hover:bg-orange-600 transition-all"
+          >
+            {showProblem ? 'Ocultar' : '📝 Problema'}
           </button>
         </div>
       </div>
 
-      <div className="bg-white border-2 border-gray-300 rounded-lg overflow-hidden">
-        <canvas ref={canvasRef} width={800} height={400} className="w-full" />
+      {showProblem && (
+        <div className="bg-orange-50 border-l-4 border-orange-500 p-5 mb-4 rounded-lg shadow-md">
+          <div className="flex justify-between items-start mb-3">
+            <h3 className="font-bold text-orange-800 text-lg">📚 Problema {problemaActual + 1} de 3:</h3>
+            <div className="flex gap-2">
+              <button 
+                onClick={() => setProblemaActual((problemaActual - 1 + 3) % 3)}
+                className="bg-orange-400 text-white px-3 py-1 rounded-lg text-sm font-semibold hover:bg-orange-500"
+              >
+                ◀ Anterior
+              </button>
+              <button 
+                onClick={() => setProblemaActual((problemaActual + 1) % 3)}
+                className="bg-orange-400 text-white px-3 py-1 rounded-lg text-sm font-semibold hover:bg-orange-500"
+              >
+                Siguiente ▶
+              </button>
+            </div>
+          </div>
+          <p className="text-gray-800 mb-3 font-medium">{problemas[simType][problemaActual].enunciado}</p>
+          <div className="flex gap-2">
+            <button 
+              onClick={() => setShowSolution(!showSolution)}
+              className="bg-orange-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-orange-700"
+            >
+              {showSolution ? '🔒 Ocultar Solución' : '💡 Ver Solución'}
+            </button>
+            <button 
+              onClick={() => setIsRunning(true)}
+              className="bg-blue-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-blue-700"
+            >
+              ▶ Simular
+            </button>
+          </div>
+          {showSolution && (
+            <div className="mt-4 bg-white p-4 rounded-lg border-2 border-orange-300">
+              <h4 className="font-bold text-gray-700 mb-2">✅ Solución:</h4>
+              <pre className="text-gray-800 font-mono text-sm whitespace-pre-wrap">{problemas[simType][problemaActual].solucion}</pre>
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 xl:grid-cols-5 gap-4">
+        {/* Panel de controles */}
+        <div className="xl:col-span-1 space-y-4">
+          <div className="bg-white p-4 rounded-lg shadow-md">
+            <label className="block text-sm font-bold text-gray-700 mb-2">Tipo de Movimiento</label>
+            <select 
+              value={simType} 
+              onChange={(e) => { setSimType(e.target.value); resetSimulation(); setProblemaActual(0); }} 
+              className="w-full p-2 border-2 border-gray-300 rounded-lg"
+            >
+              <option value="mru">MRU</option>
+              <option value="mrua">MRUA</option>
+              <option value="parabolico">Parabólico</option>
+              <option value="circular">Circular</option>
+            </select>
+          </div>
+
+          <div className="bg-white p-4 rounded-lg shadow-md border-l-4 border-blue-500">
+            <h3 className="font-bold text-blue-700 mb-3">🔵 Objeto 1</h3>
+            
+            {(simType === 'mru' || simType === 'mrua' || simType === 'parabolico') && (
+              <div className="mb-3">
+                <label className="block text-xs font-medium text-gray-700 mb-1">Velocidad inicial (m/s)</label>
+                <input 
+                  type="number" 
+                  value={params.v0} 
+                  onChange={(e) => setParams({...params, v0: Number(e.target.value)})} 
+                  className="w-full p-2 border-2 border-gray-300 rounded-lg text-sm" 
+                  disabled={isRunning} 
+                />
+              </div>
+            )}
+            
+            {simType === 'mrua' && (
+              <div className="mb-3">
+                <label className="block text-xs font-medium text-gray-700 mb-1">Aceleración (m/s²)</label>
+                <input 
+                  type="number" 
+                  value={params.a} 
+                  onChange={(e) => setParams({...params, a: Number(e.target.value)})} 
+                  className="w-full p-2 border-2 border-gray-300 rounded-lg text-sm" 
+                  disabled={isRunning} 
+                />
+              </div>
+            )}
+            
+            {simType === 'parabolico' && (
+              <>
+                <div className="mb-3">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Ángulo (°)</label>
+                  <input 
+                    type="number" 
+                    value={params.angle} 
+                    onChange={(e) => setParams({...params, angle: Number(e.target.value)})} 
+                    className="w-full p-2 border-2 border-gray-300 rounded-lg text-sm" 
+                    disabled={isRunning} 
+                  />
+                </div>
+                <label className="flex items-center text-xs cursor-pointer">
+                  <input 
+                    type="checkbox" 
+                    checked={showComponents} 
+                    onChange={(e) => setShowComponents(e.target.checked)}
+                    className="mr-2"
+                  />
+                  <span>Mostrar componentes X-Y</span>
+                </label>
+              </>
+            )}
+            
+            {simType === 'circular' && (
+              <>
+                <div className="mb-3">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Radio (px)</label>
+                  <input 
+                    type="number" 
+                    value={params.radio} 
+                    onChange={(e) => setParams({...params, radio: Number(e.target.value)})} 
+                    className="w-full p-2 border-2 border-gray-300 rounded-lg text-sm" 
+                    disabled={isRunning} 
+                  />
+                </div>
+                <div className="mb-3">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Vel. angular (rad/s)</label>
+                  <input 
+                    type="number" 
+                    value={params.omega} 
+                    onChange={(e) => setParams({...params, omega: Number(e.target.value)})} 
+                    className="w-full p-2 border-2 border-gray-300 rounded-lg text-sm" 
+                    disabled={isRunning} 
+                  />
+                </div>
+              </>
+            )}
+
+            <div className="mb-3">
+              <label className="block text-xs font-medium text-gray-700 mb-1">Tiempo máx (s)</label>
+              <input 
+                type="number" 
+                value={params.tiempoMax} 
+                onChange={(e) => setParams({...params, tiempoMax: Number(e.target.value)})} 
+                className="w-full p-2 border-2 border-gray-300 rounded-lg text-sm" 
+                disabled={isRunning} 
+              />
+            </div>
+
+            {simType !== 'circular' && (
+              <>
+                <div className="mb-3">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Escala X</label>
+                  <input 
+                    type="number" 
+                    value={params.escalaX} 
+                    onChange={(e) => setParams({...params, escalaX: Number(e.target.value)})} 
+                    className="w-full p-2 border-2 border-gray-300 rounded-lg text-sm" 
+                    disabled={isRunning} 
+                  />
+                </div>
+                <div className="mb-3">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Escala Y</label>
+                  <input 
+                    type="number" 
+                    value={params.escalaY} 
+                    onChange={(e) => setParams({...params, escalaY: Number(e.target.value)})} 
+                    className="w-full p-2 border-2 border-gray-300 rounded-lg text-sm" 
+                    disabled={isRunning} 
+                  />
+                </div>
+              </>
+            )}
+          </div>
+
+          {compareMode && simType !== 'circular' && (
+            <div className="bg-white p-4 rounded-lg shadow-md border-l-4 border-pink-500">
+              <h3 className="font-bold text-pink-700 mb-3">🔴 Objeto 2</h3>
+              
+              <div className="mb-3">
+                <label className="block text-xs font-medium text-gray-700 mb-1">Velocidad inicial (m/s)</label>
+                <input 
+                  type="number" 
+                  value={params2.v0} 
+                  onChange={(e) => setParams2({...params2, v0: Number(e.target.value)})} 
+                  className="w-full p-2 border-2 border-gray-300 rounded-lg text-sm" 
+                  disabled={isRunning} 
+                />
+              </div>
+              
+              {simType === 'mrua' && (
+                <div className="mb-3">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Aceleración (m/s²)</label>
+                  <input 
+                    type="number" 
+                    value={params2.a} 
+                    onChange={(e) => setParams2({...params2, a: Number(e.target.value)})} 
+                    className="w-full p-2 border-2 border-gray-300 rounded-lg text-sm" 
+                    disabled={isRunning} 
+                  />
+                </div>
+              )}
+              
+              {simType === 'parabolico' && (
+                <div className="mb-3">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Ángulo (°)</label>
+                  <input 
+                    type="number" 
+                    value={params2.angle} 
+                    onChange={(e) => setParams2({...params2, angle: Number(e.target.value)})} 
+                    className="w-full p-2 border-2 border-gray-300 rounded-lg text-sm" 
+                    disabled={isRunning} 
+                  />
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="bg-gradient-to-br from-green-50 to-blue-50 p-4 rounded-lg shadow-md border-2 border-green-400">
+            <h3 className="font-bold text-green-800 mb-2 text-sm">📊 Cálculos Predictivos</h3>
+            <div className="text-xs space-y-1 text-gray-700">
+              {simType === 'mru' && (
+                <>
+                  <p><strong>Ecuación:</strong> {predicciones.ecuacion}</p>
+                  <p><strong>Distancia total:</strong> {predicciones.distanciaTotal} m</p>
+                  <p><strong>Velocidad final:</strong> {predicciones.velocidadFinal} m/s</p>
+                  <p><strong>Tiempo para 100m:</strong> {predicciones.tiempoPara100m} s</p>
+                </>
+              )}
+              {simType === 'mrua' && (
+                <>
+                  <p><strong>Ecuación:</strong> {predicciones.ecuacion}</p>
+                  <p><strong>Distancia total:</strong> {predicciones.distanciaTotal} m</p>
+                  <p><strong>Velocidad final:</strong> {predicciones.velocidadFinal} m/s</p>
+                  <p><strong>Aceleración:</strong> {predicciones.aceleracion} m/s²</p>
+                </>
+              )}
+              {simType === 'parabolico' && (
+                <>
+                  <p><strong>Alcance máximo:</strong> {predicciones.alcanceMaximo} m</p>
+                  <p><strong>Altura máxima:</strong> {predicciones.alturaMaxima} m</p>
+                  <p><strong>Tiempo de vuelo:</strong> {predicciones.tiempoVuelo} s</p>
+                  <p><strong>Componente vₓ:</strong> {predicciones.componenteX} m/s</p>
+                  <p><strong>Componente vᵧ:</strong> {predicciones.componenteY} m/s</p>
+                </>
+              )}
+              {simType === 'circular' && (
+                <>
+                  <p><strong>Período T:</strong> {predicciones.periodo} s</p>
+                  <p><strong>Frecuencia f:</strong> {predicciones.frecuencia} Hz</p>
+                  <p><strong>Radio:</strong> {params.radio} px</p>
+                  <p><strong>Velocidad lineal:</strong> {predicciones.velocidadLineal} m/s</p>
+                  <p><strong>Acel. centrípeta:</strong> {predicciones.aceleracionCentripeta} m/s²</p>
+                </>
+              )}
+            </div>
+          </div>
+
+          <div className="flex gap-2">
+            <button 
+              onClick={() => setIsRunning(!isRunning)} 
+              className={`flex-1 py-3 rounded-lg font-bold transition-all ${
+                isRunning 
+                  ? 'bg-red-500 hover:bg-red-600 text-white shadow-lg' 
+                  : 'bg-blue-600 hover:bg-blue-700 text-white shadow-lg'
+              }`}
+            >
+              {isRunning ? '⏸ Pausar' : '▶ Iniciar'}
+            </button>
+            <button 
+              onClick={resetSimulation} 
+              className="flex-1 bg-gray-500 hover:bg-gray-600 text-white py-3 rounded-lg font-bold transition-all shadow-lg"
+            >
+              🔄 Reiniciar
+            </button>
+          </div>
+        </div>
+
+        {/* Canvas y Gráficas */}
+        <div className="xl:col-span-4 space-y-4">
+          <div className="bg-white border-4 border-gray-300 rounded-lg overflow-hidden shadow-lg">
+            <canvas ref={canvasRef} width={1100} height={compareMode ? 600 : 500} className="w-full" />
+          </div>
+
+          {/* Gráficas en tiempo real */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Gráfica Posición-Tiempo */}
+            <div className="bg-white p-4 rounded-lg shadow-md">
+              <h3 className="font-bold text-gray-700 mb-2 text-sm">📈 Posición vs Tiempo</h3>
+              <ResponsiveContainer width="100%" height={180}>
+                <LineChart data={graphData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis 
+                    dataKey="tiempo" 
+                    label={{ value: 't (s)', position: 'insideBottom', offset: -5 }}
+                    style={{ fontSize: '11px' }}
+                  />
+                  <YAxis 
+                    label={{ value: 'x (m)', angle: -90, position: 'insideLeft' }}
+                    style={{ fontSize: '11px' }}
+                  />
+                  <Tooltip />
+                  <Line type="monotone" dataKey="posicion" stroke="#3b82f6" strokeWidth={2} dot={false} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+
+            {/* Gráfica Velocidad-Tiempo */}
+            <div className="bg-white p-4 rounded-lg shadow-md">
+              <h3 className="font-bold text-gray-700 mb-2 text-sm">📈 Velocidad vs Tiempo</h3>
+              <ResponsiveContainer width="100%" height={180}>
+                <LineChart data={graphData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis 
+                    dataKey="tiempo" 
+                    label={{ value: 't (s)', position: 'insideBottom', offset: -5 }}
+                    style={{ fontSize: '11px' }}
+                  />
+                  <YAxis 
+                    label={{ value: 'v (m/s)', angle: -90, position: 'insideLeft' }}
+                    style={{ fontSize: '11px' }}
+                  />
+                  <Tooltip />
+                  <Line type="monotone" dataKey="velocidad" stroke="#10b981" strokeWidth={2} dot={false} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+
+            {/* Gráfica Aceleración-Tiempo */}
+            <div className="bg-white p-4 rounded-lg shadow-md">
+              <h3 className="font-bold text-gray-700 mb-2 text-sm">📈 Aceleración vs Tiempo</h3>
+              <ResponsiveContainer width="100%" height={180}>
+                <LineChart data={graphData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis 
+                    dataKey="tiempo" 
+                    label={{ value: 't (s)', position: 'insideBottom', offset: -5 }}
+                    style={{ fontSize: '11px' }}
+                  />
+                  <YAxis 
+                    label={{ value: 'a (m/s²)', angle: -90, position: 'insideLeft' }}
+                    style={{ fontSize: '11px' }}
+                  />
+                  <Tooltip />
+                  <Line type="monotone" dataKey="aceleracion" stroke="#ef4444" strokeWidth={2} dot={false} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
 }
-
 function DinamicaCalculador() {
   const [calcType, setCalcType] = useState('segunda_ley');
   const [inputs, setInputs] = useState({});
@@ -6978,16 +9149,683 @@ function TrabajoCalculator() {
   );
 }
 
+const simTypeNombresConsevacion = {
+  trabajo: 'Trabajo Mecánico',
+  energiaCinetica: 'Energía Cinética',
+  energiaPotencial: 'Energía Potencial (Gravit.)',
+  conservacionEnergia: 'Conservación de la Energía'
+};
+
+
 function TrabajoSimulacion() {
+  const canvasRef = useRef(null);
+  const [isRunning, setIsRunning] = useState(false);
+  const [simType, setSimType] = useState('conservacionEnergia'); // Iniciar en el más visual
+  const [compareMode, setCompareMode] = useState(false);
+  const [showProblem, setShowProblem] = useState(false);
+  const [showSolution, setShowSolution] = useState(false);
+  
+  const [params, setParams] = useState({ 
+    // Comunes
+    masa: 5, 
+    v0: 5, // Velocidad inicial
+    h0: 40, // Altura inicial
+    tiempoMax: 10,
+    escalaX: 10, // px por metro
+    escalaY: 8,  // px por metro
+    // Para trabajo
+    fuerza: 20, 
+    distancia: 30,
+    angulo: 0,
+    // Para K
+    velocidad: 15,
+    // Para U
+    altura: 40
+  });
+  
+  const [params2, setParams2] = useState({ 
+    masa: 10, 
+    v0: 2, 
+    h0: 50,
+    fuerza: 30, 
+    distancia: 20,
+    angulo: 30,
+    escalaX: 10,
+    escalaY: 8
+  });
+  
+  const [graphData, setGraphData] = useState([]);
+  const [problemaActual, setProblemaActual] = useState(0);
+  const animationRef = useRef(null);
+  const timeRef = useRef(0);
+  const trajectoryRef = useRef([]);
+  const trajectoryRef2 = useRef([]);
+
+  // --- CÁLCULOS Y PROBLEMAS ---
+  
+  const calcularPredicciones = (p) => {
+    if (simType === 'trabajo') {
+      const angleRad = (p.angulo * Math.PI) / 180;
+      const W = p.fuerza * p.distancia * Math.cos(angleRad);
+      const v0 = p.v0;
+      const W_neto = W; // Asumiendo que es la única fuerza
+      // Por Teorema W-Energía: W_neto = K_f - K_i
+      const K_i = 0.5 * p.masa * v0 * v0;
+      const K_f = K_i + W_neto;
+      const v_f = Math.sqrt((2 * K_f) / p.masa);
+      
+      return {
+        trabajoRealizado: W.toFixed(2),
+        energiaCineticaInicial: K_i.toFixed(2),
+        energiaCineticaFinal: K_f.toFixed(2),
+        velocidadFinal: v_f.toFixed(2)
+      };
+    } else if (simType === 'energiaCinetica') {
+      const K = 0.5 * p.masa * p.velocidad * p.velocidad;
+      return {
+        energiaCinetica: K.toFixed(2),
+      };
+    } else if (simType === 'energiaPotencial') {
+      const U = p.masa * G * p.altura;
+      return {
+        energiaPotencial: U.toFixed(2),
+      };
+    } else if (simType === 'conservacionEnergia') {
+      // Predicción en h=0 (caída libre)
+      const K_i = 0.5 * p.masa * p.v0 * p.v0;
+      const U_i = p.masa * G * p.h0;
+      const E_Total = K_i + U_i;
+      // En h=0, U_f = 0, E_Total = K_f
+      const K_f = E_Total;
+      const v_f = Math.sqrt((2 * K_f) / p.masa);
+      const t_vuelo = (Math.sqrt(p.v0*p.v0 + 2*G*p.h0) - p.v0) / G;
+      
+      return {
+        energiaTotal: E_Total.toFixed(2),
+        energiaPotencialInicial: U_i.toFixed(2),
+        energiaCineticaInicial: K_i.toFixed(2),
+        velocidadImpacto: v_f.toFixed(2),
+        tiempoCaida: t_vuelo.toFixed(2)
+      };
+    }
+    return {};
+  };
+
+  // Los cálculos y problemas se regeneran si los params cambian
+  const predicciones = calcularPredicciones(params);
+
+  const problemas = {
+    trabajo: [
+      {
+        enunciado: `Un bloque de ${params.masa} kg es empujado ${params.distancia} m por una fuerza de ${params.fuerza} N con un ángulo de ${params.angulo}°. ¿Cuánto trabajo se realizó?`,
+        solucion: `Usando W = F · d · cos(θ)\nW = ${params.fuerza} × ${params.distancia} × cos(${params.angulo}°) = ${predicciones.trabajoRealizado} Joules`
+      },
+      {
+        enunciado: `Si el bloque del problema anterior partió de ${params.v0} m/s, ¿cuál es su energía cinética final?`,
+        solucion: `K_i = ½·m·v₀² = ½·${params.masa}·${params.v0}² = ${predicciones.energiaCineticaInicial} J\nW_neto = ΔK = K_f - K_i\nK_f = W_neto + K_i = ${predicciones.trabajoRealizado} + ${predicciones.energiaCineticaInicial} = ${predicciones.energiaCineticaFinal} J`
+      },
+      {
+        enunciado: `¿Cuál es la velocidad final del bloque, asumiendo que el trabajo calculado fue el trabajo neto?`,
+        solucion: `K_f = ½·m·v_f²\nv_f = √(2·K_f / m) = √(2·${predicciones.energiaCineticaFinal} / ${params.masa}) = ${predicciones.velocidadFinal} m/s`
+      }
+    ],
+    energiaCinetica: [
+      {
+        enunciado: `Un objeto de ${params.masa} kg se mueve a ${params.velocidad} m/s. ¿Cuál es su energía cinética?`,
+        solucion: `Usando K = ½·m·v²\nK = 0.5 × ${params.masa} × ${params.velocidad}² = ${predicciones.energiaCinetica} Joules`
+      },
+      {
+        enunciado: `Si se duplica la masa a ${params.masa * 2} kg (misma velocidad), ¿cuál es la nueva K?`,
+        solucion: `K = 0.5 × ${params.masa * 2} × ${params.velocidad}² = ${(0.5 * (params.masa * 2) * params.velocidad**2).toFixed(2)} J. (El doble)`
+      },
+      {
+        enunciado: `Si se duplica la velocidad a ${params.velocidad * 2} m/s (misma masa), ¿cuál es la nueva K?`,
+        solucion: `K = 0.5 × ${params.masa} × ${params.velocidad * 2}² = ${(0.5 * params.masa * (params.velocidad * 2)**2).toFixed(2)} J. (Cuatro veces más)`
+      }
+    ],
+    energiaPotencial: [
+      {
+        enunciado: `Un libro de ${params.masa} kg está en un estante a ${params.altura} m del suelo. ¿Cuál es su energía potencial gravitatoria?`,
+        solucion: `Usando U_g = m·g·h\nU_g = ${params.masa} × 9.81 × ${params.altura} = ${predicciones.energiaPotencial} Joules`
+      },
+      {
+        enunciado: `¿Cuánta energía potencial tiene un elevador de ${params.masa * 100} kg a ${params.altura} m de altura?`,
+        solucion: `U_g = ${params.masa * 100} × 9.81 × ${params.altura} = ${(params.masa * 100 * G * params.altura).toFixed(2)} J`
+      },
+      {
+        enunciado: `Si el libro (${params.masa} kg) se sube a un estante al doble de altura (${params.altura * 2} m), ¿cuál es su nueva U_g?`,
+        solucion: `U_g = ${params.masa} × 9.81 × ${params.altura * 2} = ${(params.masa * G * params.altura * 2).toFixed(2)} J. (El doble)`
+      }
+    ],
+    conservacionEnergia: [
+      {
+        enunciado: `Un objeto de ${params.masa} kg se deja caer desde ${params.h0} m (v₀=${params.v0} m/s). ¿Cuál es su energía mecánica total?`,
+        solucion: `E_Total = K_i + U_i\nK_i = ½·${params.masa}·${params.v0}² = ${predicciones.energiaCineticaInicial} J\nU_i = ${params.masa}·g·${params.h0} = ${predicciones.energiaPotencialInicial} J\nE_Total = ${predicciones.energiaCineticaInicial} + ${predicciones.energiaPotencialInicial} = ${predicciones.energiaTotal} J`
+      },
+      {
+        enunciado: `¿Con qué velocidad (en m/s) golpeará el suelo el objeto?`,
+        solucion: `En h=0, U_f = 0. E_Total = K_f = ${predicciones.energiaTotal} J\nv_f = √(2·K_f / m) = √(2·${predicciones.energiaTotal} / ${params.masa}) = ${predicciones.velocidadImpacto} m/s`
+      },
+      {
+        enunciado: `¿Cuánto tiempo tardará en caer?`,
+        solucion: `Usando h = v₀t + ½gt² (o de v_f = v₀ + gt)\nt = (v_f - v₀) / g = (${predicciones.velocidadImpacto} - ${params.v0}) / 9.81 = ${predicciones.tiempoCaida} s`
+      }
+    ]
+  };
+
+  // --- EFECTO DE ANIMACIÓN ---
+  
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    
+    // Limpia el canvas si no está corriendo
+    if (!isRunning) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        // Dibujar estado inicial estático
+        if (simType === 'energiaPotencial') {
+            const yOffset = 0;
+            const canvasHeight = canvas.height;
+            const y = yOffset + canvasHeight - 50 - params.altura * params.escalaY;
+            // Dibuja suelo
+            ctx.strokeStyle = '#1f2937'; ctx.lineWidth = 3; ctx.beginPath();
+            ctx.moveTo(0, yOffset + canvasHeight - 50); ctx.lineTo(canvas.width, yOffset + canvasHeight - 50); ctx.stroke();
+            // Dibuja objeto
+            ctx.fillStyle = '#3b82f6'; ctx.beginPath(); ctx.arc(100, y, 14, 0, 2 * Math.PI); ctx.fill();
+        }
+        return;
+    }
+
+    if (isRunning) {
+      timeRef.current = 0;
+      trajectoryRef.current = [];
+      trajectoryRef2.current = [];
+      setGraphData([]);
+      
+      const animate = () => {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        const canvasHeight = compareMode ? canvas.height / 2 : canvas.height;
+        
+        const drawSimulation = (p, yOffset, traj, color) => {
+          // --- Dibujar Cuadrícula y Suelo ---
+          ctx.strokeStyle = '#e5e7eb';
+          ctx.lineWidth = 1;
+          for (let i = 0; i < canvas.width; i += 50) { // Vertical
+            ctx.beginPath(); ctx.moveTo(i, yOffset); ctx.lineTo(i, yOffset + canvasHeight); ctx.stroke();
+            if (i > 50) {
+              ctx.fillStyle = '#6b7280'; ctx.font = 'bold 11px Arial';
+              const metros = ((i - 50) / p.escalaX).toFixed(0);
+              ctx.fillText(metros + 'm', i - 8, yOffset + canvasHeight - 10);
+            }
+          }
+          const sueloY = yOffset + canvasHeight - 50;
+          ctx.strokeStyle = '#1f2937'; ctx.lineWidth = 3; ctx.beginPath(); // Suelo
+          ctx.moveTo(0, sueloY); ctx.lineTo(canvas.width, sueloY); ctx.stroke();
+          
+          // --- Lógica de Simulación ---
+          const t = timeRef.current;
+          let x_canvas = 0, y_canvas = 0;
+          let K = 0, U = 0, E_Total = 0;
+          let shouldContinue = true;
+
+          if (simType === 'trabajo') {
+            const angleRad = (p.angulo * Math.PI) / 180;
+            const Fx = p.fuerza * Math.cos(angleRad);
+            const ax = Fx / p.masa; // a = F/m
+            const x_real = p.v0 * t + 0.5 * ax * t * t;
+            const v = p.v0 + ax * t;
+            
+            x_canvas = 50 + x_real * p.escalaX;
+            y_canvas = sueloY - 14; // Sobre el suelo
+            
+            K = 0.5 * p.masa * v * v;
+            U = 0; // En el suelo
+            E_Total = K; // El trabajo se convierte en K
+            
+            // Dibujar vector de fuerza
+            ctx.strokeStyle = '#ef4444'; ctx.lineWidth = 3; ctx.beginPath();
+            ctx.moveTo(x_canvas, y_canvas);
+            ctx.lineTo(x_canvas + 40 * Math.cos(angleRad), y_canvas - 40 * Math.sin(angleRad));
+            ctx.stroke();
+            
+            if (x_real >= p.distancia || t > p.tiempoMax) shouldContinue = false;
+
+          } else if (simType === 'energiaCinetica') {
+            const x_real = p.velocidad * t;
+            x_canvas = 50 + x_real * p.escalaX;
+            y_canvas = sueloY - 14;
+            
+            K = 0.5 * p.masa * p.velocidad * p.velocidad;
+            U = 0;
+            E_Total = K;
+            
+            if (x_canvas > canvas.width || t > p.tiempoMax) shouldContinue = false;
+
+          } else if (simType === 'energiaPotencial') {
+            const x_real = 0;
+            const y_real = p.altura;
+            x_canvas = 100; // Estático
+            y_canvas = sueloY - y_real * p.escalaY;
+            
+            K = 0;
+            U = p.masa * G * y_real;
+            E_Total = U;
+            
+            if (t > p.tiempoMax) shouldContinue = false; // Simulación estática, detener por tiempo
+
+          } else if (simType === 'conservacionEnergia') { // Caída libre
+            const v_y = p.v0 + G * t;
+            const y_real = p.h0 - (p.v0 * t + 0.5 * G * t * t);
+            
+            x_canvas = 100; // Caída vertical
+            y_canvas = sueloY - y_real * p.escalaY;
+            
+            if (y_real > 0) {
+              K = 0.5 * p.masa * v_y * v_y;
+              U = p.masa * G * y_real;
+              E_Total = K + U;
+            } else {
+              // Golpeó el suelo
+              K = 0.5 * p.masa * (p.v0 + G * (t-0.05))**2; // K justo antes
+              U = 0;
+              E_Total = K + U;
+              y_canvas = sueloY - 14; // Fijar al suelo
+              shouldContinue = false;
+            }
+            
+            if (t > p.tiempoMax) shouldContinue = false;
+          }
+
+          // --- Dibujar Objeto y Trayectoria ---
+          traj.current.push({ x: x_canvas, y: y_canvas, K, U, E_Total });
+          
+          if (traj.current.length > 1) {
+            ctx.strokeStyle = color === '#3b82f6' ? '#fbbf24' : '#ec4899';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            traj.current.forEach((point, i) => {
+              if (i === 0) ctx.moveTo(point.x, point.y);
+              else ctx.lineTo(point.x, point.y);
+            });
+            ctx.stroke();
+          }
+
+          // Objeto
+          ctx.fillStyle = color;
+          ctx.shadowColor = color;
+          ctx.shadowBlur = 20;
+          ctx.beginPath();
+          ctx.arc(x_canvas, y_canvas, 14, 0, 2 * Math.PI);
+          ctx.fill();
+          ctx.shadowBlur = 0;
+          
+          // Devolver última data para gráficas
+          return { K, U, E_Total, shouldContinue };
+        };
+
+        // --- Bucle de Animación ---
+        
+        const result1 = drawSimulation(params, 0, trajectoryRef, '#3b82f6');
+        let result2 = null;
+        
+        const canCompare = simType === 'trabajo' || simType === 'conservacionEnergia';
+        
+        if (compareMode && canCompare) {
+          // Línea divisoria
+          ctx.strokeStyle = '#1f2937'; ctx.lineWidth = 4; ctx.beginPath();
+          ctx.moveTo(0, canvas.height / 2); ctx.lineTo(canvas.width, canvas.height / 2); ctx.stroke();
+          
+          result2 = drawSimulation(params2, canvas.height / 2, trajectoryRef2, '#ec4899');
+        }
+
+        const t = timeRef.current;
+        timeRef.current += 0.05; // Incremento de tiempo
+
+        // Actualizar datos de gráficas (solo del Objeto 1)
+        setGraphData(prev => [...prev, {
+          tiempo: parseFloat(t.toFixed(2)),
+          energiaCinetica: parseFloat(result1.K.toFixed(2)),
+          energiaPotencial: parseFloat(result1.U.toFixed(2)),
+          energiaTotal: parseFloat(result1.E_Total.toFixed(2))
+        }]);
+
+        // Decide si continuar la animación
+        let shouldContinue = result1.shouldContinue;
+        if (compareMode && canCompare) {
+            shouldContinue = result1.shouldContinue || (result2 && result2.shouldContinue);
+        }
+
+        if (shouldContinue) {
+          animationRef.current = requestAnimationFrame(animate);
+        } else {
+          setIsRunning(false);
+        }
+      };
+
+      animate();
+    }
+
+    // Limpieza
+    return () => {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
+    };
+  }, [isRunning, simType, params, params2, compareMode]); // Dependencias del efecto
+
+  // Resetea la simulación
+  const resetSimulation = () => {
+    setIsRunning(false);
+    timeRef.current = 0;
+    trajectoryRef.current = [];
+    trajectoryRef2.current = [];
+    setGraphData([]);
+  };
+  
+  // --- Componente de Gráfica ---
+  const Grafica = ({ dataKey, color, unit }) => (
+    <div className="bg-white p-4 rounded-lg shadow-md h-64">
+      <h4 className="font-bold text-gray-700 text-sm mb-2 capitalize">{dataKey.replace(/([A-Z])/g, ' $1')} vs. Tiempo</h4>
+      <ResponsiveContainer width="100%" height="100%">
+        <LineChart data={graphData} margin={{ top: 5, right: 20, left: -5, bottom: 20 }}>
+          <CartesianGrid strokeDasharray="3 3" />
+          <XAxis 
+            dataKey="tiempo" 
+            label={{ value: "Tiempo (s)", position: 'insideBottom', offset: -10 }} 
+            tick={{ fontSize: 10 }}
+          />
+          <YAxis 
+            label={{ value: unit, angle: -90, position: 'insideLeft', offset: 5 }}
+            tick={{ fontSize: 10 }}
+            domain={['auto', 'auto']}
+          />
+          <Tooltip 
+            formatter={(value) => [`${value} ${unit}`, dataKey.replace(/([A-Z])/g, ' $1')]}
+            labelFormatter={(label) => `Tiempo: ${label} s`}
+          />
+          <Legend verticalAlign="top" height={36}/>
+          <Line 
+            type="monotone" 
+            dataKey={dataKey} 
+            stroke={color} 
+            strokeWidth={2} 
+            dot={false} 
+            isAnimationActive={false}
+          />
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+  );
+
+  // --- Inputs Dinámicos ---
+  const renderInputs = (p, setP) => {
+    const isP1 = p === params; // Para saber si es el objeto 1 o 2
+
+    return (
+      <>
+        <div className="mb-3">
+          <label className="block text-xs font-medium text-gray-700 mb-1">Masa (kg)</label>
+          <input 
+            type="number" 
+            value={p.masa} 
+            onChange={(e) => setP({...p, masa: Number(e.target.value)})} 
+            className="w-full p-2 border-2 border-gray-300 rounded-lg text-sm" 
+            disabled={isRunning} 
+          />
+        </div>
+
+        {simType === 'trabajo' && (
+          <>
+            <div className="mb-3">
+              <label className="block text-xs font-medium text-gray-700 mb-1">Fuerza (N)</label>
+              <input type="number" value={p.fuerza} onChange={(e) => setP({...p, fuerza: Number(e.target.value)})} className="w-full p-2 border-2 border-gray-300 rounded-lg text-sm" disabled={isRunning} />
+            </div>
+            <div className="mb-3">
+              <label className="block text-xs font-medium text-gray-700 mb-1">Distancia (m)</label>
+              <input type="number" value={p.distancia} onChange={(e) => setP({...p, distancia: Number(e.target.value)})} className="w-full p-2 border-2 border-gray-300 rounded-lg text-sm" disabled={isRunning} />
+            </div>
+            <div className="mb-3">
+              <label className="block text-xs font-medium text-gray-700 mb-1">Ángulo (°)</label>
+              <input type="number" value={p.angulo} onChange={(e) => setP({...p, angulo: Number(e.target.value)})} className="w-full p-2 border-2 border-gray-300 rounded-lg text-sm" disabled={isRunning} />
+            </div>
+            <div className="mb-3">
+              <label className="block text-xs font-medium text-gray-700 mb-1">Vel. Inicial (m/s)</label>
+              <input type="number" value={p.v0} onChange={(e) => setP({...p, v0: Number(e.target.value)})} className="w-full p-2 border-2 border-gray-300 rounded-lg text-sm" disabled={isRunning} />
+            </div>
+          </>
+        )}
+
+        {simType === 'energiaCinetica' && isP1 && ( // No comparar en este modo
+          <div className="mb-3">
+            <label className="block text-xs font-medium text-gray-700 mb-1">Velocidad (m/s)</label>
+            <input type="number" value={p.velocidad} onChange={(e) => setP({...p, velocidad: Number(e.target.value)})} className="w-full p-2 border-2 border-gray-300 rounded-lg text-sm" disabled={isRunning} />
+          </div>
+        )}
+        
+        {simType === 'energiaPotencial' && isP1 && ( // No comparar en este modo
+          <div className="mb-3">
+            <label className="block text-xs font-medium text-gray-700 mb-1">Altura (m)</label>
+            <input type="number" value={p.altura} onChange={(e) => setP({...p, altura: Number(e.target.value)})} className="w-full p-2 border-2 border-gray-300 rounded-lg text-sm" disabled={isRunning} />
+          </div>
+        )}
+
+        {simType === 'conservacionEnergia' && (
+          <>
+            <div className="mb-3">
+              <label className="block text-xs font-medium text-gray-700 mb-1">Altura Inicial (m)</label>
+              <input type="number" value={p.h0} onChange={(e) => setP({...p, h0: Number(e.target.value)})} className="w-full p-2 border-2 border-gray-300 rounded-lg text-sm" disabled={isRunning} />
+            </div>
+            <div className="mb-3">
+              <label className="block text-xs font-medium text-gray-700 mb-1">Vel. Inicial (m/s)</label>
+              <input type="number" value={p.v0} onChange={(e) => setP({...p, v0: Number(e.target.value)})} className="w-full p-2 border-2 border-gray-300 rounded-lg text-sm" disabled={isRunning} />
+            </div>
+          </>
+        )}
+
+        {isP1 && (simType === 'trabajo' || simType === 'conservacionEnergia') && (
+          <>
+            <div className="mb-3">
+              <label className="block text-xs font-medium text-gray-700 mb-1">Escala X (px/m)</label>
+              <input type="number" value={p.escalaX} onChange={(e) => setP({...p, escalaX: Number(e.target.value)})} className="w-full p-2 border-2 border-gray-300 rounded-lg text-sm" disabled={isRunning} />
+            </div>
+            <div className="mb-3">
+              <label className="block text-xs font-medium text-gray-700 mb-1">Escala Y (px/m)</label>
+              <input type="number" value={p.escalaY} onChange={(e) => setP({...p, escalaY: Number(e.target.value)})} className="w-full p-2 border-2 border-gray-300 rounded-lg text-sm" disabled={isRunning} />
+            </div>
+            <div className="mb-3">
+              <label className="block text-xs font-medium text-gray-700 mb-1">Tiempo máx (s)</label>
+              <input type="number" value={p.tiempoMax} onChange={(e) => setP({...p, tiempoMax: Number(e.target.value)})} className="w-full p-2 border-2 border-gray-300 rounded-lg text-sm" disabled={isRunning} />
+            </div>
+          </>
+        )}
+      </>
+    );
+  };
+
+  const canCompare = simType === 'trabajo' || simType === 'conservacionEnergia';
+
+  // --- RENDER ---
   return (
-    <div className="p-8">
-      <h2 className="text-3xl font-bold text-gray-800 mb-6">Simulación de Trabajo y Energía</h2>
-      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6">
-        <p className="text-yellow-800">Simulación en desarrollo</p>
+    <div className="p-6 max-w-[1900px] mx-auto bg-gradient-to-br from-blue-50 to-indigo-50 min-h-screen">
+      <div className="flex justify-between items-center mb-4">
+        <div>
+          <h2 className="text-4xl font-bold text-gray-800 mb-1">Simulación de Trabajo y Energía</h2>
+          <p className="text-gray-600">Gráficas en tiempo real • Comparación • Análisis predictivo</p>
+        </div>
+        <div className="flex gap-2">
+          <button 
+            onClick={() => { setCompareMode(!compareMode); resetSimulation(); }}
+            className={`px-4 py-2 rounded-lg font-semibold transition-all ${
+              compareMode ? 'bg-purple-600 text-white shadow-lg' : 'bg-white border-2 border-purple-600 text-purple-600'
+            } ${canCompare ? '' : 'opacity-50 cursor-not-allowed'}`}
+            disabled={!canCompare}
+            title={canCompare ? 'Comparar dos escenarios' : 'Comparación no disponible para este modo'}
+          >
+            {compareMode ? '✓ Comparando' : '⚖️ Comparar'}
+          </button>
+          <button 
+            onClick={() => { setShowProblem(!showProblem); setShowSolution(false); }}
+            className="px-4 py-2 bg-orange-500 text-white rounded-lg font-semibold hover:bg-orange-600 transition-all"
+          >
+            {showProblem ? 'Ocultar' : '📝 Problema'}
+          </button>
+        </div>
+      </div>
+
+      {showProblem && (
+        <div className="bg-orange-50 border-l-4 border-orange-500 p-5 mb-4 rounded-lg shadow-md">
+          <div className="flex justify-between items-start mb-3">
+            <h3 className="font-bold text-orange-800 text-lg">📚 Problema {problemaActual + 1} de 3: {simTypeNombresConsevacion[simType]}</h3>
+            <div className="flex gap-2">
+              <button 
+                onClick={() => setProblemaActual((problemaActual - 1 + 3) % 3)}
+                className="bg-orange-400 text-white px-3 py-1 rounded-lg text-sm font-semibold hover:bg-orange-500"
+              >
+                ◀ Anterior
+              </button>
+              <button 
+                onClick={() => setProblemaActual((problemaActual + 1) % 3)}
+                className="bg-orange-400 text-white px-3 py-1 rounded-lg text-sm font-semibold hover:bg-orange-500"
+              >
+                Siguiente ▶
+              </button>
+            </div>
+          </div>
+          <p className="text-gray-800 mb-3 font-medium">{problemas[simType][problemaActual].enunciado}</p>
+          <div className="flex gap-2">
+            <button 
+              onClick={() => setShowSolution(!showSolution)}
+              className="bg-orange-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-orange-700"
+            >
+              {showSolution ? '🔒 Ocultar Solución' : '💡 Ver Solución'}
+            </button>
+            <button 
+              onClick={() => setIsRunning(true)}
+              className="bg-blue-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-blue-700"
+            >
+              ▶ Simular Problema
+            </button>
+          </div>
+          {showSolution && (
+            <div className="mt-4 bg-white p-4 rounded-lg border-2 border-orange-300">
+              <h4 className="font-bold text-gray-700 mb-2">✅ Solución:</h4>
+              <pre className="text-gray-800 font-mono text-sm whitespace-pre-wrap">{problemas[simType][problemaActual].solucion}</pre>
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 xl:grid-cols-5 gap-4">
+        {/* Panel de controles */}
+        <div className="xl:col-span-1 space-y-4">
+          <div className="bg-white p-4 rounded-lg shadow-md">
+            <label className="block text-sm font-bold text-gray-700 mb-2">Tema de Simulación</label>
+            <select 
+              value={simType} 
+              onChange={(e) => { setSimType(e.target.value); resetSimulation(); setProblemaActual(0); setCompareMode(false); }} 
+              className="w-full p-2 border-2 border-gray-300 rounded-lg"
+            >
+              {Object.keys(simTypeNombresConsevacion).map(key => (
+                <option key={key} value={key}>{simTypeNombresConsevacion[key]}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="bg-white p-4 rounded-lg shadow-md border-l-4 border-blue-500">
+            <h3 className="font-bold text-blue-700 mb-3">🔵 Objeto 1</h3>
+            {renderInputs(params, setParams)}
+          </div>
+
+          {compareMode && canCompare && (
+            <div className="bg-white p-4 rounded-lg shadow-md border-l-4 border-pink-500">
+              <h3 className="font-bold text-pink-700 mb-3">🔴 Objeto 2</h3>
+              {renderInputs(params2, setParams2)}
+            </div>
+          )}
+
+          <div className="bg-gradient-to-br from-green-50 to-blue-50 p-4 rounded-lg shadow-md border-2 border-green-400">
+            <h3 className="font-bold text-green-800 mb-2 text-sm">📊 Cálculos Predictivos (Objeto 1)</h3>
+            <div className="text-xs space-y-1 text-gray-700">
+              {simType === 'trabajo' && (
+                <>
+                  <p><strong>Trabajo:</strong> {predicciones.trabajoRealizado} J</p>
+                  <p><strong>K Final:</strong> {predicciones.energiaCineticaFinal} J</p>
+                  <p><strong>V Final:</strong> {predicciones.velocidadFinal} m/s</p>
+                </>
+              )}
+              {simType === 'energiaCinetica' && (
+                <p><strong>Energía Cinética:</strong> {predicciones.energiaCinetica} J</p>
+              )}
+              {simType === 'energiaPotencial' && (
+                 <p><strong>Energía Potencial:</strong> {predicciones.energiaPotencial} J</p>
+              )}
+              {simType === 'conservacionEnergia' && (
+                <>
+                  <p><strong>E. Total:</strong> {predicciones.energiaTotal} J</p>
+                  <p><strong>V. Impacto:</strong> {predicciones.velocidadImpacto} m/s</p>
+                  <p><strong>T. Caída:</strong> {predicciones.tiempoCaida} s</p>
+                </>
+              )}
+            </div>
+          </div>
+
+          <div className="flex gap-2">
+            <button 
+              onClick={() => setIsRunning(!isRunning)} 
+              className={`flex-1 py-3 rounded-lg font-bold transition-all ${
+                isRunning 
+                  ? 'bg-red-500 hover:bg-red-600 text-white shadow-lg' 
+                  : 'bg-blue-600 hover:bg-blue-700 text-white shadow-lg'
+              }`}
+            >
+              {isRunning ? '⏸ Pausar' : '▶ Iniciar'}
+            </button>
+            <button 
+              onClick={resetSimulation} 
+              className="flex-1 bg-gray-500 hover:bg-gray-600 text-white py-3 rounded-lg font-bold transition-all shadow-lg"
+            >
+              🔄 Reiniciar
+            </button>
+          </div>
+        </div>
+
+        {/* Canvas y Gráficas */}
+        <div className="xl:col-span-4 space-y-4">
+          <div className="bg-white border-4 border-gray-300 rounded-lg overflow-hidden shadow-lg">
+            <canvas ref={canvasRef} width={1100} height={compareMode && canCompare ? 600 : 500} className="w-full" />
+          </div>
+
+          {/* Gráficas en tiempo real */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            
+            <Grafica 
+              dataKey="energiaCinetica" 
+              color="#10b981" 
+              unit="Joules" 
+            />
+            
+            <Grafica 
+              dataKey="energiaPotencial" 
+              color="#3b82f6" 
+              unit="Joules" 
+            />
+            
+            <Grafica 
+              dataKey="energiaTotal" 
+              color="#ef4444" 
+              unit="Joules" 
+            />
+            
+          </div>
+        </div>
       </div>
     </div>
   );
 }
+
+
 function TemperaturaCalculator() {
   const [inputValue, setInputValue] = useState('');
   const [fromScale, setFromScale] = useState('C');
